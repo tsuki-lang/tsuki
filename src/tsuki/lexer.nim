@@ -7,7 +7,6 @@ import errors
 
 type
   TokenKind* = enum
-    # meta
     tkEof = "<end of file>"
 
     # literals
@@ -190,8 +189,11 @@ proc `$`*(t: Token): string =
 
 {.push inline.}
 
-proc hasMore(l: Lexer): bool =
+proc hasMore*(l: Lexer): bool =
   l.position < l.input.len
+
+proc atEnd*(l: Lexer): bool =
+  not l.hasMore
 
 proc get(l: Lexer): char =
   if l.hasMore: l.input[l.position]
@@ -339,6 +341,7 @@ proc next*(l: var Lexer): Token =
     l.error(leUnexpectedEof % $l.get)
   else: l.error(leUnexpectedChar % $l.get)
 
+  result.filename = l.filename
   result.lineInfo = l.storedLineInfo
 
 proc peek*(l: var Lexer): Token =
@@ -348,6 +351,24 @@ proc peek*(l: var Lexer): Token =
   result = l.next()
   l.peekCache = some((result, l.savePosition()))
   l.restorePosition(pi)
+
+proc expect*(l: var Lexer, kind: TokenKind, error: string): Token =
+  result = l.next()
+  if result.kind != kind:
+    l.error(result, error)
+
+proc peekOperator*(l: var Lexer, op: string): bool =
+  let token = l.next()
+  result = token.kind == tkOperator and token.operator == op
+
+proc expectOperator*(l: var Lexer, op, error: string) =
+  let token = l.next()
+  if token.kind != tkOperator or token.operator != op:
+    l.error(token, error)
+
+proc skip*(l: var Lexer, optional: TokenKind) =
+  if l.peek().kind == optional:
+    discard l.next()
 
 proc initLexer*(cs: CompilerState, filename: FilenameId,
                 input: string): Lexer {.inline.} =
