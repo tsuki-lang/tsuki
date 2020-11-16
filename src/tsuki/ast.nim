@@ -22,10 +22,27 @@ type
     nkConstr        # object construction
     nkMember        # member access ``.a``
     nkDot           # dot expression ``a.b``
+    nkIf            # if expression
+    nkProc          # procedure (declaration, method, or closure)
+
+    # statements
+    nkVar           # variable declaration
+    nkWhile         # while loop
+    nkFor           # for loop
+    nkBreak         # break statement
+    nkContinue      # continue statement
+    nkReturn        # return statement
+    nkObject        # object definition
+    nkImpl          # object implementation
 
     # building blocks
     nkStmtList
-    nkFieldVal
+    nkFieldVal      # object construction ``field = value`` pair
+    nkParamList     # procedure parameters
+    nkVarList       # variable names (used in var and for)
+    nkFieldList     # object field names
+    nkIfBranch      # if-condition-block or elif-condition-block
+    nkElseBranch    # else-block
 
   NodeObj* = object
     filename*: FilenameId
@@ -45,38 +62,80 @@ const
   LeafNodes* = {nkEmpty..nkIdent}
 
 proc `[]`*(node: Node, index: Index): Node =
+  ## Indexes or slices the node.
   node.sons[index]
 
+proc add*(node, son: Node) =
+  ## Adds a son to the node.
+  node.sons.add(son)
+
 iterator items*(node: Node): Node =
+  ## Iterates over the node's sons.
+
   for n in node.sons:
     yield n
 
-proc emptyNode*(): Node = Node(kind: nkEmpty)
+proc emptyNode*(): Node =
+  ## Returns a new empty node.
+  Node(kind: nkEmpty)
 
-proc nilNode*(): Node = Node(kind: nkNil)
+proc nilNode*(): Node =
+  ## Returns a new ``nil`` literal node.
+  Node(kind: nkNil)
 
-proc trueNode*(): Node = Node(kind: nkTrue)
+proc trueNode*(): Node =
+  ## Returns a new ``true`` literal node.
+  Node(kind: nkTrue)
 
-proc falseNode*(): Node = Node(kind: nkFalse)
+proc falseNode*(): Node =
+  ## Returns a new ``false`` literal node.
+  Node(kind: nkFalse)
 
-proc floatNode*(value: float32): Node = Node(kind: nkFloat, floatVal: value)
+proc floatNode*(value: float32): Node =
+  ## Returns a new float literal node.
+  Node(kind: nkFloat, floatVal: value)
 
-proc stringNode*(value: string): Node = Node(kind: nkString, stringVal: value)
+proc stringNode*(value: string): Node =
+  ## Returns a new string literal node.
+  Node(kind: nkString, stringVal: value)
 
-proc identNode*(ident: string): Node = Node(kind: nkIdent, stringVal: ident)
+proc identNode*(ident: string): Node =
+  ## Returns a new identifier node. Note that operators are flattened to
+  ## identifiers during parsing.
+  Node(kind: nkIdent, stringVal: ident)
 
 proc tree*(kind: NodeKind, children: varargs[Node]): Node =
+  ## Returns a new tree node with the given children.
 
   result = Node(kind: kind)
   result.sons.add(@children)
 
 proc lineInfoFrom*(node: Node, token: Token): Node {.discardable.} =
+  ## Inherits line info from the given token.
 
   node.filename = token.filename
   node.lineInfo = token.lineInfo
   result = node
 
+proc lineInfoFrom*(node, other: Node): Node {.discardable.} =
+  ## Inherits line info from the given node.
+
+  node.filename = other.filename
+  node.lineInfo = other.lineInfo
+  result = node
+
+proc identNode*(token: Token): Node =
+  ## Creates an identifier node from a token.
+  identNode(token.ident).lineInfoFrom(token)
+
+proc error*(l: var Lexer, node: Node, message: string) =
+  ## Raises a parsing error with tht given message, at the given node.
+  error(l.cs, node.filename, node.lineInfo, message)
+
 proc treeRepr*(node: Node): string =
+  ## Returns a human-readable tree representation of the given AST.
+
+  if node.isNil: return "!nil"
 
   case node.kind
   of nkEmpty: result = "Empty"

@@ -22,7 +22,7 @@ type
     tkWhile = "while"
     tkFor = "for", tkIn = "in",
     tkBreak = "break", tkContinue = "continue"
-    tkFunction = "proc", tkReturn = "return"
+    tkProc = "proc", tkReturn = "return"
     tkDo = "do", tkEnd = "end"
     tkObject = "object", tkImpl = "impl"
     tkImport = "import"
@@ -58,7 +58,7 @@ type
     lineInfo: LineInfo
 
   Lexer* = object
-    cs: CompilerState
+    cs*: CompilerState
 
     input: string
     position: int
@@ -125,6 +125,8 @@ const
 {.push inline.}
 
 proc getPrecedence(operator: string): int =
+  ## Calculates precedence for the given operator. This follows Nim's precedence
+  ## rules.
 
   assert operator.len > 0
   # standard operators
@@ -143,15 +145,24 @@ proc getPrecedence(operator: string): int =
     result = 0
 
 
-proc simpleToken(kind: TokenKind): Token = Token(kind: kind)
+proc simpleToken(kind: TokenKind): Token =
+  ## Returns a new "simple" token; that is, a token without data.
+  Token(kind: kind)
 
-proc floatToken(value: float64): Token = Token(kind: tkFloat, floatVal: value)
+proc floatToken(value: float64): Token =
+  ## Returns a new float literal token.
+  Token(kind: tkFloat, floatVal: value)
 
-proc stringToken(value: string): Token = Token(kind: tkString, stringVal: value)
+proc stringToken(value: string): Token =
+  ## Returns a new string literal token.
+  Token(kind: tkString, stringVal: value)
 
-proc identToken(ident: string): Token = Token(kind: tkIdent, ident: ident)
+proc identToken(ident: string): Token =
+  ## Returns a new identifier token.
+  Token(kind: tkIdent, ident: ident)
 
 proc operatorToken(operator: string): Token =
+  ## Returns a new operator token with calculated precedence.
   Token(
     kind: tkOperator,
     operator: operator,
@@ -177,6 +188,7 @@ proc repr*(t: Token): string =
   else: discard
 
 proc `$`*(t: Token): string =
+  ## Pretty representation of tokens, used in error messages.
 
   case t.kind
   of tkFloat: result.addFloat(t.floatVal)
@@ -190,30 +202,42 @@ proc `$`*(t: Token): string =
 {.push inline.}
 
 proc hasMore*(l: Lexer): bool =
+  ## Returns whether the lexer has more input.
   l.position < l.input.len
 
 proc atEnd*(l: Lexer): bool =
+  ## Returns whether the lexer has reached the end of input.
   not l.hasMore
 
 proc get(l: Lexer): char =
+  ## Returns the current character.
+
   if l.hasMore: l.input[l.position]
   else: eofChar
 
 proc advance(l: var Lexer) =
+  ## Advances the lexer by one character.
+
   inc l.position
   inc l.lineInfo.column
 
 proc savePosition*(l: Lexer): PositionInfo =
+  ## Saves the current position information.
   (l.position, l.lineInfo)
 
 proc restorePosition*(l: var Lexer, pi: PositionInfo) =
+  ## Restores position information from the given tuple. This is used to
+  ## implement peeking and backtracking.
   (l.position, l.lineInfo) = pi
 
 proc syncPosition(l: var Lexer) =
+  ## Synchronizes the reported line info with the current line info.
   l.storedLineInfo = l.lineInfo
 
 proc error*(cs: CompilerState, filename: FilenameId, lineInfo: LineInfo,
             message: string) =
+  ## Raises a parsing error.
+
   raise ParseErrorRef(
     msg: errorFormat % [
       cs.getFilename(filename),
@@ -224,17 +248,23 @@ proc error*(cs: CompilerState, filename: FilenameId, lineInfo: LineInfo,
   )
 
 proc error*(l: var Lexer, message: string) =
+  ## Raises a parsing error with the given message.
   error(l.cs, l.filename, l.storedLineInfo, message)
 
 proc error*(l: var Lexer, token: Token, message: string) =
+  ## Raises a parsing error with tht given message, at the given token.
   error(l.cs, token.filename, token.lineInfo, message)
 
 proc readChars(l: var Lexer, set: set[char], dest: var string) =
+  ## Reads as many characters from the ``set`` as there are available to the
+  ## ``dest`` string.
   while l.get in set:
     dest.add(l.get)
     l.advance()
 
 proc readString(l: var Lexer, quote: char, dest: var string) =
+  ## Reads a string literal until the ``quote`` character is hit.
+
   l.advance()  # assume that the first char is valid
   while true:
     if not l.hasMore: l.error(leUnexpectedEof)
@@ -245,10 +275,16 @@ proc readString(l: var Lexer, quote: char, dest: var string) =
     l.advance()
 
 proc discardChars(l: var Lexer, set: set[char]) =
+  ## Discards characters from the given set.
+
   while l.get in set:
     l.advance()
 
 proc matchChar(l: var Lexer, set: set[char], dest: var string): bool =
+  ## Consumes a single character from the ``set``, and adds it into ``dest``.
+  ## Returns true if the character was consumed, or ``false`` if no match was
+  ## found.
+
   result = l.get in set
   if result:
     dest.add(l.get)
@@ -306,8 +342,11 @@ proc next*(l: var Lexer): Token =
     # whole part
     l.readChars(decDigits, number)
     # fractional part
+    let beforeFract = l.savePosition()
     if l.matchChar({'.'}, number):
       l.readChars(decDigits, number)
+      if number[^1] == '.':
+        l.restorePosition(beforeFract)
     # exponent
     if l.matchChar({'e', 'E'}, number):
       discard l.matchChar({'-', '+'}, number)
@@ -344,41 +383,65 @@ proc next*(l: var Lexer): Token =
   result.filename = l.filename
   result.lineInfo = l.storedLineInfo
 
+{.push inline.}
+
 proc peek*(l: var Lexer): Token =
   ## Peeks a token from the stream.
+
+  if l.peekCache.isSome:
+    return l.peekCache.get[0]
 
   let pi = l.savePosition()
   result = l.next()
   l.peekCache = some((result, l.savePosition()))
   l.restorePosition(pi)
 
-proc expect*(l: var Lexer, kind: TokenKind, error: string): Token =
+proc expect*(l: var Lexer, kinds: set[TokenKind], error: string): Token =
+  ## Takes the next token, checks if it matches one of the given kinds, and
+  ## returns it. If the kind doesn't match, a user-provided error is raised.
+
   result = l.next()
-  if result.kind != kind:
+  if result.kind notin kinds:
     l.error(result, error)
 
+proc expect*(l: var Lexer, kind: TokenKind, error: string): Token =
+  ## Takes the next token, checks if it matches the given kind, and returns it.
+  ## If the kind doesn't match, a user-provided error is raised.
+  l.expect({kind}, error)
+
 proc peekOperator*(l: var Lexer, op: string): bool =
-  let token = l.next()
+  ## Peeks input and returns whether the next token is the given operator.
+
+  let token = l.peek()
   result = token.kind == tkOperator and token.operator == op
 
 proc expectOperator*(l: var Lexer, op, error: string) =
+  ## Reads input and checks whether the next token is the given operator.
+  ## If it is not, an error is raised.
+
   let token = l.next()
   if token.kind != tkOperator or token.operator != op:
     l.error(token, error)
 
 proc skip*(l: var Lexer, optional: TokenKind) =
+  ## Skips the given optional token. Does nothing if the next token isn't of
+  ## the given kind.
+
   if l.peek().kind == optional:
     discard l.next()
 
 proc initLexer*(cs: CompilerState, filename: FilenameId,
                 input: string): Lexer {.inline.} =
   ## Creates and initializes a new lexer.
+
   Lexer(
     cs: cs,
     input: input,
     filename: filename,
     lineInfo: liStartOfFile,
   )
+
+{.pop.}
 
 when isMainModule:
   const input = """
