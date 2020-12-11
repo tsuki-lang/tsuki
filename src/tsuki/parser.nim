@@ -27,7 +27,7 @@ template parseCommaSep(l: var Lexer, dest: var seq[Node], fin: static TokenKind,
     else:
       l.error(peXExpected % "',' or '" & $fin & "'")
 
-proc parseExpr(l: var Lexer, precedence = 0): Node
+proc parseExpr(l: var Lexer, precedence = -1): Node
 
 proc parseStmt(l: var Lexer): Node
 
@@ -43,10 +43,13 @@ proc parseBlock(l: var Lexer, dest: var seq[Node],
     dest.add(l.parseStmt())
     l.skip(tkSemi)
 
-proc parseIf(l: var Lexer, token: Token): Node =
-  ## Parses an if expression.
+proc parseIf(l: var Lexer, token: Token, isStmt: bool): Node =
+  ## Parses an if expression or statement.
 
-  result = nkIf.tree().lineInfoFrom(token)
+  let astKind =
+    if isStmt: nkIfStmt
+    else: nkIfExpr
+  result = astKind.tree().lineInfoFrom(token)
 
   var hasElse = false
   while true:
@@ -79,15 +82,17 @@ proc parseProc(l: var Lexer, token: Token, anonymous: static bool): Node =
 
   var name = emptyNode().lineInfoFrom(token)
   if not anonymous:
-    let
-      nameToken =
-        l.expect({tkIdent, tkOperator}, peXExpected % "procedure name")
-      nameStr =
-        case nameToken.kind
-        of tkIdent: nameToken.ident
-        of tkOperator: nameToken.operator
-        else: "<invalid>"
-    name = identNode(nameToken)
+    let nameToken =
+      l.expect({tkIdent, tkOperator}, peXExpected % "procedure name")
+    var nameStr =
+      case nameToken.kind
+      of tkIdent: nameToken.ident
+      of tkOperator: nameToken.operator
+      else: "<invalid>"
+    if l.peekOperator("="):
+      discard l.next()
+      nameStr.add('=')
+    name = identNode(nameStr).lineInfoFrom(nameToken)
 
   var params = emptyNode().lineInfoFrom(name)
   if l.peek().kind == tkLParen:
@@ -109,7 +114,13 @@ proc parseProc(l: var Lexer, token: Token, anonymous: static bool): Node =
     l.parseBlock(body.sons, {tkEnd})
     discard l.next()  # always tkEnd
 
-  result = nkProc.tree(name, params, body).lineInfoFrom(token)
+  let astKind =
+    if anonymous: nkClosure
+    else: nkProc
+  result = astKind.tree(name, params, body).lineInfoFrom(token)
+
+const
+  pathPrecedence = 11
 
 proc parsePrefix(l: var Lexer, token: Token): Node =
   ## Parses a prefix expression.
@@ -122,8 +133,14 @@ proc parsePrefix(l: var Lexer, token: Token): Node =
   of tkString: result = stringNode(token.stringVal)
   of tkIdent: result = identNode(token.ident)
   of tkOperator:
-    let op = identNode(token.operator).lineInfoFrom(token)
-    result = nkPrefix.tree(op, l.parsePrefix(l.next()))
+    let
+      op = identNode(token.operator).lineInfoFrom(token)
+      expr =
+        if token.operator == "@":
+          l.parsePrefix(l.next())
+        else:
+          l.parseExpr(pathPrecedence - 1)
+    result = nkPrefix.tree(op, expr).lineInfoFrom(op)
   of tkDot:
     let name = l.expect(tkIdent, peXExpected % "identifier")
     let member = identNode(name).lineInfoFrom(token)
@@ -131,14 +148,11 @@ proc parsePrefix(l: var Lexer, token: Token): Node =
   of tkLParen:
     result = nkParen.tree(l.parseExpr())
     discard l.expect(tkRParen, peTokenMissing % ")")
-  of tkIf: result = l.parseIf(token)
+  of tkIf: result = l.parseIf(token, isStmt = false)
   of tkProc: result = l.parseProc(token, anonymous = true)
   else: l.error(token, peUnexpectedToken % $token)
 
   result.lineInfoFrom(token)
-
-const
-  pathPrecedence = 11
 
 proc parseInfix(l: var Lexer, left: Node, token: Token): Node =
   ## Parses an infix expression.
@@ -171,9 +185,9 @@ proc precedence(token: Token): int =
   case token.kind
   of tkOperator: token.precedence
   of tkLParen, tkLBrace, tkDot: pathPrecedence
-  else: -1
+  else: -10
 
-proc parseExpr(l: var Lexer, precedence = 0): Node =
+proc parseExpr(l: var Lexer, precedence = -1): Node =
   ## Parses an expression.
 
   var token = l.next()
@@ -192,9 +206,18 @@ proc parseVar(l: var Lexer): Node =
     varToken = l.next()  # always tkVar (see parseStmt)
     name = l.expect(tkIdent, peXExpected % "variable name")
     nameNode = identNode(name)
+    names = nkVarList.tree(nameNode).lineInfoFrom(nameNode)
   l.expectOperator("=", peXExpected % "'='")
   let value = l.parseExpr()
-  result = nkVar.tree(nameNode, value).lineInfoFrom(varToken)
+  result = nkVar.tree(names, value).lineInfoFrom(varToken)
+
+proc parseBlockStmt(l: var Lexer): Node =
+  ## Parses a block statement.
+
+  let blockToken = l.next()  # always tkBlock (see parseStmt)
+  result = nkBlockStmt.tree().lineInfoFrom(blockToken)
+  l.parseBlock(result.sons, {tkEnd})
+  discard l.next()  # always tkEnd
 
 proc parseWhile(l: var Lexer): Node =
   ## Parses a while loop.
@@ -276,6 +299,8 @@ proc parseStmt(l: var Lexer): Node =
 
   case l.peek().kind
   of tkVar: result = l.parseVar()
+  of tkBlock: result = l.parseBlockStmt()
+  of tkIf: result = l.parseIf(l.next(), isStmt = true)
   of tkWhile: result = l.parseWhile()
   of tkFor: result = l.parseFor()
   of tkProc: result = l.parseProc(l.next(), anonymous = false)
@@ -345,6 +370,8 @@ when isMainModule:
   # expressions
   test("math", "a = 2 + 2 * 2", l.parseExpr())
   test("members", ".a.b.c + .b", l.parseExpr())
+  test("non-sigil prefix", "-a.b.c", l.parseExpr())
+  test("sigil prefix", "@a.b.c", l.parseExpr())
   test("call echo", "echo(awd)", l.parseExpr())
   test("call no args", "echo()", l.parseExpr())
   test("call >1 arg", "echo(1, 2, 3)", l.parseExpr())
@@ -391,6 +418,10 @@ when isMainModule:
     proc short = _
 
     proc forward = ...
+
+    var closure = proc
+      _
+    end
   """, l.parseScript())
 
   test("objects", """

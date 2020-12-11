@@ -22,15 +22,18 @@ type
     nkConstr        # object construction
     nkMember        # member access ``.a``
     nkDot           # dot expression ``a.b``
-    nkIf            # if expression
-    nkProc          # procedure (declaration, method, or closure)
+    nkIfExpr        # if expression
+    nkClosure       # closure (proc without a name)
 
     # statements
     nkVar           # variable declaration
+    nkBlockStmt     # block statement
+    nkIfStmt        # if statement
     nkWhile         # while loop
     nkFor           # for loop
     nkBreak         # break statement
     nkContinue      # continue statement
+    nkProc          # procedure or method
     nkReturn        # return statement
     nkObject        # object definition
     nkImpl          # object implementation
@@ -56,14 +59,21 @@ type
 
   Node* = ref NodeObj
 
-  Index = int | BackwardsIndex | Slice[int] | HSlice[int, BackwardsIndex]
+  Index = int | BackwardsIndex
+  SomeSlice = Slice[int] | HSlice[int, BackwardsIndex]
 
 const
   LeafNodes* = {nkEmpty..nkIdent}
+  ExprNodes* = {nkPrefix..nkClosure}
+  StmtNodes* = {nkVar..nkImpl}
 
 proc `[]`*(node: Node, index: Index): Node =
-  ## Indexes or slices the node.
+  ## Indexes the node.
   node.sons[index]
+
+proc `[]`*(node: Node, slice: SomeSlice): seq[Node] =
+  ## Slices the node.
+  node.sons[slice]
 
 proc add*(node, son: Node) =
   ## Adds a son to the node.
@@ -74,6 +84,10 @@ iterator items*(node: Node): Node =
 
   for n in node.sons:
     yield n
+
+proc len*(node: Node): int =
+  ## Returns the amount of sons the node has.
+  node.sons.len
 
 proc emptyNode*(): Node =
   ## Returns a new empty node.

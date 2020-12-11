@@ -23,7 +23,7 @@ type
     tkFor = "for", tkIn = "in",
     tkBreak = "break", tkContinue = "continue"
     tkProc = "proc", tkReturn = "return"
-    tkDo = "do", tkEnd = "end"
+    tkBlock = "block", tkEnd = "end"
     tkObject = "object", tkImpl = "impl"
     tkImport = "import"
 
@@ -69,6 +69,7 @@ type
     storedLineInfo: LineInfo
 
   ParseError* = object of ValueError
+    filename*: string
     lineInfo*: LineInfo
 
   ParseErrorRef* = ref ParseError
@@ -143,7 +144,6 @@ proc getPrecedence(operator: string): int =
        operator[^1] == '>' and operator[^2] in {'-', '~', '='}:
     # arrow-like operator
     result = 0
-
 
 proc simpleToken(kind: TokenKind): Token =
   ## Returns a new "simple" token; that is, a token without data.
@@ -242,8 +242,9 @@ proc error*(cs: CompilerState, filename: FilenameId, lineInfo: LineInfo,
     msg: errorFormat % [
       cs.getFilename(filename),
       $lineInfo.line, $lineInfo.column,
-      message
+      message,
     ],
+    filename: cs.getFilename(filename),
     lineInfo: lineInfo,
   )
 
