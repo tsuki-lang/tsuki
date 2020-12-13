@@ -55,6 +55,23 @@ run "variables and scope", """
   var b = a
 """
 
+run "nested scopes", """
+  block
+    var a = 1
+    block
+      var b = 2
+      block
+        var c = 3
+        block
+          echo(a)
+          echo(b)
+          echo(c)
+        end
+      end
+    end
+  end
+"""
+
 run "calls/proc/native", """
   echo("this is a test")
 """

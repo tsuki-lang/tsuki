@@ -12,7 +12,7 @@ import value
 type
   Scope* = object
     syms: Table[string, Symbol]
-    vars: int
+    vars, totalVars: int
 
   CodeGen* = ref object
     cs: CompilerState
@@ -68,10 +68,15 @@ proc scope(g: CodeGen): var Scope =
 
 proc pushScope(g: CodeGen) =
   ## Pushes a new scope.
-  g.scopes.add(Scope())
+
+  let totalVars =
+    if g.scopes.len > 0: g.scopes[^1].totalVars
+    else: 0
+  g.scopes.add(Scope(totalVars: totalVars))
 
 proc popScope(g: CodeGen) =
   ## Pops the current scope, together with its variables.
+
   let scope = g.scopes.pop()
   if scope.vars > 0:
     g.chunk.emitOpcode(opcDiscard)
@@ -109,8 +114,9 @@ proc defineVar(g: CodeGen, name: Node): Symbol =
   # local variable
   if g.scopes.len > 0:
     result = newVarSymbol(name, isLocal = true)
-    result.stackPos = g.scope.vars
+    result.stackPos = g.scope.totalVars
     inc g.scope.vars
+    inc g.scope.totalVars
     g.scope.syms[name.stringVal] = result
 
   # global variable
@@ -223,7 +229,7 @@ proc genAssignment(g: CodeGen, left, right: Node) =
   else:
     g.error(left, ceAsgnInvalidLHS)
 
-const specialInfixOps = ["=", "and", "or"]
+const specialInfixOps = ["=", "and", "or", "of"]
 proc genSpecialInfix(g: CodeGen, n: Node) =
   ## Generates code for special infix operators (``=``, ``and``, ``or``).
 
@@ -234,6 +240,7 @@ proc genSpecialInfix(g: CodeGen, n: Node) =
   of "=": g.genAssignment(n[1], n[2])
   of "and": unreachable "and is NYI"
   of "or": unreachable "or is NYI"
+  of "of": unreachable "of is NYI"
   else: unreachable "operator must be one of the special infix operators"
 
 proc genCall(g: CodeGen, n: Node) =
