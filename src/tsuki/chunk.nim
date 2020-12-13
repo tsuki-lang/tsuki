@@ -1,6 +1,7 @@
 import std/bitops
 import std/options
 import std/tables
+import std/with
 
 import ast
 import common
@@ -10,23 +11,37 @@ import value
 
 type
   Opcode* = enum
+
+    # literals
     opcPushNil
     opcPushTrue
     opcPushFalse
     opcPushFloat
     opcPushString
+
+    # global variables
     opcPushGlobal
     opcPopToGlobal
+    opcAssignToGlobal
+
+    # local variables
     opcPushLocal
     opcPopToLocal
+    opcAssignToLocal
+
+    # other stack ops
     opcDiscard
 
+    # jumps
     opcJumpFwd
     opcJumpFwdIfFalsey
     opcJumpBack
+
+    # calls
     opcCallProc
     opcCallMethod
 
+    # halting
     opcHalt
 
   JumpOpcode* = range[opcJumpFwd..opcJumpFwdIfFalsey]
@@ -69,6 +84,7 @@ type
   Vtable* = object
     # TODO: this is less than efficient - benchmark the performance of using
     # a seq[Option[Procedure]] vs a Table[int, Procedure]
+    name*: string
     methods: seq[Option[Procedure]]
 
   MethodId* = distinct int
@@ -77,6 +93,11 @@ type
     name: string
     paramCount: int
 
+  SpecialMethods* = object
+    iterate*: int
+    hasNext*: int
+    next*: int
+
   Assembly* = ref object
     procedures*: seq[Procedure]
     vtables*: seq[Vtable]
@@ -84,6 +105,8 @@ type
     globalVarCount*: int
     methodIds: Table[MethodSignature, int]
     methodSignatures: seq[MethodSignature]
+
+    special*: SpecialMethods
 
   Module* = ref object
     mainChunk*: Chunk
@@ -142,11 +165,6 @@ proc addMethod*(vt: var Vtable, i: int, name: string, paramCount: int,
 
 # assembly
 
-proc newAssembly*(): Assembly =
-  ## Creates and initializes a new assembly.
-
-  new result
-  result.vtables.setLen(vtableFirstObject)
 
 proc getVtableIndex*(a: Assembly, name: string, paramCount: int): int =
   ## Returns the vtable index of the method with the given name.
@@ -160,6 +178,26 @@ proc getVtableIndex*(a: Assembly, name: string, paramCount: int): int =
     a.methodSignatures.add(sig)
   else:
     result = a.methodIds[sig]
+
+proc newAssembly*(): Assembly =
+  ## Creates and initializes a new assembly.
+
+  new result
+  result.vtables.setLen(vtableFirstObject)
+
+  const vtableNames = [
+    vtableNil: "Nil",
+    vtableBool: "Bool",
+    vtableFloat: "Float",
+    vtableString: "String",
+  ]
+  for i, name in vtableNames:
+    result.vtables[i].name = name
+
+  with result.special:
+    iterate = result.getVtableIndex("_iterate", 0)
+    hasNext = result.getVtableIndex("_hasNext", 0)
+    next = result.getVtableIndex("_next", 0)
 
 {.push inline.}
 
@@ -209,6 +247,11 @@ proc addMethod*(a: Assembly, vtable: int, name: string, paramCount: int,
   a.vtables[vtable].addMethod(a.getVtableIndex(name, paramCount),
                               name, paramCount, impl)
 
+proc addVtable*(a: Assembly, name: string): int =
+  ## Adds a new, empty vtable to the given assembly.
+
+  result = a.vtables.len
+  a.vtables.add(Vtable(name: name))
 
 # module
 

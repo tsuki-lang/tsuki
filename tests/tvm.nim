@@ -83,41 +83,65 @@ run "lib/arithmetic", """
   echo(e)
 """
 
-# run "control flow/if", """
-#   if true
-#     var a = 1 + 2
-#   end
-# """
+run "control flow/if", """
+  if true
+    echo(1 + 2)
+  end
+"""
 
-# run "control flow/if..elif", """
-#   if true
-#     var a = 1 + 2
-#   elif true
-#     var b = 3 + 4
-#   end
-# """
+run "control flow/if..elif", """
+  if true
+    echo(1 + 2)
+  elif true
+    echo(3 + 4)
+  end
+"""
 
-# run "control flow/if..else", """
-#   if true
-#     var a = 1 + 2
-#   else
-#     var b = 3 + 4
-#   end
-# """
+run "control flow/if..else", """
+  if true
+    echo(1 + 2)
+  else
+    echo(3 + 4)
+  end
+"""
 
-# run "control flow/if..elif..else", """
-#   if true
-#     var a = 1 + 2
-#   elif true
-#     var b = 3 + 4
-#   else
-#     var c = 5 + 6
-#   end
-# """
+run "control flow/if..elif..else", """
+  if true
+    echo(1 + 2)
+  elif true
+    echo(3 + 4)
+  else
+    echo(5 + 6)
+  end
+"""
 
-# run "control flow/while", """
-#   var a = true
-#   while a
-#     var b = 10
-#   end
-# """
+run "control flow/while", """
+  var a = 0
+  while a < 10
+    echo(a)
+    a = a + 1
+  end
+"""
+
+run "nim data", """
+  var r = 1..10
+  echo(r)
+  echo(0..<10)
+"""
+
+run "for loops/experimental sample", """
+  var range = 1..10
+  var iter = range._iterate
+  while iter._hasNext
+    var x = iter._next
+    block
+      echo(x)
+    end
+  end
+"""
+
+run "for loops/transformed", """
+  for x in 1..10
+    echo(x)
+  end
+"""

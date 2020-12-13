@@ -73,8 +73,9 @@ proc pushScope(g: CodeGen) =
 proc popScope(g: CodeGen) =
   ## Pops the current scope, together with its variables.
   let scope = g.scopes.pop()
-  g.chunk.emitOpcode(opcDiscard)
-  g.chunk.emitU8(scope.vars.uint8)
+  if scope.vars > 0:
+    g.chunk.emitOpcode(opcDiscard)
+    g.chunk.emitU8(scope.vars.uint8)
 
 template withNewScope(g: CodeGen, body: untyped) =
   ## Helper for automatically pushing and popping a scope.
@@ -137,11 +138,15 @@ proc popToVar(g: CodeGen, sym: Symbol) =
   ## given symbol.
 
   assert sym.kind == skVar
-  if sym.isLocalVar and sym.isSet:
-    g.chunk.emitOpcode(opcPopToLocal)
-    g.chunk.emitU16(sym.stackPos.uint16)
-  elif not sym.isLocalVar:
-    g.chunk.emitOpcode(opcPopToGlobal)
+  if sym.isLocalVar:
+    if sym.isSet:
+      g.chunk.emitOpcode(opcAssignToLocal)
+      g.chunk.emitU16(sym.stackPos.uint16)
+  else:
+    if sym.isSet:
+      g.chunk.emitOpcode(opcAssignToGlobal)
+    else:
+      g.chunk.emitOpcode(opcPopToGlobal)
     g.chunk.emitU16(sym.globalId.uint16)
   sym.isSet = true
 
@@ -298,7 +303,6 @@ proc genDot(g: CodeGen, n: Node) =
   g.genExpr(n[0])
   g.chunk.emitOpcode(opcCallMethod)
   g.chunk.emitU16(vid.uint16)
-  g.chunk.emitU8(1)
 
 proc genIf(g: CodeGen, n: Node) =
   ## Generates code for an if expression or statement.
@@ -309,9 +313,7 @@ proc genIf(g: CodeGen, n: Node) =
   let isExpr = n.kind == nkIfExpr
   assert not isExpr, "if expressions are NYI"
 
-  var
-    afterIfBranches: seq[int]
-    hadElse = false
+  var afterIfBranches: seq[int]
 
   for branch in n:
     case branch.kind
@@ -352,7 +354,7 @@ proc genExpr(g: CodeGen, n: Node) =
   g.lineInfoFrom(n)
 
   case n.kind
-  of nkParen: g.genExpr(n)
+  of nkParen: g.genExpr(n[0])
   of nkNil..nkString: g.genLiteral(n)
   of nkIdent: g.genVarLookup(n)
   of nkPrefix, nkInfix, nkCall: g.genCall(n)
@@ -384,30 +386,106 @@ proc genBlockStmt(g: CodeGen, n: Node) =
     for stmt in n:
       g.genStmt(stmt)
 
+template genLoop(g: CodeGen, cond, body: untyped): untyped =
+  ## Skeleton for loop generation. Used in ``genWhile`` and ``genFor`` to reduce
+  ## repetition.
+
+  block:
+    # emit condition
+    let loopStart = g.chunk.bytecode.len
+    `cond`
+    let jumpAfterLoop = g.chunk.emitJump(opcJumpFwdIfFalsey)
+
+    # discard condition
+    g.chunk.emitOpcode(opcDiscard)
+    g.chunk.emitU8(1)
+
+    # emit body
+    `body`
+
+    # jump back to start
+    g.chunk.emitOpcode(opcJumpBack)
+    g.chunk.emitU16(uint16 g.chunk.bytecode.len - loopStart + 2)
+
+    g.chunk.patchJump(jumpAfterLoop)
+
+    # remember to also discard the condition if the loop was jumped over
+    g.chunk.emitOpcode(opcDiscard)
+    g.chunk.emitU8(1)
+
 proc genWhile(g: CodeGen, n: Node) =
   ## Generates code for a while loop.
 
   assert n.kind == nkWhile
   g.lineInfoFrom(n)
 
-  # condition
-  let loopStart = g.chunk.bytecode.len
-  g.genExpr(n[0])
-  let afterLoop = g.chunk.emitJump(opcJumpFwdIfFalsey)
+  g.genLoop do:
+    # condition
+    g.genExpr(n[0])
+  do:
+    # body
+    g.withNewScope:
+      g.genStmtList(n[1])
 
-  # body
-  g.chunk.emitOpcode(opcDiscard)
-  g.chunk.emitU8(1)
+proc genFor(g: CodeGen, n: Node) =
+  ## Generates code for a for loop.
+
+  # note for those hunting for performance:
+  # it is faster to use a for loop than a while loop to perform protocol
+  # iteration, because a for loop can make use of more efficient instructions.
+  # namely, assigning to the loop variable can use the faster PopToVar
+  # opcode, which avoids saving the old value of the variable.
+
+  assert n.kind == nkFor
+  g.lineInfoFrom(n)
+
+  var
+    iteratorSym: Symbol
+    loopVarSym: Symbol
+
+  let varList = n[0]
+  assert varList.len == 1, "only one variable is supported"
+  assert varList[0].kind == nkIdent
+
   g.withNewScope:
-    g.genStmtList(n[1])
 
-  # jump back to start
-  g.chunk.emitOpcode(opcJumpBack)
-  g.chunk.emitU16(uint16 g.chunk.bytecode.len - loopStart + 2)
+    # first, the iterator variable
+    # a for loop calls the `_iterate` special method on the value being iterated
+    let iter = n[1]
+    g.genExpr(iter)
+    g.chunk.emitOpcode(opcCallMethod)
+    g.chunk.emitU16(uint16 g.a.special.iterate)
+    iteratorSym = g.defineVar(identNode":iterator")
+    assert iteratorSym.isLocalVar
+    g.popToVar(iteratorSym)  # mark it as set
 
-  g.chunk.patchJump(afterLoop)
-  g.chunk.emitOpcode(opcDiscard)
-  g.chunk.emitU8(1)
+    # then, the loop variable
+    # we create it outside of the loop body's scope to minimize stack operations
+    g.chunk.emitOpcode(opcPushNil)
+    loopVarSym = g.defineVar(varList[0])
+    assert loopVarSym.isLocalVar
+    g.popToVar(loopVarSym)  # also mark it as set
+
+
+    g.genLoop do:
+      # as the condition, we use :iterator._hasNext
+      g.pushVar(iteratorSym)
+      g.chunk.emitOpcode(opcCallMethod)
+      g.chunk.emitU16(uint16 g.a.special.hasNext)
+    do:
+      # in the body, first, we need to update the loop var
+      # we call :iterator._next to obtain the value, then we pop it to the var
+      # note that we don't use assignment to reduce stack operations
+      g.pushVar(iteratorSym)
+      g.chunk.emitOpcode(opcCallMethod)
+      g.chunk.emitU16(uint16 g.a.special.next)
+      g.chunk.emitOpcode(opcPopToLocal)
+      g.chunk.emitU16(loopVarSym.stackPos.uint16)
+
+      # then we can execute the loop body
+      let loop = n[2]
+      g.withNewScope:
+        g.genStmtList(loop)
 
 proc genStmt(g: CodeGen, n: Node) =
   ## Generates code for a statement.
@@ -419,7 +497,7 @@ proc genStmt(g: CodeGen, n: Node) =
   of nkBlockStmt: g.genBlockStmt(n)
   of nkIfStmt: g.genIf(n)
   of nkWhile: g.genWhile(n)
-  of nkFor: unreachable "for is NYI"
+  of nkFor: g.genFor(n)
   of nkBreak: unreachable "control flow is NYI"
   of nkContinue: unreachable "control flow is NYI"
   of nkReturn: unreachable "procedures are NYI"

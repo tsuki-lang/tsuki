@@ -1,19 +1,13 @@
 type
   ObjectImpl[V] = ref object
     # this is defined as a generic type to avoid repetition.
-    vtable: int
+    vtable*: int
     fields: seq[V]
 
   NimData* = object
     ## A Nim object, as stored in the tsuki VM.
-    data*: ref RootObj
     vtable*: int
-
-proc vtable*(obj: ObjectImpl): int =
-  ## Returns the vtable ID of this object.
-  ## This is only really useful for the VM, but it can be used to uniquely
-  ## identify the type of the object if necessary.
-  obj.vtable
+    data*: ref RootObj
 
 proc `[]`*[V](obj: ObjectImpl[V], field: int): V =
   ## Returns an object field. Manual usage of this should be avoided at all
@@ -125,6 +119,9 @@ when defined(nimdoc):
       ## These constants are ``let``s when using the variant object
       ## representation.
 
+  converter toValue*(b: bool): Value =
+    ## Converts a ``bool`` to a tsuki ``Value``
+
   converter toValue*(f: float64): Value =
     ## Converts a ``float64`` to a tsuki ``Value``.
 
@@ -145,6 +142,9 @@ when defined(nimdoc):
 
   proc `$`*(v: Value): string =
     ## Stringifies a value.
+
+  proc `==`*(a, b: Value): bool =
+    ## Compares two values for equality.
 
 elif defined(tsukiNanBoxing):
 
@@ -171,6 +171,8 @@ else:
       of vkString: stringVal: string
       of vkObject: objectVal: Object
       of vkNimData: nimData: NimData
+
+  {.push inline.}
 
   proc isNil*(v: Value): bool = v.kind == vkNil
 
@@ -204,17 +206,20 @@ else:
   proc getNimData*(v: Value, T: type): T =
 
     when T is ref:
-      v.nimData
+      cast[T](v.nimData.data)
     else:
-      v.nimData[]
+      cast[ref T](v.nimData.data)[]
 
   proc mgetNimData*[TT: not ref](v: Value, T: type TT): var T =
-    v.nimData[]
+    cast[ref T](v.nimData.data)[]
 
   let
     tsukiNil* = Value(kind: vkNil)
     tsukiTrue* = Value(kind: vkTrue)
     tsukiFalse* = Value(kind: vkFalse)
+
+  converter toValue*(b: bool): Value =
+    Value(kind: vkFalse.succ(ord(b)))
 
   converter toValue*(f: float64): Value =
     Value(kind: vkFloat, floatVal: f)
@@ -222,24 +227,28 @@ else:
   converter toValue*(s: string): Value =
     Value(kind: vkString, stringVal: s)
 
-  proc toValue*[T](data: T): Value =
+  proc initValue*[T](vtable: int, data: T): Value =
+    assert vtable >= vtableFirstObject
+    result = Value(kind: vkNimData, nimData: NimData(vtable: vtable))
     when T is ref:
-      result = Value(kind: vkNimData, nimData: data)
+      result.nimData.data = cast[ref RootObj](data)
     else:
-      result = Value(kind: vkNimData, nimData: new(T))
-      result.nimData[] = data
+      var r = new(T)
+      r[] = data
+      result.nimData.data = cast[ref RootObj](r)
 
   proc newObject*(vtable, size: int): Value =
     Value(kind: vkObject, objectVal: newObjectImpl[Value](vtable, size))
 
+  const vtableForKind = [
+    vkNil: vtableNil,
+    vkFalse: vtableBool,
+    vkTrue: vtableBool,
+    vkFloat: vtableFloat,
+    vkString: vtableString,
+  ]
+
   proc vtable*(v: Value): int =
-    const vtableForKind = [
-      vkNil: vtableNil,
-      vkFalse: vtableBool,
-      vkTrue: vtableBool,
-      vkFloat: vtableFloat,
-      vkString: vtableString,
-    ]
 
     case v.kind
     of vkNil..vkString:
@@ -248,6 +257,8 @@ else:
       v.objectVal.vtable
     of vkNimData:
       v.nimData.vtable
+
+  {.pop.}
 
   proc `$`*(v: Value): string =
     case v.kind
@@ -258,3 +269,15 @@ else:
     of vkString: v.stringVal
     of vkObject: "<object>"
     of vkNimData: "<nimdata>"
+
+  proc `==`*(a, b: Value): bool =
+    if a.kind == b.kind:
+      result =
+        case a.kind
+        of vkNil, vkFalse, vkTrue: true
+        of vkFloat: a.floatVal == b.floatVal
+        of vkString: a.stringVal == b.stringVal
+        of vkObject: a.objectVal == b.objectVal
+        of vkNimData: a.nimData == b.nimData
+    else:
+      result = false

@@ -39,11 +39,11 @@ proc disassemble*(chunk: Chunk, a: Assembly): string =
       dest.add("<" & $s.len & "> ")
       dest.add(escape s)
 
-    of opcPushGlobal, opcPopToGlobal:
+    of opcPushGlobal, opcPopToGlobal, opcAssignToGlobal:
       dest.add("%%")
       dest.add($chunk.readU16(pc))
 
-    of opcPushLocal, opcPopToLocal:
+    of opcPushLocal, opcPopToLocal, opcAssignToLocal:
       dest.add("%")
       dest.add($chunk.readU16(pc))
 

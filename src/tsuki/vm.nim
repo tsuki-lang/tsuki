@@ -220,13 +220,28 @@ proc interpret*(s: State, procedure: Procedure, args: seq[Value],
       of opcPopToGlobal:
         s.setGlobal(int c.readU16(pc), stack.pop())
 
+      of opcAssignToGlobal:
+        let
+          gid = int c.readU16(pc)
+          old = s.globals[gid]
+        s.globals[gid] = stack[^1]
+        stack[^1] = old
+
       of opcPushLocal:
         stack.add(local(int c.readU16(pc)))
 
       of opcPopToLocal:
         local(int c.readU16(pc)) = stack.pop()
 
+      of opcAssignToLocal:
+        let
+          lid = int c.readU16(pc)
+          old = local(lid)
+        local(lid) = stack[^1]
+        stack[^1] = old
+
       of opcDiscard:
+        assert stack.len > 0, $pc
         stack.setLen(stack.len - c.readU8(pc).int)
 
       of opcJumpFwd:
@@ -267,7 +282,7 @@ proc interpret*(s: State, procedure: Procedure, args: seq[Value],
           let m = vtable.getMethod(vid)
           doCall(m, isMethodCall = true)
         else:
-          abort("'" & $sig & "' is not declared on the receiver")
+          abort('\'' & vtable.name & "' does not respond to '" & $sig & '\'')
         restoreFrame()
 
       of opcHalt: break

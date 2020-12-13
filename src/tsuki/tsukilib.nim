@@ -5,12 +5,36 @@ import common
 import value
 import vm
 
+type
+  Range* = Slice[float]
+    ## A tsuki range.
+
+  Countup* = ref object
+    ## A tsuki countup iterator.
+    lo, hi, stride: int
+    i: int
+
+  Countdown* = ref object
+    ## A tsuki countdown iterator.
+    hi, lo, stride: int
+    i: int
+
 proc addSystemModule*(cs: CompilerState, a: Assembly): Module =
 
   var
     filenameId = cs.addFilename("system.tsu")
     chunk = newChunk(filenameId)
     m = newModule(chunk)
+
+  template equality(vt: int) =
+
+    a.addMethod vt, "==", 1,
+      wrap proc (s: State, args: openArray[Value]): Value =
+        args[0] == args[1]
+
+    a.addMethod vt, "!=", 1,
+      wrap proc (s: State, args: openArray[Value]): Value =
+        args[0] != args[1]
 
   let mDollar = a.getMethodId("$", 0)
 
@@ -42,9 +66,11 @@ proc addSystemModule*(cs: CompilerState, a: Assembly): Module =
       tsukiTrue
 
   # $
-  a.addMethod vTableNil, "$", 0,
+  a.addMethod vtableNil, "$", 0,
     wrap proc (s: State, args: openArray[Value]): Value =
       "nil"
+
+  equality vtableNil
 
   #---
   # Bool
@@ -62,9 +88,16 @@ proc addSystemModule*(cs: CompilerState, a: Assembly): Module =
       if args[0].isTrue: "true"
       else: "false"
 
+  equality vtableBool
+
   #--
   # Float
   #--
+
+  # $
+  a.addMethod vtableFloat, "$", 0,
+    wrap proc (s: State, args: openArray[Value]): Value =
+      $args[0].getFloat
 
   # arithmetic
 
@@ -73,21 +106,24 @@ proc addSystemModule*(cs: CompilerState, a: Assembly): Module =
       -args[0].getFloat
 
   block binary:
-    template binaryArithm(name: string, op: untyped) =
+
+    template binaryOp(name: string, op: untyped) =
       a.addMethod vtableFloat, name, 1,
         proc (s: State, args: openArray[Value]): Value =
           s.assert(args[1].isFloat, "second operand must be a Float")
           `op`(args[0].getFloat, args[1].getFloat)
 
-    binaryArithm "+", `+`
-    binaryArithm "-", `-`
-    binaryArithm "*", `*`
-    binaryArithm "/", `/`
+    binaryOp "+", `+`
+    binaryOp "-", `-`
+    binaryOp "*", `*`
+    binaryOp "/", `/`
 
-  # $
-  a.addMethod vtableFloat, "$", 0,
-    wrap proc (s: State, args: openArray[Value]): Value =
-      $args[0].getFloat
+    binaryOp "<", `<`
+    binaryOp "<=", `<=`
+    binaryOp ">", `>`
+    binaryOp ">=", `>=`
+
+  equality vtableFloat
 
   #--
   # String
@@ -97,5 +133,87 @@ proc addSystemModule*(cs: CompilerState, a: Assembly): Module =
   a.addMethod vtableString, "$", 0,
     wrap proc (s: State, args: openArray[Value]): Value =
       args[0].getString
+
+  equality vtableString
+
+  #--
+  # Range
+  #--
+
+  let vtableRange = a.addVtable("Range")
+
+  # Float: ..
+  a.addMethod vtableFloat, "..", 1,
+    wrap proc (s: State, args: openArray[Value]): Value =
+      s.assert(args[1].isFloat, "second operand must be a Float")
+      initValue(vtableRange, args[0].getFloat..args[1].getFloat)
+
+  # Float: ..<
+  a.addMethod vtableFloat, "..<", 1,
+    wrap proc (s: State, args: openArray[Value]): Value =
+      s.assert(args[1].isFloat, "second operand must be a Float")
+      initValue(vtableRange, args[0].getFloat..args[1].getFloat - 1)
+
+  # $
+  a.addMethod vtableRange, "$", 0,
+    wrap proc (s: State, args: openArray[Value]): Value =
+      let r = args[0].getNimData(Range)
+      $r.a & ".." & $r.b
+
+  #--
+  # Countup
+  #--
+
+  let vtableCountup = a.addVtable("Countup")
+
+  # Range: _iterate, countup
+  block:
+
+    proc impl(s: State, args: openArray[Value]): Value =
+      let r = args[0].getNimData(Range)
+      result = initValue(
+        vtableCountup,
+        Countup(
+          lo: min(r.a.int, r.b.int), hi: max(r.a.int, r.b.int), stride: 1,
+          i: 0
+        )
+      )
+
+    a.addMethod vtableRange, "_iterate", 0, wrap impl
+    a.addMethod vtableRange, "countup", 0, wrap impl
+
+  # Range: countup(_)
+  a.addMethod vtableRange, "countup", 1,
+    wrap proc (s: State, args: openArray[Value]): Value =
+      s.assert(args[1].isFloat, "first argument must be a Float")
+      let
+        r = args[0].getNimData(Range)
+        stride = args[1].getFloat.int
+      initValue(
+        vtableCountup,
+        Countup(
+          lo: min(r.a.int, r.b.int), hi: max(r.a.int, r.b.int), stride: stride,
+          i: 0
+        )
+      )
+
+  # _iterate
+  a.addMethod vtableCountup, "_iterate", 0,
+    wrap proc (s: State, args: openArray[Value]): Value =
+      args[0]
+
+  # _hasNext
+  a.addMethod vtableCountup, "_hasNext", 0,
+    wrap proc (s: State, args: openArray[Value]): Value =
+      let it = args[0].getNimData(Countup)
+      it.i <= it.hi
+
+  # _next
+  a.addMethod vtableCountup, "_next", 0,
+    wrap proc (s: State, args: openArray[Value]): Value =
+      let it = args[0].getNimData(Countup)
+      result = it.i.float
+      inc it.i
+
 
   result = m
