@@ -91,6 +91,7 @@ iterator pairs*(node: Node): (int, Node) =
   var i = 0
   for n in node.items:
     yield (i, n)
+    inc i
 
 proc low*(node: Node): int =
   ## Returns the first index in the node.

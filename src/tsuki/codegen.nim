@@ -245,7 +245,7 @@ proc genStmtList(g: CodeGen, n: Node, isExpr: bool) =
 
   if isExpr:
     for i, stmt in n:
-      if i < n.len - 1:
+      if i < n.high:
         g.genStmt(stmt)
       else:
         g.genExpr(stmt)
@@ -436,7 +436,7 @@ proc genExpr(g: CodeGen, n: Node) =
   of nkDot: g.genDot(n)
   of nkIfExpr: g.genIf(n)
   of nkClosure: unreachable "closures are NYI"
-  else: unreachable "node must represent an expression"
+  else: g.error(n, ceExprExpected)
 
 proc genVar(g: CodeGen, n: Node) =
   ## Generates code for a variable declaration.
