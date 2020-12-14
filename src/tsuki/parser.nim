@@ -252,6 +252,18 @@ proc parseFor(l: var Lexer): Node =
     varList = nkVarList.tree(forVar).lineInfoFrom(forVar)
   result = nkFor.tree(varList, iter, loop).lineInfoFrom(forToken)
 
+proc parseBreak(l: var Lexer): Node =
+  ## Parses a break statement.
+
+  let breakToken = l.next()  # always tkBreak (see parseStmt)
+  result = nkBreak.tree.lineInfoFrom(breakToken)
+
+proc parseContinue(l: var Lexer): Node =
+  ## Parses a continue statement.
+
+  let continueToken = l.next()  # always tkContinue (see parseStmt)
+  result = nkContinue.tree.lineInfoFrom(continueToken)
+
 proc parseImpl(l: var Lexer): Node =
   ## Parses an object implementation block.
 
@@ -303,6 +315,8 @@ proc parseStmt(l: var Lexer): Node =
   of tkIf: result = l.parseIf(l.next(), isStmt = true)
   of tkWhile: result = l.parseWhile()
   of tkFor: result = l.parseFor()
+  of tkBreak: result = l.parseBreak()
+  of tkContinue: result = l.parseContinue()
   of tkProc: result = l.parseProc(l.next(), anonymous = false)
   of tkObject: result = l.parseObject()
   of tkImpl: result = l.parseImpl()

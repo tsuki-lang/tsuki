@@ -63,14 +63,14 @@ proc disassemble*(chunk: Chunk, a: Assembly): string =
 
     of opcCallProc:
       let id = int chunk.readU16(pc)
-      dest.add(':')
+      dest.add("::")
       dest.addInt(id)
       dest.add(' ')
       dest.add(a.procedures[id].name)
 
     of opcCallMethod:
       let id = int chunk.readU16(pc)
-      dest.add('.')
+      dest.add(":")
       dest.addInt(id)
       dest.add(' ')
       dest.add($a.getMethodSignature(id))

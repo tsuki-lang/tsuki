@@ -10,9 +10,18 @@ import symbol
 import value
 
 type
-  Scope* = object
+  Scope = object
     syms: Table[string, Symbol]
     vars, totalVars: int
+
+  FlowBlockKind = enum
+    fbkLoopOuter
+    fbkLoopIteration
+
+  FlowBlock = object
+    kind: FlowBlockKind
+    breaks: seq[int]
+    bottomScope: int
 
   CodeGen* = ref object
     cs: CompilerState
@@ -21,6 +30,7 @@ type
     chunk: Chunk
 
     scopes: seq[Scope]
+    flowBlocks: seq[FlowBlock]
 
   CompileError* = object of ValueError
     filename*: FilenameId
@@ -31,8 +41,8 @@ type
 
 # init
 
-proc initCodeGen*(cs: CompilerState, assembly: Assembly,
-                  module: Module, chunk: Chunk): CodeGen =
+proc newCodeGen*(cs: CompilerState, assembly: Assembly,
+                 module: Module, chunk: Chunk): CodeGen =
   ## Creates and initializes a new codegen instance.
 
   CodeGen(
@@ -72,7 +82,7 @@ proc pushScope(g: CodeGen) =
   let totalVars =
     if g.scopes.len > 0: g.scopes[^1].totalVars
     else: 0
-  g.scopes.add(Scope(totalVars: totalVars))
+  g.scopes.add Scope(totalVars: totalVars)
 
 proc popScope(g: CodeGen) =
   ## Pops the current scope, together with its variables.
@@ -88,6 +98,43 @@ template withNewScope(g: CodeGen, body: untyped) =
   g.pushScope()
   `body`
   g.popScope()
+
+proc pushFlowBlock(g: CodeGen, kind: FlowBlockKind) =
+  ## Pushes a new flow block, and an associated scope.
+
+  g.pushScope()
+  g.flowBlocks.add FlowBlock(kind: kind, bottomScope: g.scopes.len)
+
+proc popFlowBlock(g: CodeGen) =
+  ## Pops the current flow block, and its associated scope..
+
+  for hole in g.flowBlocks[^1].breaks:
+    g.chunk.patchJump(hole)
+  discard g.flowBlocks.pop()
+  g.popScope()
+
+proc breakFlowBlock(g: CodeGen, kind: FlowBlockKind) =
+  ## Breaks the flow block with the matching kind.
+
+  for i in countdown(g.flowBlocks.high, 0):
+    let flow = g.flowBlocks[i]
+    if flow.kind == kind:
+      var varCount: int
+      for i in countdown(g.scopes.high, flow.bottomScope):
+        let scope = g.scopes[i]
+        inc varCount, scope.vars
+      if varCount > 0:
+        g.chunk.emitOpcode(opcDiscard)
+        g.chunk.emitU8(uint8 varCount)
+      g.flowBlocks[i].breaks.add g.chunk.emitJump(opcJumpFwd)
+      break
+
+template withNewFlowBlock(g: CodeGen, kind: FlowBlockKind, body: untyped) =
+  ## Helper for automatically pushing and popping a flow block.
+
+  g.pushFlowBlock(kind)
+  `body`
+  g.popFlowBlock()
 
 proc lookupSymbol(g: CodeGen, name: Node): Symbol =
   ## Looks up a symbol in context of the current scope.
@@ -369,7 +416,7 @@ proc genExpr(g: CodeGen, n: Node) =
   of nkMember: unreachable "objects are NYI"
   of nkDot: g.genDot(n)
   of nkIfExpr: g.genIf(n)
-  of nkProc: unreachable "closures are NYI"
+  of nkClosure: unreachable "closures are NYI"
   else: unreachable "node must represent an expression"
 
 proc genVar(g: CodeGen, n: Node) =
@@ -398,27 +445,29 @@ template genLoop(g: CodeGen, cond, body: untyped): untyped =
   ## repetition.
 
   block:
-    # emit condition
-    let loopStart = g.chunk.bytecode.len
-    `cond`
-    let jumpAfterLoop = g.chunk.emitJump(opcJumpFwdIfFalsey)
+    g.withNewFlowBlock(fbkLoopOuter):
+      # emit condition
+      let loopStart = g.chunk.bytecode.len
+      `cond`
+      let jumpAfterLoop = g.chunk.emitJump(opcJumpFwdIfFalsey)
 
-    # discard condition
-    g.chunk.emitOpcode(opcDiscard)
-    g.chunk.emitU8(1)
+      # discard condition
+      g.chunk.emitOpcode(opcDiscard)
+      g.chunk.emitU8(1)
 
-    # emit body
-    `body`
+      # emit body
+      g.withNewFlowBlock(fbkLoopIteration):
+        `body`
 
-    # jump back to start
-    g.chunk.emitOpcode(opcJumpBack)
-    g.chunk.emitU16(uint16 g.chunk.bytecode.len - loopStart + 2)
+      # jump back to start
+      g.chunk.emitOpcode(opcJumpBack)
+      g.chunk.emitU16(uint16 g.chunk.bytecode.len - loopStart + 2)
 
-    g.chunk.patchJump(jumpAfterLoop)
+      g.chunk.patchJump(jumpAfterLoop)
 
-    # remember to also discard the condition if the loop was jumped over
-    g.chunk.emitOpcode(opcDiscard)
-    g.chunk.emitU8(1)
+      # remember to also discard the condition if the loop was jumped over
+      g.chunk.emitOpcode(opcDiscard)
+      g.chunk.emitU8(1)
 
 proc genWhile(g: CodeGen, n: Node) =
   ## Generates code for a while loop.
@@ -431,8 +480,7 @@ proc genWhile(g: CodeGen, n: Node) =
     g.genExpr(n[0])
   do:
     # body
-    g.withNewScope:
-      g.genStmtList(n[1])
+    g.genStmtList(n[1])
 
 proc genFor(g: CodeGen, n: Node) =
   ## Generates code for a for loop.
@@ -491,8 +539,23 @@ proc genFor(g: CodeGen, n: Node) =
 
       # then we can execute the loop body
       let loop = n[2]
-      g.withNewScope:
-        g.genStmtList(loop)
+      g.genStmtList(loop)
+
+proc genBreak(g: CodeGen, n: Node) =
+  ## Generates code for a break statement.
+
+  assert n.kind == nkBreak
+  g.lineInfoFrom(n)
+
+  g.breakFlowBlock(fbkLoopOuter)
+
+proc genContinue(g: CodeGen, n: Node) =
+  ## Generates code for a continue statement.
+
+  assert n.kind == nkContinue
+  g.lineInfoFrom(n)
+
+  g.breakFlowBlock(fbkLoopIteration)
 
 proc genStmt(g: CodeGen, n: Node) =
   ## Generates code for a statement.
@@ -505,8 +568,8 @@ proc genStmt(g: CodeGen, n: Node) =
   of nkIfStmt: g.genIf(n)
   of nkWhile: g.genWhile(n)
   of nkFor: g.genFor(n)
-  of nkBreak: unreachable "control flow is NYI"
-  of nkContinue: unreachable "control flow is NYI"
+  of nkBreak: g.genBreak(n)
+  of nkContinue: g.genContinue(n)
   of nkReturn: unreachable "procedures are NYI"
   of nkObject: unreachable "objects are NYI"
   of nkImpl: unreachable "objects are NYI"

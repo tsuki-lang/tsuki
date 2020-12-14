@@ -25,7 +25,7 @@ proc run(test, input: string) =
       assembly = newAssembly()
       chunk = newChunk(filenameId)
       module = newModule(mainChunk = chunk)
-      cg = initCodeGen(cs, assembly, module, chunk)
+      cg = newCodeGen(cs, assembly, module, chunk)
       system = addSystemModule(cs, assembly)
 
       state = newState(cs, assembly)
@@ -147,12 +147,14 @@ run "nim data", """
 """
 
 run "for loops/experimental sample", """
-  var range = 1..10
-  var iter = range._iterate
-  while iter._hasNext
-    var x = iter._next
-    block
-      echo(x)
+  block
+    var iter = (1..10)._iterate
+    var x = nil
+    while iter._hasNext
+      x = iter._next
+      block
+        echo(x)
+      end
     end
   end
 """
@@ -160,5 +162,30 @@ run "for loops/experimental sample", """
 run "for loops/transformed", """
   for x in 1..10
     echo(x)
+  end
+"""
+
+run "loops/break", """
+  var a = 0
+  while true
+    var x = a + 10
+    var y = x + 20
+    a = a + 1
+    echo(a)
+    echo(x)
+    echo(y)
+    if a == 10
+      break
+    end
+  end
+"""
+
+run "loops/continue", """
+  for a in 1..10
+    var x = 1
+    if a == 5
+      continue
+    end
+    echo(a)
   end
 """
