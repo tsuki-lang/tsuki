@@ -206,12 +206,12 @@ else:
   proc getNimData*(v: Value, T: type): T =
 
     when T is ref:
-      cast[T](v.nimData.data)
+      cast[T](cast[pointer](v.nimData.data))
     else:
-      cast[ref T](v.nimData.data)[]
+      cast[ref T](cast[pointer](v.nimData.data))[]
 
   proc mgetNimData*[TT: not ref](v: Value, T: type TT): var T =
-    cast[ref T](v.nimData.data)[]
+    cast[ref T](cast[pointer](v.nimData.data))[]
 
   let
     tsukiNil* = Value(kind: vkNil)
@@ -231,11 +231,12 @@ else:
     assert vtable >= vtableFirstObject
     result = Value(kind: vkNimData, nimData: NimData(vtable: vtable))
     when T is ref:
-      result.nimData.data = cast[ref RootObj](data)
+      result.nimData.data = cast[ref RootObj](cast[pointer](data))
     else:
       var r = new(T)
       r[] = data
-      result.nimData.data = cast[ref RootObj](r)
+      result.nimData.data = cast[ref RootObj](cast[pointer](r))
+    GC_ref(result.nimData.data)
 
   proc newObject*(vtable, size: int): Value =
     Value(kind: vkObject, objectVal: newObjectImpl[Value](vtable, size))

@@ -132,6 +132,16 @@ run "control flow/if..elif..else", """
   end
 """
 
+run "control flow/if/expression", """
+  var cond =
+    if false
+      "hi"
+    else
+      "bye"
+    end
+  echo(cond)
+"""
+
 run "control flow/while", """
   var a = 0
   while a < 10
@@ -175,6 +185,7 @@ run "loops/break", """
     echo(x)
     echo(y)
     if a == 10
+      var z = 10
       break
     end
   end
@@ -184,8 +195,11 @@ run "loops/continue", """
   for a in 1..10
     var x = 1
     if a == 5
+      var z = 20
       continue
     end
     echo(a)
   end
 """
+
+echo getTotalMem()

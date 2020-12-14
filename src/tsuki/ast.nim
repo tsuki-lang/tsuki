@@ -85,6 +85,21 @@ iterator items*(node: Node): Node =
   for n in node.sons:
     yield n
 
+iterator pairs*(node: Node): (int, Node) =
+  ## Iterates over the node's sons with indices.
+
+  var i = 0
+  for n in node.items:
+    yield (i, n)
+
+proc low*(node: Node): int =
+  ## Returns the first index in the node.
+  0
+
+proc high*(node: Node): int =
+  ## Returns the last index in the node.
+  node.sons.high
+
 proc len*(node: Node): int =
   ## Returns the amount of sons the node has.
   node.sons.len
@@ -122,7 +137,8 @@ proc tree*(kind: NodeKind, children: varargs[Node]): Node =
   ## Returns a new tree node with the given children.
 
   result = Node(kind: kind)
-  result.sons.add(@children)
+  for c in children:
+    result.sons.add(c)
 
 proc lineInfoFrom*(node: Node, token: Token): Node {.discardable.} =
   ## Inherits line info from the given token.

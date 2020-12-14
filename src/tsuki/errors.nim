@@ -18,3 +18,4 @@ const
   ceSymCannotBeCalled* = "'$#' cannot be called"
   ceWrongParamCount* = "'$#' takes $# parameters, but $# were supplied"
   ceAsgnInvalidLHS* = "invalid left-hand side of assignment"
+  ceIfExprMustHaveElse* = "if expression must have an else branch"

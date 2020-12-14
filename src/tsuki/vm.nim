@@ -61,7 +61,7 @@ proc setGlobal*(s: State, i: int, v: sink Value) =
     s.globals.setLen(i + 1)
   s.globals[i] = v
 
-proc setError*(s: State, msg: string) =
+proc setError*(s: State, msg: sink string) =
   ## Sets the error message in the state. This then aborts execution in the VM.
   s.nativeError = msg
 
@@ -172,17 +172,18 @@ proc interpret*(s: State, procedure: Procedure, args: seq[Value],
 
     case p.kind
     of pkNative:
+      storeFrame()
       let result =
         p.impl(s, stack.toOpenArray(stackBottom, stack.high))
 
       # check error state
       if s.getError().len > 0:
-        storeFrame()
         abort(s.getError())
 
       # remove params from the stack
-      stack.setLen(stack.len - p.paramCount - ord(isMethodCall))
-      stack.add(result)
+      stack.setLen(stack.len - p.paramCount - ord(isMethodCall) + 1)
+      stack[^1] = result
+      restoreFrame()
     of pkBytecode:
       unreachable "bytecode proc calls are NYI"
 

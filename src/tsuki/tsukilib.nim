@@ -45,9 +45,10 @@ proc addSystemModule*(cs: CompilerState, a: Assembly): Module =
   # echo(_)
   m.addProc a, "echo", 1,
     wrap proc (s: State, args: openArray[Value]): Value =
-      let str = s.call(mDollar, args[0])
-      s.assert(str.isString, "echo expects a string")
-      echo str.getString
+      let strVal = s.call(mDollar, args[0])
+      s.assert(strVal.isString, "echo expects a string")
+      let str = strVal.getString
+      echo str
       tsukiNil
 
   # abort(_)

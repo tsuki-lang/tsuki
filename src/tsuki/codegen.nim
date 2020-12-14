@@ -154,6 +154,14 @@ proc lookupSymbol(g: CodeGen, name: Node): Symbol =
 
   g.assert(result != nil, name, ceSymUndeclared % strName)
 
+proc addSymbol(g: CodeGen, sym: Symbol) =
+  ## Adds a symbol to the topmost scope.
+
+  if g.scopes.len > 0:
+    g.scope.syms[sym.name.stringVal] = sym
+  else:
+    g.module.globalSyms[sym.name.stringVal] = sym
+
 proc defineVar(g: CodeGen, name: Node): Symbol =
   ## Defines a new variable with the given name and returns its symbol.
   ## To set the value, use ``popToVar``.
@@ -164,16 +172,15 @@ proc defineVar(g: CodeGen, name: Node): Symbol =
     result.stackPos = g.scope.totalVars
     inc g.scope.vars
     inc g.scope.totalVars
-    g.scope.syms[name.stringVal] = result
 
   # global variable
   else:
     result = newVarSymbol(name, isLocal = false)
     result.globalId = g.a.globalVarCount
     inc g.a.globalVarCount
-    g.module.globalSyms[name.stringVal] = result
 
   assert result != nil
+  g.addSymbol(result)
 
 proc pushVar(g: CodeGen, sym: Symbol) =
   ## Pushes a copy of the variable's value onto the stack.
@@ -230,14 +237,21 @@ proc genLiteral(g: CodeGen, n: Node) =
 proc genStmt(g: CodeGen, n: Node)
 proc genExpr(g: CodeGen, n: Node)
 
-proc genStmtList(g: CodeGen, n: Node) =
+proc genStmtList(g: CodeGen, n: Node, isExpr: bool) =
   ## Generates code for a statement list.
 
   assert n.kind == nkStmtList
   g.lineInfoFrom(n)
 
-  for stmt in n:
-    g.genStmt(stmt)
+  if isExpr:
+    for i, stmt in n:
+      if i < n.len - 1:
+        g.genStmt(stmt)
+      else:
+        g.genExpr(stmt)
+  else:
+    for stmt in n:
+      g.genStmt(stmt)
 
 proc genVarLookup(g: CodeGen, n: Node) =
   ## Generates code for a variable lookup.
@@ -365,9 +379,10 @@ proc genIf(g: CodeGen, n: Node) =
   g.lineInfoFrom(n)
 
   let isExpr = n.kind == nkIfExpr
-  assert not isExpr, "if expressions are NYI"
 
-  var afterIfBranches: seq[int]
+  var
+    afterIfBranches: seq[int]
+    hadElse = false
 
   for branch in n:
     case branch.kind
@@ -384,7 +399,7 @@ proc genIf(g: CodeGen, n: Node) =
       g.chunk.emitOpcode(opcDiscard)
       g.chunk.emitU8(1)
       g.withNewScope:
-        g.genStmtList(branch[1])
+        g.genStmtList(branch[1], isExpr)
       afterIfBranches.add(g.chunk.emitJump(opcJumpFwd))
 
       # if the branch is falsey, we land here and discard the condition
@@ -395,9 +410,13 @@ proc genIf(g: CodeGen, n: Node) =
     of nkElseBranch:
       # else doesn't need to do any magic
       g.withNewScope:
-        g.genStmtList(branch[0])
+        g.genStmtList(branch[0], isExpr)
+      hadElse = true
 
     else: unreachable
+
+  if isExpr and not hadElse:
+    g.error(n, ceIfExprMustHaveElse)
 
   for i in afterIfBranches:
     g.chunk.patchJump(i)
@@ -480,7 +499,7 @@ proc genWhile(g: CodeGen, n: Node) =
     g.genExpr(n[0])
   do:
     # body
-    g.genStmtList(n[1])
+    g.genStmtList(n[1], isExpr = false)
 
 proc genFor(g: CodeGen, n: Node) =
   ## Generates code for a for loop.
@@ -539,7 +558,7 @@ proc genFor(g: CodeGen, n: Node) =
 
       # then we can execute the loop body
       let loop = n[2]
-      g.genStmtList(loop)
+      g.genStmtList(loop, isExpr = false)
 
 proc genBreak(g: CodeGen, n: Node) =
   ## Generates code for a break statement.
@@ -570,6 +589,7 @@ proc genStmt(g: CodeGen, n: Node) =
   of nkFor: g.genFor(n)
   of nkBreak: g.genBreak(n)
   of nkContinue: g.genContinue(n)
+  of nkProc: unreachable "procedures are NYI"
   of nkReturn: unreachable "procedures are NYI"
   of nkObject: unreachable "objects are NYI"
   of nkImpl: unreachable "objects are NYI"
@@ -583,5 +603,5 @@ proc genScript*(g: CodeGen, n: Node) =
   ## Generates code for a toplevel statement list.
 
   g.lineInfoFrom(n)
-  g.genStmtList(n)
+  g.genStmtList(n, isExpr = false)
   g.chunk.emitOpcode(opcHalt)
