@@ -387,6 +387,15 @@ proc genDot(g: CodeGen, n: Node) =
   g.chunk.emitOpcode(opcCallMethod)
   g.chunk.emitU16(vid.uint16)
 
+proc genBlockExprOrStmt(g: CodeGen, n: Node) =
+  ## Generates code for a block expression statement.
+
+  assert n.kind in {nkBlockExpr, nkBlockStmt}
+  g.lineInfoFrom(n)
+
+  g.withNewScope:
+    g.genStmtList(n[0], isExpr = n.kind == nkBlockExpr)
+
 proc genIf(g: CodeGen, n: Node) =
   ## Generates code for an if expression or statement.
 
@@ -501,6 +510,7 @@ proc genExpr(g: CodeGen, n: Node) =
   of nkConstr: unreachable "objects are NYI"
   of nkMember: unreachable "objects are NYI"
   of nkDot: g.genDot(n)
+  of nkBlockExpr: g.genBlockExprOrStmt(n)
   of nkIfExpr: g.genIf(n)
   of nkClosure: g.genProc(n)
   else: g.error(n, ceExprExpected)
@@ -517,16 +527,6 @@ proc genVar(g: CodeGen, n: Node) =
     g.genExpr(n[1])
     let sym = g.defineVar(name)
     g.popToVar(sym)
-
-proc genBlockStmt(g: CodeGen, n: Node) =
-  ## Generates code for a block statement.
-
-  assert n.kind == nkBlockStmt
-  g.lineInfoFrom(n)
-
-  g.withNewScope:
-    for stmt in n:
-      g.genStmt(stmt)
 
 template genLoop(g: CodeGen, cond, body: untyped): untyped =
   ## Skeleton for loop generation. Used in ``genWhile`` and ``genFor`` to reduce
@@ -668,7 +668,7 @@ proc genStmt(g: CodeGen, n: Node) =
 
   case n.kind
   of nkVar: g.genVar(n)
-  of nkBlockStmt: g.genBlockStmt(n)
+  of nkBlockStmt: g.genBlockExprOrStmt(n)
   of nkIfStmt: g.genIf(n)
   of nkWhile: g.genWhile(n)
   of nkFor: g.genFor(n)

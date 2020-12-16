@@ -43,6 +43,17 @@ proc parseBlock(l: var Lexer, dest: var seq[Node],
     dest.add(l.parseStmt())
     l.skip(tkSemi)
 
+proc parseBlockExprOrStmt(l: var Lexer, token: Token, isStmt: bool): Node =
+  ## Parses a block expression or statement.
+
+  let nodeKind =
+    if isStmt: nkBlockStmt
+    else: nkBlockExpr
+  var stmts = nkStmtList.tree()
+  result = nodeKind.tree(stmts).lineInfoFrom(token)
+  l.parseBlock(stmts.sons, {tkEnd})
+  discard l.next()  # always tkEnd
+
 proc parseIf(l: var Lexer, token: Token, isStmt: bool): Node =
   ## Parses an if expression or statement.
 
@@ -103,7 +114,6 @@ proc parseProc(l: var Lexer, token: Token, anonymous: static bool): Node =
       identNode(nameToken)
 
   var body = nkStmtList.tree().lineInfoFrom(l.peek())
-  echo l.peek
   if l.peekOperator("=>"):
     let eqToken = l.next()
     if l.peekOperator("..."):
@@ -148,6 +158,7 @@ proc parsePrefix(l: var Lexer, token: Token): Node =
   of tkLParen:
     result = nkParen.tree(l.parseExpr())
     discard l.expect(tkRParen, peTokenMissing % ")")
+  of tkBlock: result = l.parseBlockExprOrStmt(token, isStmt = false)
   of tkIf: result = l.parseIf(token, isStmt = false)
   of tkProc: result = l.parseProc(token, anonymous = true)
   else: l.error(token, peUnexpectedToken % $token)
@@ -210,14 +221,6 @@ proc parseVar(l: var Lexer): Node =
   l.expectOperator("=", peXExpected % "'='")
   let value = l.parseExpr()
   result = nkVar.tree(names, value).lineInfoFrom(varToken)
-
-proc parseBlockStmt(l: var Lexer): Node =
-  ## Parses a block statement.
-
-  let blockToken = l.next()  # always tkBlock (see parseStmt)
-  result = nkBlockStmt.tree().lineInfoFrom(blockToken)
-  l.parseBlock(result.sons, {tkEnd})
-  discard l.next()  # always tkEnd
 
 proc parseWhile(l: var Lexer): Node =
   ## Parses a while loop.
@@ -320,7 +323,7 @@ proc parseStmt(l: var Lexer): Node =
 
   case l.peek().kind
   of tkVar: result = l.parseVar()
-  of tkBlock: result = l.parseBlockStmt()
+  of tkBlock: result = l.parseBlockExprOrStmt(l.next(), isStmt = true)
   of tkIf: result = l.parseIf(l.next(), isStmt = true)
   of tkWhile: result = l.parseWhile()
   of tkFor: result = l.parseFor()

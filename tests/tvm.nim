@@ -61,7 +61,7 @@ run "variables and scope", """
   var b = a
 """
 
-run "nested scopes", """
+run "block/nested", """
   block
     var a = 1
     block
@@ -75,6 +75,14 @@ run "nested scopes", """
         end
       end
     end
+  end
+"""
+
+run "block/expression", """
+  var x = block
+    var a = 10
+    var b = 20
+    a + b
   end
 """
 

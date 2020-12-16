@@ -18,6 +18,7 @@ type
     nkPrefix
     nkInfix
     nkParen         # parenthesized expression
+    nkBlockExpr     # block expression
     nkCall          # proc call
     nkConstr        # object construction
     nkMember        # member access ``.a``
