@@ -20,3 +20,6 @@ const
   ceAsgnInvalidLHS* = "invalid left-hand side of assignment"
   ceIfExprMustHaveElse* = "if expression must have an else branch"
   ceExprExpected* = "expression expected"
+  ceInvalidBreak* = "break can only be used in loops"
+  ceInvalidContinue* = "continue can only be used in loops"
+  ceInvalidReturn* = "return can only be used in procedures"

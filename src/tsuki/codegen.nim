@@ -33,6 +33,9 @@ type
     scopes: seq[Scope]
     flowBlocks: seq[FlowBlock]
 
+    result: Symbol
+      # the result variable, not nil if the CodeGen is a proc generator
+
   CompileError* = object of ValueError
     filename*: FilenameId
     lineInfo*: LineInfo
@@ -122,8 +125,10 @@ proc popFlowBlock(g: CodeGen) =
   discard g.flowBlocks.pop()
   g.popScope()
 
-proc breakFlowBlock(g: CodeGen, kind: FlowBlockKind) =
+proc breakFlowBlock(g: CodeGen, kind: FlowBlockKind): bool =
   ## Breaks the flow block with the matching kind.
+  ## Returns true if a block was successfully broken out of, or false if a
+  ## matching block could not be found.
 
   for i in countdown(g.flowBlocks.high, 0):
     let flow = g.flowBlocks[i]
@@ -137,7 +142,7 @@ proc breakFlowBlock(g: CodeGen, kind: FlowBlockKind) =
         g.chunk.emitOpcode(opcDiscard)
         g.chunk.emitU8(uint8 varCount)
       g.flowBlocks[i].breaks.add g.chunk.emitJump(opcJumpFwd)
-      break
+      return true
 
 template withNewFlowBlock(g: CodeGen, kind: FlowBlockKind, body: untyped) =
   ## Helper for automatically pushing and popping a flow block.
@@ -465,20 +470,22 @@ proc genProc(g: CodeGen, n: Node) =
   # parameters
   if params.kind != nkEmpty:
     for name in params:
-      discard cg.defineVar(name)
+      var sym = cg.defineVar(name)
+      sym.isSet = true
 
   # result variable
   cg.lineInfoFrom(params)
   cg.chunk.emitOpcode(opcPushNil)
-  var resultSym = cg.defineVar(identNode("result").lineInfoFrom(params))
-  resultSym.isSet = true
+  cg.result = cg.defineVar(identNode("result").lineInfoFrom(params))
+  cg.result.isSet = true
 
   # body
   cg.withNewFlowBlock(fbkProcBody):
     cg.genStmtList(body, isExpr = false)
 
   # return the value stored in `result`
-  cg.pushVar(resultSym)
+  # `result` is already at the top of the stack so we don't need to copy it
+  # one more time
   cg.chunk.emitOpcode(opcReturn)
 
 proc genExpr(g: CodeGen, n: Node) =
@@ -504,6 +511,8 @@ proc genVar(g: CodeGen, n: Node) =
   assert n.kind == nkVar
   g.lineInfoFrom(n)
 
+  # note: multiple var names aren't supported by the syntax yet, but the logic
+  # is here.
   for name in n[0]:
     g.genExpr(n[1])
     let sym = g.defineVar(name)
@@ -626,7 +635,8 @@ proc genBreak(g: CodeGen, n: Node) =
   assert n.kind == nkBreak
   g.lineInfoFrom(n)
 
-  g.breakFlowBlock(fbkLoopOuter)
+  if not g.breakFlowBlock(fbkLoopOuter):
+    g.error(n, ceInvalidBreak)
 
 proc genContinue(g: CodeGen, n: Node) =
   ## Generates code for a continue statement.
@@ -634,7 +644,22 @@ proc genContinue(g: CodeGen, n: Node) =
   assert n.kind == nkContinue
   g.lineInfoFrom(n)
 
-  g.breakFlowBlock(fbkLoopIteration)
+  if not g.breakFlowBlock(fbkLoopIteration):
+    g.error(n, ceInvalidContinue)
+
+proc genReturn(g: CodeGen, n: Node) =
+  ## Generates code for a return statement.
+
+  assert n.kind == nkReturn
+  g.lineInfoFrom(n)
+
+  g.assert(g.result != nil, n, ceInvalidReturn)
+
+  if n[0].kind == nkEmpty:
+    g.pushVar(g.result)
+  else:
+    g.genExpr(n[0])
+  g.chunk.emitOpcode(opcReturn)
 
 proc genStmt(g: CodeGen, n: Node) =
   ## Generates code for a statement.
@@ -650,7 +675,7 @@ proc genStmt(g: CodeGen, n: Node) =
   of nkBreak: g.genBreak(n)
   of nkContinue: g.genContinue(n)
   of nkProc: g.genProc(n)
-  of nkReturn: unreachable "procedures are NYI"
+  of nkReturn: g.genReturn(n)
   of nkObject: unreachable "objects are NYI"
   of nkImpl: unreachable "objects are NYI"
   else:

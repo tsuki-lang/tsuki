@@ -231,7 +231,6 @@ run "procs/implicit result", """
   proc fac(n)
     result = 1
     for i in 1..n
-      echo(i)
       result = result * i
     end
   end
@@ -251,6 +250,24 @@ run "procs/recursive", """
   for i in 1..10
     echo(fib(i))
   end
+"""
+
+run "procs/return", """
+  proc loop(x)
+    var i = x
+    while true
+      if x >= 10
+        return x + 10
+      end
+      x = x + 3
+    end
+  end
+
+  echo(loop(31))
+
+  proc shorthand => 10
+
+  echo(shorthand())
 """
 
 echo getTotalMem()

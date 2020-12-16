@@ -293,24 +293,38 @@ proc matchChar(l: var Lexer, set: set[char], dest: var string): bool =
 
 {.pop.}
 
+proc matchLinebreak*(l: var Lexer): bool =
+  ## Returns true if a line break was matched.
+  ## This skips any whitespace and comments first, then looks for line breaks.
 
-proc skipIgnored*(l: var Lexer) =
-  ## Skips comments, whitespace, and line breaks.
-
+  # skip whitespace + comments
   while true:
     case l.get
     of whitespace:
       l.discardChars(whitespace)
+    of '#':
+      l.discardChars(allChars - lineBreaks)
+    else: break
+
+  # handle linebreaks if there are any
+  while true:
+    case l.get
     of '\n':
       l.advance()
       inc l.lineInfo.line
       l.lineInfo.column = 0
+      result = true
     of '\r':
       l.advance()
       l.lineInfo.column = 0
-    of '#':
-      l.discardChars(allChars - lineBreaks)
+      result = true
     else: break
+
+proc skipIgnored*(l: var Lexer) =
+  ## Skips comments, whitespace, and line breaks.
+
+  while l.matchLinebreak():
+    discard
 
 proc next*(l: var Lexer): Token =
   ## Returns the next token in the input string.

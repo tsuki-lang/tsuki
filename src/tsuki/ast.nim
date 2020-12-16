@@ -71,6 +71,10 @@ proc `[]`*(node: Node, index: Index): Node =
   ## Indexes the node.
   node.sons[index]
 
+proc `[]=`*(node: Node, index: Index, son: Node) =
+  ## Modifies the node.
+  node.sons[index] = son
+
 proc `[]`*(node: Node, slice: SomeSlice): seq[Node] =
   ## Slices the node.
   node.sons[slice]

@@ -103,7 +103,8 @@ proc parseProc(l: var Lexer, token: Token, anonymous: static bool): Node =
       identNode(nameToken)
 
   var body = nkStmtList.tree().lineInfoFrom(l.peek())
-  if l.peekOperator("="):
+  echo l.peek
+  if l.peekOperator("=>"):
     let eqToken = l.next()
     if l.peekOperator("..."):
       body = emptyNode().lineInfoFrom(l.next())
@@ -263,6 +264,15 @@ proc parseContinue(l: var Lexer): Node =
   let continueToken = l.next()  # always tkContinue (see parseStmt)
   result = nkContinue.tree.lineInfoFrom(continueToken)
 
+proc parseReturn(l: var Lexer): Node =
+  ## Parses a return statement.
+
+  let returnToken = l.next()  # always tkReturn (see parseStmt)
+  result = nkReturn.tree(emptyNode()).lineInfoFrom(returnToken)
+
+  if not l.matchLinebreak():
+    result[0] = l.parseExpr()
+
 proc parseImpl(l: var Lexer): Node =
   ## Parses an object implementation block.
 
@@ -317,6 +327,7 @@ proc parseStmt(l: var Lexer): Node =
   of tkBreak: result = l.parseBreak()
   of tkContinue: result = l.parseContinue()
   of tkProc: result = l.parseProc(l.next(), anonymous = false)
+  of tkReturn: result = l.parseReturn()
   of tkObject: result = l.parseObject()
   of tkImpl: result = l.parseImpl()
   else: result = l.parseExpr()
