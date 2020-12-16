@@ -442,6 +442,7 @@ proc genProc(g: CodeGen, n: Node) =
     isClosure = g.scopes.len > 0 or not isNamed
   assert not isClosure, "closures are NYI"
 
+  # set up a new codegen
   var cg = g.createSub()
   cg.chunk = newChunk(g.chunk.filename)
   let
@@ -449,6 +450,13 @@ proc genProc(g: CodeGen, n: Node) =
     paramCount =
       if params.kind == nkEmpty: 0
       else: params.len
+
+  # create a new Procedure and a symbol for it
+  let
+    p = g.a.addProc(name.stringVal, paramCount, cg.chunk)
+    sym = newSymbol(skProc, name)
+  sym.procId = p.id
+  g.addSymbol(sym)
 
   # create a new scope. this scope is never popped as opcReturn makes sure that
   # all variables are removed from the stack
@@ -460,6 +468,7 @@ proc genProc(g: CodeGen, n: Node) =
       discard cg.defineVar(name)
 
   # result variable
+  cg.lineInfoFrom(params)
   cg.chunk.emitOpcode(opcPushNil)
   var resultSym = cg.defineVar(identNode("result").lineInfoFrom(params))
   resultSym.isSet = true
@@ -471,13 +480,6 @@ proc genProc(g: CodeGen, n: Node) =
   # return the value stored in `result`
   cg.pushVar(resultSym)
   cg.chunk.emitOpcode(opcReturn)
-
-  # create a new Procedure and a symbol for it
-  let
-    p = g.a.addProc(name.stringVal, paramCount, cg.chunk)
-    sym = newSymbol(skProc, name)
-  sym.procId = p.id
-  g.addSymbol(sym)
 
 proc genExpr(g: CodeGen, n: Node) =
   ## Generates code for an expression.

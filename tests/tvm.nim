@@ -239,4 +239,18 @@ run "procs/implicit result", """
   echo(fac(10))
 """
 
+run "procs/recursive", """
+  proc fib(n)
+    result =
+      if   n == 0  0
+      elif n == 1  1
+      else         fib(n - 1) + fib(n - 2)
+      end
+  end
+
+  for i in 1..10
+    echo(fib(i))
+  end
+"""
+
 echo getTotalMem()
