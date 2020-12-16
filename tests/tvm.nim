@@ -1,6 +1,6 @@
 # tests for codegen
 
-import std/sugar
+import std/strutils
 
 import tsuki/chunk
 import tsuki/codegen
@@ -32,7 +32,13 @@ proc run(test, input: string) =
 
     module.importAll(system)
     cg.genScript(ast)
+
     echo chunk.disassemble(assembly)
+    for i, p in assembly.procedures:
+      echo "* procedure ", i, ": ", $(p.name, p.paramCount).MethodSignature
+      if p.kind == pkBytecode:
+        echo p.chunk.disassemble(assembly).indent(2)
+
     echo "<interpret result> ", state.interpret(chunk)
 
   except ValueError as e:
@@ -208,6 +214,29 @@ run "procs/basic definition", """
   end
 
   sayHello()
+"""
+
+run "procs/with parameters", """
+  proc doThings(a, b, c)
+    echo(a + b * c)
+  end
+
+  doThings(1, 2, 3)
+"""
+
+run "procs/implicit result", """
+  proc nop end
+  echo(nop())
+
+  proc fac(n)
+    result = 1
+    for i in 1..n
+      echo(i)
+      result = result * i
+    end
+  end
+
+  echo(fac(10))
 """
 
 echo getTotalMem()

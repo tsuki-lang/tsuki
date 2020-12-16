@@ -174,10 +174,13 @@ proc addSystemModule*(cs: CompilerState, a: Assembly): Module =
       let r = args[0].getNimData(Range)
       result = initValue(
         vtableCountup,
-        Countup(
-          lo: min(r.a.int, r.b.int), hi: max(r.a.int, r.b.int), stride: 1,
-          i: 0
-        )
+        block:
+          var c = Countup(
+            lo: min(r.a.int, r.b.int), hi: max(r.a.int, r.b.int),
+            stride: 1,
+          )
+          c.i = c.lo
+          c
       )
 
     a.addMethod vtableRange, "_iterate", 0, wrap impl
@@ -192,10 +195,13 @@ proc addSystemModule*(cs: CompilerState, a: Assembly): Module =
         stride = args[1].getFloat.int
       initValue(
         vtableCountup,
-        Countup(
-          lo: min(r.a.int, r.b.int), hi: max(r.a.int, r.b.int), stride: stride,
-          i: 0
-        )
+        block:
+          var c = Countup(
+            lo: min(r.a.int, r.b.int), hi: max(r.a.int, r.b.int),
+            stride: stride,
+          )
+          c.i = c.lo
+          c
       )
 
   # _iterate

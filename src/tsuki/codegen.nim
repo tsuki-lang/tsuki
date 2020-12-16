@@ -450,25 +450,27 @@ proc genProc(g: CodeGen, n: Node) =
       if params.kind == nkEmpty: 0
       else: params.len
 
-  # compile the proc in cg's context
-  cg.withNewScope:
+  # create a new scope. this scope is never popped as opcReturn makes sure that
+  # all variables are removed from the stack
+  cg.pushScope()
 
-    # parameters
-    if params.kind != nkEmpty:
-      for name in params:
-        discard cg.defineVar(name)
+  # parameters
+  if params.kind != nkEmpty:
+    for name in params:
+      discard cg.defineVar(name)
 
-    # result variable
-    cg.chunk.emitOpcode(opcPushNil)
-    let resultSym = cg.defineVar(identNode("result").lineInfoFrom(params))
+  # result variable
+  cg.chunk.emitOpcode(opcPushNil)
+  var resultSym = cg.defineVar(identNode("result").lineInfoFrom(params))
+  resultSym.isSet = true
 
-    # body
-    cg.withNewFlowBlock(fbkProcBody):
-      cg.genStmtList(body, isExpr = false)
+  # body
+  cg.withNewFlowBlock(fbkProcBody):
+    cg.genStmtList(body, isExpr = false)
 
-    # return the value stored in `result`
-    cg.pushVar(resultSym)
-    cg.chunk.emitOpcode(opcReturn)
+  # return the value stored in `result`
+  cg.pushVar(resultSym)
+  cg.chunk.emitOpcode(opcReturn)
 
   # create a new Procedure and a symbol for it
   let

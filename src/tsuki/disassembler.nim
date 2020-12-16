@@ -24,6 +24,9 @@ proc disassemble*(chunk: Chunk, a: Assembly): string =
     dest.add(pc.BiggestUInt.toHex(8))
     dest.add("  ")
 
+    let (line, column) = chunk.getLineInfo(pc)
+    dest.add(alignLeft($line & ":" & $column, 8))
+
     let opcode = chunk.readOpcode(pc)
     dest.add(($opcode)[3..^1].alignLeft(longestOpcodeLen + 2))
 

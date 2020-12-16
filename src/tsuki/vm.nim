@@ -153,6 +153,8 @@ proc interpret*(s: State, procedure: Procedure, args: seq[Value],
     procName = f.procName
 
   template abort(message: string) =
+    storeFrame()
+
     var e = new(InterpretError)
     e.error = message
     e.cs = s.cs
@@ -164,7 +166,7 @@ proc interpret*(s: State, procedure: Procedure, args: seq[Value],
         entry.native = true
       else:
         entry.filename = f.chunk.filename
-        entry.lineInfo = f.chunk.getLineInfo(errpc)
+        entry.lineInfo = f.chunk.getLineInfo(f.errpc)
       e.callStack.add(entry)
 
     e.msg.addFormattedError(e[])
