@@ -17,6 +17,7 @@ type
   FlowBlockKind = enum
     fbkLoopOuter
     fbkLoopIteration
+    fbkProcBody
 
   FlowBlock = object
     kind: FlowBlockKind
@@ -48,6 +49,14 @@ proc newCodeGen*(cs: CompilerState, assembly: Assembly,
   CodeGen(
     cs: cs, a: assembly,
     module: module, chunk: chunk
+  )
+
+proc createSub(g: CodeGen): CodeGen =
+  ## Creates a sub-codegen of the given codegen.
+
+  CodeGen(
+    cs: g.cs, a: g.a,
+    module: g.module,
   )
 
 
@@ -121,6 +130,7 @@ proc breakFlowBlock(g: CodeGen, kind: FlowBlockKind) =
     if flow.kind == kind:
       var varCount: int
       for i in countdown(g.scopes.high, flow.bottomScope):
+        # i think this for loop can be avoided but i haven't figured out how.
         let scope = g.scopes[i]
         inc varCount, scope.vars
       if varCount > 0:
@@ -421,6 +431,52 @@ proc genIf(g: CodeGen, n: Node) =
   for i in afterIfBranches:
     g.chunk.patchJump(i)
 
+proc genProc(g: CodeGen, n: Node) =
+  ## Generates code for a procedure declaration or closure.
+
+  assert n.kind in {nkProc, nkClosure}
+  g.lineInfoFrom(n)
+
+  let
+    isNamed = n.kind == nkProc
+    isClosure = g.scopes.len > 0 or not isNamed
+  assert not isClosure, "closures are NYI"
+
+  var cg = g.createSub()
+  cg.chunk = newChunk(g.chunk.filename)
+  let
+    (name, params, body) = (n[0], n[1], n[2])
+    paramCount =
+      if params.kind == nkEmpty: 0
+      else: params.len
+
+  # compile the proc in cg's context
+  cg.withNewScope:
+
+    # parameters
+    if params.kind != nkEmpty:
+      for name in params:
+        discard cg.defineVar(name)
+
+    # result variable
+    cg.chunk.emitOpcode(opcPushNil)
+    let resultSym = cg.defineVar(identNode("result").lineInfoFrom(params))
+
+    # body
+    cg.withNewFlowBlock(fbkProcBody):
+      cg.genStmtList(body, isExpr = false)
+
+    # return the value stored in `result`
+    cg.pushVar(resultSym)
+    cg.chunk.emitOpcode(opcReturn)
+
+  # create a new Procedure and a symbol for it
+  let
+    p = g.a.addProc(name.stringVal, paramCount, cg.chunk)
+    sym = newSymbol(skProc, name)
+  sym.procId = p.id
+  g.addSymbol(sym)
+
 proc genExpr(g: CodeGen, n: Node) =
   ## Generates code for an expression.
 
@@ -435,7 +491,7 @@ proc genExpr(g: CodeGen, n: Node) =
   of nkMember: unreachable "objects are NYI"
   of nkDot: g.genDot(n)
   of nkIfExpr: g.genIf(n)
-  of nkClosure: unreachable "closures are NYI"
+  of nkClosure: g.genProc(n)
   else: g.error(n, ceExprExpected)
 
 proc genVar(g: CodeGen, n: Node) =
@@ -589,7 +645,7 @@ proc genStmt(g: CodeGen, n: Node) =
   of nkFor: g.genFor(n)
   of nkBreak: g.genBreak(n)
   of nkContinue: g.genContinue(n)
-  of nkProc: unreachable "procedures are NYI"
+  of nkProc: g.genProc(n)
   of nkReturn: unreachable "procedures are NYI"
   of nkObject: unreachable "objects are NYI"
   of nkImpl: unreachable "objects are NYI"

@@ -202,4 +202,12 @@ run "loops/continue", """
   end
 """
 
+run "procs/basic definition", """
+  proc sayHello
+    echo("hello")
+  end
+
+  sayHello()
+"""
+
 echo getTotalMem()

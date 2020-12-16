@@ -78,7 +78,7 @@ proc disassemble*(chunk: Chunk, a: Assembly): string =
     of opcDiscard:
       dest.add($chunk.readU8(pc))
 
-    of opcHalt: discard
+    of opcReturn, opcHalt: discard
 
     dest.add('\n')
     result.add(dest)

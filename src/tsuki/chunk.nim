@@ -40,6 +40,7 @@ type
     # calls
     opcCallProc
     opcCallMethod
+    opcReturn
 
     # halting
     opcHalt
@@ -143,7 +144,7 @@ proc addMethod*(vt: var Vtable, i: int, name: string, paramCount: int,
 
   var p = Procedure(
     id: i,
-    name: name, paramCount: paramCount,
+    name: name, paramCount: paramCount + 1,  # add one for the receiver
     kind: pkBytecode, chunk: chunk,
   )
   vt.methods[i] = some p
@@ -157,7 +158,7 @@ proc addMethod*(vt: var Vtable, i: int, name: string, paramCount: int,
 
   var p = Procedure(
     id: i,
-    name: name, paramCount: paramCount,
+    name: name, paramCount: paramCount + 1,  # again, add one for the receiver
     kind: pkNative, impl: impl,
   )
   vt.methods[i] = some p

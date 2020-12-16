@@ -108,7 +108,6 @@ proc parseProc(l: var Lexer, token: Token, anonymous: static bool): Node =
     if l.peekOperator("..."):
       body = emptyNode().lineInfoFrom(l.next())
     else:
-      let token = l.peek()
       body.add(nkReturn.tree(l.parseExpr()).lineInfoFrom(eqToken))
   else:
     l.parseBlock(body.sons, {tkEnd})

@@ -142,6 +142,10 @@ proc interpret*(s: State, procedure: Procedure, args: seq[Value],
     ))
 
   template restoreFrame() =
+    # discard locals/params/everything from the current stack frame
+    stack.setLen(stackBottom)
+
+    # restore the running chunk, pc, stack bottom, proc name
     let f = s.callStack.pop()
     c = f.chunk
     pc = f.pc
@@ -166,13 +170,14 @@ proc interpret*(s: State, procedure: Procedure, args: seq[Value],
     e.msg.addFormattedError(e[])
     raise e
 
-  template doCall(p: Procedure, isMethodCall: bool) =
+  template doCall(p: Procedure) =
+    storeFrame()
     c = nil
     procName = p.name
+    stackBottom = stack.len - p.paramCount
 
     case p.kind
     of pkNative:
-      storeFrame()
       let result =
         p.impl(s, stack.toOpenArray(stackBottom, stack.high))
 
@@ -180,16 +185,21 @@ proc interpret*(s: State, procedure: Procedure, args: seq[Value],
       if s.getError().len > 0:
         abort(s.getError())
 
-      # remove params from the stack
-      stack.setLen(stack.len - p.paramCount - ord(isMethodCall) + 1)
-      stack[^1] = result
+      # restore the previous stack frame
       restoreFrame()
+
+      # store the new result at the top
+      stack.add(result)
+
     of pkBytecode:
-      unreachable "bytecode proc calls are NYI"
+      # as simple as it could get.
+      # the stack frame gets restored by the opcReturn at the end of each proc
+      c = p.chunk
+      pc = 0
 
   case procedure.kind
   of pkNative:
-    doCall(procedure, isMethodCall)
+    doCall(procedure)
   of pkBytecode:
     c = procedure.chunk
     while true:
@@ -255,36 +265,31 @@ proc interpret*(s: State, procedure: Procedure, args: seq[Value],
         pc -= c.readU16(pc).int
 
       of opcCallProc:
-
         let p = s.a.procedures[c.readU16(pc)]
-        storeFrame()
-
-        # adjust stack bottom to match the proc's signature
-        stackBottom = stack.len - p.paramCount
-
-        # do the call
-        doCall(p, isMethodCall = false)
-        restoreFrame()
+        doCall(p)
 
       of opcCallMethod:
 
         let
           vid = int c.readU16(pc)
           sig = s.a.getMethodSignature(vid)
-        storeFrame()
-        stackBottom = stack.len - sig.paramCount - 1
 
         let
-          receiver = local(0)
+          receiver = stack[stack.high - sig.paramCount]
           vtable = s.a.vtables[receiver.vtable]
 
         if vtable.hasMethod(vid):
           # do the call
           let m = vtable.getMethod(vid)
-          doCall(m, isMethodCall = true)
+          doCall(m)
         else:
           abort('\'' & vtable.name & "' does not respond to '" & $sig & '\'')
+
+      of opcReturn:
+
+        let val = stack[^1]
         restoreFrame()
+        stack.add(val)
 
       of opcHalt: break
 
