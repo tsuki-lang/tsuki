@@ -326,7 +326,7 @@ proc genAssignment(g: CodeGen, left, right: Node) =
 
     let
       name = setter.stringVal & '='
-      vid = g.a.getVtableIndex(name, paramCount = 1)
+      vid = g.a.getVtableIndex(name, paramCount = 2)
     g.chunk.emitOpcode(opcCallMethod)
     g.chunk.emitU16(vid.uint16)
 
@@ -467,8 +467,16 @@ proc genConstr(g: CodeGen, n: Node) =
     let index = sym.fields[name]
     fieldValues[index] = value
 
-  for value in fieldValues:
-    g.genExpr(value)
+  var uninitialized: seq[string]
+  for i, value in fieldValues:
+    if uninitialized.len == 0 and value != nil:
+      g.genExpr(value)
+    else:
+      uninitialized.add(sym.fieldNames[i])
+
+  if uninitialized.len > 0:
+    g.error(n, ceFieldsUninitialized % uninitialized.join(", "))
+
   g.chunk.emitOpcode(opcNewObject)
   g.chunk.emitU16(sym.vtable)
   g.chunk.emitU8(uint8 fieldValues.len)
@@ -819,6 +827,7 @@ proc genObject(g: CodeGen, n: Node) =
     # inherit existing fields
     for name, index in parent.fields:
       sym.fields[name] = index
+    sym.fieldNames.add(parent.fieldNames)
 
     # inherit existing methods
     let parentvt = g.a.vtables[parent.vtable]
@@ -830,6 +839,7 @@ proc genObject(g: CodeGen, n: Node) =
     let name = nameNode.stringVal
     g.assert(name notin sym.fields, nameNode, ceFieldAlreadyExists % name)
     sym.fields[name] = uint8 sym.fields.len
+    sym.fieldNames.add(name)
 
   g.addSymbol(sym)
 

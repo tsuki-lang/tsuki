@@ -26,6 +26,7 @@ type
     of skObject:
       vtable*: uint16
       fields*: Table[string, uint8]
+      fieldNames*: seq[string]
       methods*: set[uint16]
       children*: seq[Symbol]
 

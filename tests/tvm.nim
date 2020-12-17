@@ -3,6 +3,7 @@
 import std/options
 import std/strutils
 
+import tsuki/ast
 import tsuki/chunk
 import tsuki/codegen
 import tsuki/common
@@ -30,6 +31,9 @@ proc run(test, input: string) =
       system = addSystemModule(cs, assembly)
 
       state = newState(cs, assembly)
+
+    when defined(dumpAst):
+      echo ast.treeRepr
 
     module.importAll(system)
     cg.genScript(ast)
@@ -319,6 +323,26 @@ run "objects/impl", """
     c.count()
     echo(c.value)
   end
+"""
+
+run "objects/call styles", """
+
+  object Dummy = _
+
+  impl Dummy
+    proc named end
+    proc setter=(x) end
+    proc ! end
+    proc !(x) end
+  end
+
+  var d = Dummy { _ = nil }
+  d.named;
+  d.named();
+  d.setter = 1;
+  !d;
+  d ! 1;
+
 """
 
 echo getOccupiedMem()

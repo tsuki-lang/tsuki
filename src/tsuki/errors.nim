@@ -25,8 +25,9 @@ const
   ceInvalidBreak* = "break can only be used in loops"
   ceInvalidContinue* = "continue can only be used in loops"
   ceInvalidReturn* = "return can only be used in procedures"
-  ceFieldAlreadyExists* = "field '$#' already is already declared"
+  ceFieldAlreadyExists* = "field '$#' is already declared"
   ceFieldUndeclared* = "undeclared field '$#'"
+  ceFieldsUninitialized* = "all fields must be initialized; missing: $#"
   ceImplInvalid* = "an impl block may only contain proc definitions"
   ceInvalidMember* =
     "member access '.$#' may only be used inside of an impl block"

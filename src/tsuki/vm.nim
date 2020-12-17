@@ -213,6 +213,9 @@ proc interpret*(s: State, procedure: Procedure, args: seq[Value],
     procName = p.name
     stackBottom = stack.len - p.paramCount
 
+    when defined(tsukiDebugStack):
+      echo "-- stack bottom: ", stackBottom
+
     case p.kind
     of pkNative:
       let result =
