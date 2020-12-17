@@ -130,6 +130,7 @@ proc `$`*(ms: MethodSignature): string =
       result.add(", ")
   result.add(')')
 
+
 # vtable
 
 proc hasMethod*(vt: Vtable, i: int): bool =

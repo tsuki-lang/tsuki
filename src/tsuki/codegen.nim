@@ -306,6 +306,8 @@ proc genAssignment(g: CodeGen, left, right: Node) =
 
   of nkMember:
     # assignment to field
+    g.assert(left[0].kind == nkIdent, left[0], ceIdentExpected)
+
     let name = left[0].stringVal
     g.assert(g.objectType != nil, left, ceInvalidMember % name)
     g.assert(name in g.objectType.fields, left, ceFieldUndeclared % name)
@@ -395,7 +397,7 @@ proc genCall(g: CodeGen, n: Node) =
 
         # call the method
         let
-          argc = n.high
+          argc = n.len
           mid = g.a.getVtableIndex(name, argc)
         g.chunk.emitOpcode(opcCallMethod)
         g.chunk.emitU16(uint16 mid)

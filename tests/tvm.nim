@@ -334,14 +334,18 @@ run "objects/call styles", """
     proc setter=(x) end
     proc ! end
     proc !(x) end
+    proc memberStyle
+      .named()
+    end
   end
 
   var d = Dummy { _ = nil }
-  d.named;
-  d.named();
+  d.named
+  d.named()
   d.setter = 1;
-  !d;
-  d ! 1;
+  !d
+  d ! 1
+  d.memberStyle()
 
 """
 
