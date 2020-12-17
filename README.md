@@ -3,7 +3,7 @@
 tsuki (jap. 月, *moon*) is a lightweight, dynamically typed, modular, embeddable
 scripting language for Nim, inspired by Lua, Ruby, and Nim itself.
 
-```rust,nim
+```nim
 object Greeter = greetings
 
 impl Greeter
