@@ -33,8 +33,14 @@ type
     scopes: seq[Scope]
     flowBlocks: seq[FlowBlock]
 
+    self: Symbol
+      # the self variable, nil if the CodeGen isn't a proc generator inside of
+      # an object
     result: Symbol
-      # the result variable, not nil if the CodeGen is a proc generator
+      # the result variable, nil if the CodeGen is not a proc generator
+    objectType: Symbol
+      # the current object type being implemented. nil if the CodeGen is
+      # outside of an impl block
 
   CompileError* = object of ValueError
     filename*: FilenameId
@@ -60,6 +66,7 @@ proc createSub(g: CodeGen): CodeGen =
   CodeGen(
     cs: g.cs, a: g.a,
     module: g.module,
+    objectType: g.objectType,
   )
 
 
@@ -172,10 +179,17 @@ proc lookupSymbol(g: CodeGen, name: Node): Symbol =
 proc addSymbol(g: CodeGen, sym: Symbol) =
   ## Adds a symbol to the topmost scope.
 
+  var
+    name = sym.name.stringVal
+    tab: ptr Table[string, Symbol]
+
   if g.scopes.len > 0:
-    g.scope.syms[sym.name.stringVal] = sym
+    tab = addr g.scope.syms
   else:
-    g.module.globalSyms[sym.name.stringVal] = sym
+    tab = addr g.module.globalSyms
+
+  g.assert(name notin tab[], sym.name, ceSymAlreadyDeclared % name)
+  tab[][name] = sym
 
 proc defineVar(g: CodeGen, name: Node): Symbol =
   ## Defines a new variable with the given name and returns its symbol.
@@ -282,12 +296,25 @@ proc genAssignment(g: CodeGen, left, right: Node) =
   ## Generates code for an assignment. Part of ``genSpecialInfix``.
 
   case left.kind
+
   of nkIdent:
     # assignment to variable
     let sym = g.lookupSymbol(left)
     g.assert(sym.kind == skVar, left, ceSymIsNotAVariable % sym.name.stringVal)
     g.genExpr(right)
     g.popToVar(sym)
+
+  of nkMember:
+    # assignment to field
+    let name = left[0].stringVal
+    g.assert(g.objectType != nil, left, ceInvalidMember % name)
+    g.assert(name in g.objectType.fields, left, ceFieldUndeclared % name)
+
+    let id = g.objectType.fields[name]
+    g.genExpr(right)
+    g.chunk.emitOpcode(opcAssignToField)
+    g.chunk.emitU8(id)
+
   of nkDot:
     # setter call
     let
@@ -302,10 +329,12 @@ proc genAssignment(g: CodeGen, left, right: Node) =
       vid = g.a.getVtableIndex(name, paramCount = 1)
     g.chunk.emitOpcode(opcCallMethod)
     g.chunk.emitU16(vid.uint16)
+
   else:
     g.error(left, ceAsgnInvalidLHS)
 
 const specialInfixOps = ["=", "and", "or", "of"]
+
 proc genSpecialInfix(g: CodeGen, n: Node) =
   ## Generates code for special infix operators (``=``, ``and``, ``or``).
 
@@ -327,11 +356,13 @@ proc genCall(g: CodeGen, n: Node) =
 
   # the only way of calling a proc is via ident() or (expr)()
   # anything else (operators, a.ident()) is a method call
-  let isProcCall = n.kind == nkCall and n[0].kind != nkDot
+  let isProcOrSelfCall = n.kind == nkCall and n[0].kind != nkDot
 
-  if isProcCall:
+  if isProcOrSelfCall:
 
-    if n[0].kind == nkIdent:
+    case n[0].kind
+
+    of nkIdent:
       let sym = g.lookupSymbol(n[0])
       case sym.kind
       of skProc:
@@ -346,33 +377,63 @@ proc genCall(g: CodeGen, n: Node) =
         g.chunk.emitU16(uint16 sym.procId)
       of skVar: unreachable "closure calls are NYI"
       else: g.error(n[0], ceSymCannotBeCalled % n[0].stringVal)
+
+    of nkMember:
+      g.assert(n[0][0].kind == nkIdent, n[0][0], ceIdentExpected)
+
+      let name = n[0][0].stringVal
+      g.assert(g.objectType != nil, n[0], ceInvalidMember % name)
+      if name in g.objectType.fields:
+        unreachable "closure calls (via member) are NYI"
+      else:
+        # self is always the 0th argument
+        g.pushVar(g.self)
+
+        # push the args
+        for arg in n[1..^1]:
+          g.genExpr(arg)
+
+        # call the method
+        let
+          argc = n.high
+          mid = g.a.getVtableIndex(name, argc)
+        g.chunk.emitOpcode(opcCallMethod)
+        g.chunk.emitU16(uint16 mid)
+
     else: unreachable "closure calls are NYI"
 
   else:
 
-    let name =
-      case n.kind
-      of nkPrefix, nkInfix:
-        n[0].stringVal
-      of nkCall:
-        # n[0] is always nkDot - see isProcCall declaration
-        g.assert(n[0][1].kind == nkIdent, n[0][1], ceIdentExpected)
-        n[0][1].stringVal
-      else: "<unreachable>"
+    let
+      name =
+        case n.kind
+        of nkPrefix, nkInfix:
+          n[0].stringVal
+        of nkCall:
+          # n[0] is always nkDot - see isProcCall declaration
+          g.assert(n[0][1].kind == nkIdent, n[0][1], ceIdentExpected)
+          n[0][1].stringVal
+        else: "<unreachable>"
+      argc =
+        case n.kind
+        of nkPrefix: 1
+        of nkInfix: 2
+        of nkCall: n.len
+        else: -1
 
     if n.kind == nkInfix and name in specialInfixOps:
       g.genSpecialInfix(n)
       return
 
+    if n.kind == nkCall:
+      g.genExpr(n[0][0])
+
     for arg in n[1..^1]:
       g.genExpr(arg)
 
-    let
-      argc = n.len - 2
-      vid = g.a.getVtableIndex(name, argc)
-
+    let mid = g.a.getVtableIndex(name, argc)
     g.chunk.emitOpcode(opcCallMethod)
-    g.chunk.emitU16(vid.uint16)
+    g.chunk.emitU16(uint16 mid)
 
 proc genDot(g: CodeGen, n: Node) =
   ## Generates code for a property access method call (a.b).
@@ -381,14 +442,55 @@ proc genDot(g: CodeGen, n: Node) =
   g.lineInfoFrom(n)
 
   g.assert(n[1].kind == nkIdent, n[1], ceIdentExpected)
-  let vid = g.a.getVtableIndex(n[1].stringVal, 0)
+  let mid = g.a.getVtableIndex(n[1].stringVal, 1)
 
   g.genExpr(n[0])
   g.chunk.emitOpcode(opcCallMethod)
-  g.chunk.emitU16(vid.uint16)
+  g.chunk.emitU16(mid.uint16)
+
+proc genConstr(g: CodeGen, n: Node) =
+  ## Generates code for an object constructor.
+
+  assert n.kind == nkConstr
+  g.lineInfoFrom(n)
+
+  let sym = g.lookupSymbol(n[0])
+  g.assert(sym.kind == skObject, n[0], ceSymIsNotAnObject)
+
+  var fieldValues: seq[Node]
+  fieldValues.setLen(sym.fields.len)
+  for pair in n[1..^1]:
+    let
+      (nameNode, value) = (pair[0], pair[1])
+      name = nameNode.stringVal
+    g.assert(name in sym.fields, nameNode, ceFieldUndeclared % name)
+    let index = sym.fields[name]
+    fieldValues[index] = value
+
+  for value in fieldValues:
+    g.genExpr(value)
+  g.chunk.emitOpcode(opcNewObject)
+  g.chunk.emitU16(sym.vtable)
+  g.chunk.emitU8(uint8 fieldValues.len)
+
+proc genMember(g: CodeGen, n: Node) =
+  ## Generates code for member access.
+
+  g.assert(n[0].kind == nkIdent, n[0], ceIdentExpected)
+
+  let name = n[0].stringVal
+  g.assert(g.objectType != nil, n, ceInvalidMember % name)
+
+  if name in g.objectType.fields:
+    g.chunk.emitOpcode(opcPushField)
+    g.chunk.emitU8(g.objectType.fields[name])
+  else:
+    let mid = g.a.getVtableIndex(name, paramCount = 0)
+    g.chunk.emitOpcode(opcCallMethod)
+    g.chunk.emitU16(uint16 mid)
 
 proc genBlockExprOrStmt(g: CodeGen, n: Node) =
-  ## Generates code for a block expression statement.
+  ## Generates code for a block expression or statement.
 
   assert n.kind in {nkBlockExpr, nkBlockStmt}
   g.lineInfoFrom(n)
@@ -445,8 +547,28 @@ proc genIf(g: CodeGen, n: Node) =
   for i in afterIfBranches:
     g.chunk.patchJump(i)
 
+proc addMethodRecursively(a: Assembly, objectSym: Symbol,
+                          name: string, paramCount: int, chunk: Chunk) =
+  ## Helper for adding a method recursively to an object and its children.
+
+  # right now this is a little bit inefficient because it has to look up the
+  # method ID twice for each call to addMethodRecursively
+
+  assert objectSym.kind == skObject
+
+  # first, *always* add the method to the object itself
+  a.addMethod(int objectSym.vtable, name, paramCount, chunk)
+
+  # then update children recursively if and only if they haven't implemented
+  # the method themselves
+  let mid = a.getVtableIndex(name, paramCount)
+  for childSym in objectSym.children:
+    let vid = childSym.vtable
+    if not a.vtables[vid].hasMethod(mid):
+      addMethodRecursively(a, childSym, name, paramCount, chunk)
+
 proc genProc(g: CodeGen, n: Node) =
-  ## Generates code for a procedure declaration or closure.
+  ## Generates code for a procedure declaration, method, or closure.
 
   assert n.kind in {nkProc, nkClosure}
   g.lineInfoFrom(n)
@@ -454,6 +576,7 @@ proc genProc(g: CodeGen, n: Node) =
   let
     isNamed = n.kind == nkProc
     isClosure = g.scopes.len > 0 or not isNamed
+    isMethod = g.objectType != nil
   assert not isClosure, "closures are NYI"
 
   # set up a new codegen
@@ -465,16 +588,27 @@ proc genProc(g: CodeGen, n: Node) =
       if params.kind == nkEmpty: 0
       else: params.len
 
-  # create a new Procedure and a symbol for it
-  let
-    p = g.a.addProc(name.stringVal, paramCount, cg.chunk)
-    sym = newSymbol(skProc, name)
-  sym.procId = p.id
-  g.addSymbol(sym)
+  # for methods, add them to the object's vtable
+  if isMethod:
+    addMethodRecursively(g.a, g.objectType, name.stringVal, paramCount + 1,
+                         cg.chunk)
+
+  # for top-level procedures, add them to the scope
+  else:
+    let
+      sym = newSymbol(skProc, name)
+      p = g.a.addProc(name.stringVal, paramCount, cg.chunk)
+    sym.procId = p.id
+    g.addSymbol(sym)
 
   # create a new scope. this scope is never popped as opcReturn makes sure that
   # all variables are removed from the stack
   cg.pushScope()
+
+  # special self parameter (if applicable)
+  if isMethod:
+    cg.self = cg.defineVar(identNode("self").lineInfoFrom(params))
+    cg.self.isSet = true
 
   # parameters
   if params.kind != nkEmpty:
@@ -497,6 +631,9 @@ proc genProc(g: CodeGen, n: Node) =
   # one more time
   cg.chunk.emitOpcode(opcReturn)
 
+  # `self` is no more
+  g.self = nil
+
 proc genExpr(g: CodeGen, n: Node) =
   ## Generates code for an expression.
 
@@ -507,8 +644,8 @@ proc genExpr(g: CodeGen, n: Node) =
   of nkNil..nkString: g.genLiteral(n)
   of nkIdent: g.genVarLookup(n)
   of nkPrefix, nkInfix, nkCall: g.genCall(n)
-  of nkConstr: unreachable "objects are NYI"
-  of nkMember: unreachable "objects are NYI"
+  of nkConstr: g.genConstr(n)
+  of nkMember: g.genMember(n)
   of nkDot: g.genDot(n)
   of nkBlockExpr: g.genBlockExprOrStmt(n)
   of nkIfExpr: g.genIf(n)
@@ -661,6 +798,57 @@ proc genReturn(g: CodeGen, n: Node) =
     g.genExpr(n[0])
   g.chunk.emitOpcode(opcReturn)
 
+proc genObject(g: CodeGen, n: Node) =
+  ## Generates code for an object definition.
+
+  assert n.kind == nkObject
+  g.lineInfoFrom(n)  # even though we don't really generate any code :p
+
+  let (name, parentName, fields) = (n[0], n[1], n[2])
+  var sym = newSymbol(skObject, name)
+  sym.vtable = uint16 g.a.addVtable(name.stringVal)
+
+  if parentName.kind != nkEmpty:
+    var parent = g.lookupSymbol(parentName)
+    g.assert(parent.kind == skObject, parentName,
+             ceSymIsNotAnObject % parentName.stringVal)
+
+    # save the new object as a child in the parent
+    parent.children.add(sym)
+
+    # inherit existing fields
+    for name, index in parent.fields:
+      sym.fields[name] = index
+
+    # inherit existing methods
+    let parentvt = g.a.vtables[parent.vtable]
+    for mid in parent.methods:
+      if parentvt.hasMethod(int mid):
+        g.a.vtables[sym.vtable].methods[mid] = parentvt.methods[mid]
+
+  for nameNode in fields:
+    let name = nameNode.stringVal
+    g.assert(name notin sym.fields, nameNode, ceFieldAlreadyExists % name)
+    sym.fields[name] = uint8 sym.fields.len
+
+  g.addSymbol(sym)
+
+proc genImpl(g: CodeGen, n: Node) =
+  ## Generates code for an object implementation.
+
+  let
+    nameNode = n[0]
+    sym = g.lookupSymbol(nameNode)
+  g.assert(sym.kind == skObject, nameNode,
+           ceSymIsNotAnObject % nameNode.stringVal)
+
+  # these may not be nested so we may as well
+  g.objectType = sym
+  for def in n[1]:
+    g.assert(def.kind == nkProc, def, ceImplInvalid)
+    g.genProc(def)
+  g.objectType = nil
+
 proc genStmt(g: CodeGen, n: Node) =
   ## Generates code for a statement.
 
@@ -676,8 +864,8 @@ proc genStmt(g: CodeGen, n: Node) =
   of nkContinue: g.genContinue(n)
   of nkProc: g.genProc(n)
   of nkReturn: g.genReturn(n)
-  of nkObject: unreachable "objects are NYI"
-  of nkImpl: unreachable "objects are NYI"
+  of nkObject: g.genObject(n)
+  of nkImpl: g.genImpl(n)
   else:
     # expressions always have a result
     g.genExpr(n)

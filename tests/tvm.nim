@@ -1,5 +1,6 @@
 # tests for codegen
 
+import std/options
 import std/strutils
 
 import tsuki/chunk
@@ -34,10 +35,21 @@ proc run(test, input: string) =
     cg.genScript(ast)
 
     echo chunk.disassemble(assembly)
+
     for i, p in assembly.procedures:
       echo "* procedure ", i, ": ", $(p.name, p.paramCount).MethodSignature
       if p.kind == pkBytecode:
         echo p.chunk.disassemble(assembly).indent(2)
+
+    for i, vt in assembly.vtables:
+      if i < vtableFirstObject: continue
+      echo "* vtable ", i, ": ", vt.name
+      for i, m in vt.methods:
+        if m.isNone: continue
+        let p = m.get
+        echo "  - method ", i, ": ", $(p.name, p.paramCount).MethodSignature
+        if p.kind == pkBytecode:
+          echo p.chunk.disassemble(assembly).indent(4)
 
     echo "<interpret result> ", state.interpret(chunk)
 
@@ -278,4 +290,35 @@ run "procs/return", """
   echo(shorthand())
 """
 
-echo getTotalMem()
+run "objects", """
+  object Vec2 = x, y
+
+  var v = Vec2 { x = 1, y = 2 }
+"""
+
+run "objects/impl", """
+  object Counter = i
+
+  impl Counter
+
+    proc count()
+      .i = .i + 1
+    end
+
+    proc value => .i
+
+  end
+
+  proc newCounter(initialValue) =>
+    Counter { i = initialValue }
+
+  var c = newCounter(1)
+  echo(c.value)
+
+  while c.value < 10
+    c.count()
+    echo(c.value)
+  end
+"""
+
+echo getOccupiedMem()

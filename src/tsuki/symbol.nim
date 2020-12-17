@@ -1,9 +1,12 @@
+import std/tables
+
 import ast
 
 type
   SymbolKind* = enum
     skVar
     skProc
+    skObject
 
   Symbol* = ref object
     name*: Node
@@ -16,8 +19,15 @@ type
       of false:
         globalId*: int
       isSet*: bool
+
     of skProc:
       procId*: int
+
+    of skObject:
+      vtable*: uint16
+      fields*: Table[string, uint8]
+      methods*: set[uint16]
+      children*: seq[Symbol]
 
 proc newSymbol*(kind: SymbolKind, name: Node): Symbol =
   Symbol(name: name, kind: kind)

@@ -29,6 +29,11 @@ type
     opcPopToLocal
     opcAssignToLocal
 
+    # objects
+    opcNewObject
+    opcPushField
+    opcAssignToField
+
     # other stack ops
     opcDiscard
 
@@ -86,7 +91,7 @@ type
     # TODO: this is less than efficient - benchmark the performance of using
     # a seq[Option[Procedure]] vs a Table[int, Procedure]
     name*: string
-    methods: seq[Option[Procedure]]
+    methods*: seq[Option[Procedure]]
 
   MethodId* = distinct int
 
@@ -144,7 +149,7 @@ proc addMethod*(vt: var Vtable, i: int, name: string, paramCount: int,
 
   var p = Procedure(
     id: i,
-    name: name, paramCount: paramCount + 1,  # add one for the receiver
+    name: name, paramCount: paramCount,
     kind: pkBytecode, chunk: chunk,
   )
   vt.methods[i] = some p
@@ -158,7 +163,7 @@ proc addMethod*(vt: var Vtable, i: int, name: string, paramCount: int,
 
   var p = Procedure(
     id: i,
-    name: name, paramCount: paramCount + 1,  # again, add one for the receiver
+    name: name, paramCount: paramCount,
     kind: pkNative, impl: impl,
   )
   vt.methods[i] = some p
@@ -180,6 +185,26 @@ proc getVtableIndex*(a: Assembly, name: string, paramCount: int): int =
   else:
     result = a.methodIds[sig]
 
+{.push inline.}
+
+proc getMethodId*(a: Assembly, name: string, paramCount: int): MethodId =
+  ## Type-safe version of ``getVtableIndex``.
+  ##
+  ## Returns what other languages may call a "call handle", that is, a number
+  ## uniquely identifying a specific method signature.
+  ##
+  ## The parameter count is incremented by one to include the receiver for
+  ## convenience.
+
+  MethodId a.getVtableIndex(name, paramCount + 1)
+
+proc getMethodSignature*(a: Assembly, vid: int): lent MethodSignature =
+  ## Returns the signature of the method with the given vtable index.
+
+  result = a.methodSignatures[vid]
+
+{.pop.}
+
 proc newAssembly*(): Assembly =
   ## Creates and initializes a new assembly.
 
@@ -196,26 +221,9 @@ proc newAssembly*(): Assembly =
     result.vtables[i].name = name
 
   with result.special:
-    iterate = result.getVtableIndex("_iterate", 0)
-    hasNext = result.getVtableIndex("_hasNext", 0)
-    next = result.getVtableIndex("_next", 0)
-
-{.push inline.}
-
-proc getMethodId*(a: Assembly, name: string, paramCount: int): MethodId =
-  ## Type-safe version of ``getVtableIndex``.
-  ##
-  ## Returns what other languages may call a "call handle", that is, a number
-  ## uniquely identifying a specific method signature.
-
-  MethodId a.getVtableIndex(name, paramCount)
-
-proc getMethodSignature*(a: Assembly, vid: int): lent MethodSignature =
-  ## Returns the name of the method with the given vtable index.
-
-  result = a.methodSignatures[vid]
-
-{.pop.}
+    iterate = result.getVtableIndex("_iterate", 1)
+    hasNext = result.getVtableIndex("_hasNext", 1)
+    next = result.getVtableIndex("_next", 1)
 
 proc addProc*(a: Assembly, name: string, paramCount: int,
               chunk: Chunk): lent Procedure =
@@ -242,11 +250,19 @@ proc addProc*(a: Assembly, name: string, paramCount: int,
   result = a.procedures[p.id]
 
 proc addMethod*(a: Assembly, vtable: int, name: string, paramCount: int,
-                impl: RawProcedureImpl) =
+                chunk: Chunk) =
   ## Adds a bytecode method to the given vtable in the given assembly.
 
   a.vtables[vtable].addMethod(a.getVtableIndex(name, paramCount),
-                              name, paramCount, impl)
+                              name, paramCount, chunk)
+
+proc addMethod*(a: Assembly, vtable: int, name: string, paramCount: int,
+                impl: RawProcedureImpl) =
+  ## Adds a native method to the given vtable in the given assembly.
+  ## This automatically adds one parameter for the receiver for convenience.
+
+  a.vtables[vtable].addMethod(a.getVtableIndex(name, paramCount + 1),
+                              name, paramCount + 1, impl)
 
 proc addVtable*(a: Assembly, name: string): int =
   ## Adds a new, empty vtable to the given assembly.

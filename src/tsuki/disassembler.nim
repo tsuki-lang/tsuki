@@ -50,6 +50,20 @@ proc disassemble*(chunk: Chunk, a: Assembly): string =
       dest.add("%")
       dest.add($chunk.readU16(pc))
 
+    of opcNewObject:
+      let vid = int chunk.readU16(pc)
+      dest.add('&')
+      dest.addInt(vid)
+      dest.add(' ')
+      dest.add(a.vtables[vid].name)
+      dest.add(" {")
+      dest.add($chunk.readU8(pc))
+      dest.add('}')
+
+    of opcPushField, opcAssignToField:
+      dest.add('.')
+      dest.add($chunk.readU8(pc))
+
     of opcJumpFwd, opcJumpFwdIfFalsey:
       let
         offset = chunk.readU16(pc)

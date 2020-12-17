@@ -14,6 +14,8 @@ const
   # compile errors
   ceSymUndeclared* = "undeclared symbol '$#'"
   ceSymIsNotAVariable* = "'$#' is not a variable"
+  ceSymIsNotAnObject* = "'$#' is not an object type"
+  ceSymAlreadyDeclared* = "'$#' is already declared"
   ceIdentExpected* = "identifier expected"
   ceSymCannotBeCalled* = "'$#' cannot be called"
   ceWrongParamCount* = "'$#' takes $# parameters, but $# were supplied"
@@ -23,3 +25,8 @@ const
   ceInvalidBreak* = "break can only be used in loops"
   ceInvalidContinue* = "continue can only be used in loops"
   ceInvalidReturn* = "return can only be used in procedures"
+  ceFieldAlreadyExists* = "field '$#' already is already declared"
+  ceFieldUndeclared* = "undeclared field '$#'"
+  ceImplInvalid* = "an impl block may only contain proc definitions"
+  ceInvalidMember* =
+    "member access '.$#' may only be used inside of an impl block"

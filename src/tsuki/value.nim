@@ -14,6 +14,11 @@ proc `[]`*[V](obj: ObjectImpl[V], field: int): V =
   ## costs! This is defined for internal use in the VM.
   obj.fields[field]
 
+proc `[]=`*[V](obj: ObjectImpl[V], field: int, value: V) =
+  ## Sets an object field. Manual usage of this should be avoided at all
+  ## costs! This is defined for internal use in the VM.
+  obj.fields[field] = value
+
 proc newObjectImpl[V](vtable, size: int): ObjectImpl[V] =
 
   result = ObjectImpl[V](vtable: vtable)

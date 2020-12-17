@@ -119,6 +119,9 @@ proc wrap*(p: NativeProcedure): RawProcedureImpl =
 
 # the VM
 
+when defined(tsukiDebugStack):
+  import std/strutils
+
 proc interpret*(s: State, procedure: Procedure, args: seq[Value],
                 isMethodCall: bool): Value =
   ## Interprets a Procedure. This is the heart of the VM.
@@ -129,6 +132,38 @@ proc interpret*(s: State, procedure: Procedure, args: seq[Value],
     stack: seq[Value] = args
     stackBottom = 0
     procName = procedure.name
+
+  when defined(tsukiDebugStack):
+    template xpc: string = errpc.BiggestInt.toHex(3)
+
+    proc add(s: var seq[Value], v: Value) =
+      system.add(s, v)
+      echo xpc, " push -> ", s
+
+    proc pop(s: var seq[Value]): Value =
+      result = system.pop(s)
+      echo xpc, " pop -> ", s
+
+    proc `[]`(s: var seq[Value], i: int): var Value =
+      echo xpc, " get <- ", i, "  ", s
+      system.`[]`(s, i)
+
+    proc `[]=`(s: var seq[Value], i: int, v: Value) =
+      echo xpc, " set <- ", i, "  ", s, " <- ", v
+      system.`[]=`(s, i, v)
+
+    proc `[]`(s: var seq[Value], i: BackwardsIndex): var Value =
+      echo xpc, " get^ <- ", i.int, "  ", s
+      system.`[]`(s, i)
+
+    proc `[]=`(s: var seq[Value], i: BackwardsIndex, v: Value) =
+      echo xpc, " set^ <- ", i.int, "  ", s, " <- ", v
+      system.`[]=`(s, i, v)
+
+    proc setLen(s: var seq[Value], newlen: int) =
+      let oldlen = s.len
+      echo xpc, " setLen -> ", newlen, "  change: ", newlen - oldlen
+      system.setLen(s, newlen)
 
   template local(i: int): var Value =
     stack[stackBottom + i]
@@ -253,6 +288,27 @@ proc interpret*(s: State, procedure: Procedure, args: seq[Value],
         local(lid) = stack[^1]
         stack[^1] = old
 
+      of opcNewObject:
+        let
+          vid = int c.readU16(pc)
+          size = int c.readU8(pc)
+          obj = newObject(vid, size)
+        for i in countdown(size - 1, 0):
+          obj.getObject[i] = stack.pop()
+        stack.add(obj)
+
+      of opcPushField:
+        let obj = local(0).getObject
+        stack.add(obj[int c.readU8(pc)])
+
+      of opcAssignToField:
+        let
+          value = stack.pop()
+          obj = local(0).getObject
+          fid = int c.readU8(pc)
+        stack.add(obj[fid])
+        obj[fid] = value
+
       of opcDiscard:
         assert stack.len > 0, $pc
         stack.setLen(stack.len - c.readU8(pc).int)
@@ -277,7 +333,7 @@ proc interpret*(s: State, procedure: Procedure, args: seq[Value],
           sig = s.a.getMethodSignature(vid)
 
         let
-          receiver = stack[stack.high - sig.paramCount]
+          receiver = stack[stack.len - sig.paramCount]
           vtable = s.a.vtables[receiver.vtable]
 
         if vtable.hasMethod(vid):
