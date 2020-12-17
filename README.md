@@ -45,7 +45,7 @@ g.greet("Nimions")
 
 ## Roadmap
 
-The following is a roadmap for feature support:
+The following is a roadmap for the project:
 
 - [x] variables
 - [x] control flow - `if`, `while`, `for`
@@ -54,8 +54,10 @@ The following is a roadmap for feature support:
 - [x] objects
 - [ ] modules, `import`
 - [ ] standard library
+  - [ ] sugar for `Seq` and `Table`
 - [ ] `tsuki/pipeline` – simplified compilation and execution pipeline
 - [ ] `tsuki/wrap` – automatic Nim code wrapper macro
+- [ ] documentation
 
 0.1.0 will be released after all the features are complete and a fairly
 comprehensive test suite is in place. The following releases will add support

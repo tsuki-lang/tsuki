@@ -495,9 +495,7 @@ proc genMember(g: CodeGen, n: Node) =
     g.chunk.emitOpcode(opcPushField)
     g.chunk.emitU8(g.objectType.fields[name])
   else:
-    let mid = g.a.getVtableIndex(name, paramCount = 0)
-    g.chunk.emitOpcode(opcCallMethod)
-    g.chunk.emitU16(uint16 mid)
+    g.error(n[0], ceMemberUndeclared % name)
 
 proc genBlockExprOrStmt(g: CodeGen, n: Node) =
   ## Generates code for a block expression or statement.

@@ -27,6 +27,7 @@ const
   ceInvalidReturn* = "return can only be used in procedures"
   ceFieldAlreadyExists* = "field '$#' is already declared"
   ceFieldUndeclared* = "undeclared field '$#'"
+  ceMemberUndeclared* = "undeclared field '$1', use '.$1()' to call the method"
   ceFieldsUninitialized* = "all fields must be initialized; missing: $#"
   ceImplInvalid* = "an impl block may only contain proc definitions"
   ceInvalidMember* =
