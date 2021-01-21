@@ -13,6 +13,10 @@ type
   Scope = object
     syms: Table[string, Symbol]
     vars, totalVars: int
+    isPseudoscope: bool
+      # pseudoscopes are a way of creating variables for values that should
+      # be left on the stack. a pseudoscope does not pop its variables once
+      # it's finished.
 
   FlowBlockKind = enum
     fbkLoopOuter
@@ -95,19 +99,19 @@ proc scope(g: CodeGen): var Scope =
   ## Returns the current scope.
   g.scopes[^1]
 
-proc pushScope(g: CodeGen) =
+proc pushScope(g: CodeGen, pseudoscope = false) =
   ## Pushes a new scope.
 
   let totalVars =
     if g.scopes.len > 0: g.scopes[^1].totalVars
     else: 0
-  g.scopes.add Scope(totalVars: totalVars)
+  g.scopes.add Scope(totalVars: totalVars, isPseudoscope: pseudoscope)
 
 proc popScope(g: CodeGen) =
   ## Pops the current scope, together with its variables.
 
   let scope = g.scopes.pop()
-  if scope.vars > 0:
+  if not scope.isPseudoScope and scope.vars > 0:
     g.chunk.emitOpcode(opcDiscard)
     g.chunk.emitU8(scope.vars.uint8)
 
@@ -115,6 +119,13 @@ template withNewScope(g: CodeGen, body: untyped) =
   ## Helper for automatically pushing and popping a scope.
 
   g.pushScope()
+  `body`
+  g.popScope()
+
+template withNewPseudoscope(g: CodeGen, body: untyped) =
+  ## Helper for automatically pushing and popping a pseudoscope.
+
+  g.pushScope(pseudoscope = true)
   `body`
   g.popScope()
 
@@ -222,14 +233,19 @@ proc pushVar(g: CodeGen, sym: Symbol) =
     g.chunk.emitOpcode(opcPushGlobal)
     g.chunk.emitU16(sym.globalId.uint16)
 
-proc popToVar(g: CodeGen, sym: Symbol) =
+proc popToVar(g: CodeGen, sym: Symbol, noAssign = false) =
   ## Pops the value at the top of the stack to the variable represented by the
   ## given symbol.
+  ## ``noAssign`` controls whether ``opcPopToLocal`` should be emitted instead
+  ## of ``opcAssignToLocal``.
 
   assert sym.kind == skVar
   if sym.isLocalVar:
     if sym.isSet:
-      g.chunk.emitOpcode(opcAssignToLocal)
+      if noAssign:
+        g.chunk.emitOpcode(opcPopToLocal)
+      else:
+        g.chunk.emitOpcode(opcAssignToLocal)
       g.chunk.emitU16(sym.stackPos.uint16)
   else:
     if sym.isSet:
@@ -266,18 +282,31 @@ proc genLiteral(g: CodeGen, n: Node) =
 proc genStmt(g: CodeGen, n: Node)
 proc genExpr(g: CodeGen, n: Node)
 
-proc genStmtList(g: CodeGen, n: Node, isExpr: bool) =
+proc genStmtList(g: CodeGen, n: Node, isExpr: bool,
+                 exprResultVar: Symbol = nil) =
   ## Generates code for a statement list.
+  ## ``isExpr`` specifies whether the statement list is part of an expression.
+  ## This enforces the last statement in the list to always be an expression.
+  ## If ``isExpr`` is true, ``exprResultVar`` must not be nil, and is used as
+  ## a result variable for the statement list.
 
   assert n.kind == nkStmtList
   g.lineInfoFrom(n)
 
   if isExpr:
+    assert not exprResultVar.isNil,
+      "the result variable must always be provided for expression StmtLists"
+    assert exprResultVar.isLocalVar,
+      "the result variable must be a local to have stack semantics"
+    assert exprResultVar.isSet,
+      "the result variable must be set to be sure that popToVar will pop " &
+      "to the local instead of just leaving it there"
     for i, stmt in n:
       if i < n.high:
         g.genStmt(stmt)
       else:
         g.genExpr(stmt)
+        g.popToVar(exprResultVar, noAssign = true)
   else:
     for stmt in n:
       g.genStmt(stmt)
@@ -503,8 +532,14 @@ proc genBlockExprOrStmt(g: CodeGen, n: Node) =
   assert n.kind in {nkBlockExpr, nkBlockStmt}
   g.lineInfoFrom(n)
 
-  g.withNewScope:
-    g.genStmtList(n[0], isExpr = n.kind == nkBlockExpr)
+  g.withNewPseudoscope:
+    var exprResult: Symbol
+    if n.kind == nkBlockExpr:
+      exprResult = g.defineVar(identNode(":blockExprResult"))
+      g.chunk.emitOpcode(opcPushNil)
+      g.popToVar(exprResult)
+    g.withNewScope:
+      g.genStmtList(n[0], isExpr = n.kind == nkBlockExpr, exprResult)
 
 proc genIf(g: CodeGen, n: Node) =
   ## Generates code for an if expression or statement.
@@ -517,37 +552,44 @@ proc genIf(g: CodeGen, n: Node) =
   var
     afterIfBranches: seq[int]
     hadElse = false
+    exprResult: Symbol
 
-  for branch in n:
-    case branch.kind
-    of nkIfBranch:
-      # condition
-      g.genExpr(branch[0])
+  g.withNewPseudoscope:
+    if isExpr:
+      exprResult = g.defineVar(identNode(":ifExprResult"))
+      g.chunk.emitOpcode(opcPushNil)
+      g.popToVar(exprResult)
 
-      # jump past the body if the condition is falsey
-      let afterBody = g.chunk.emitJump(opcJumpFwdIfFalsey)
+    for branch in n:
+      case branch.kind
+      of nkIfBranch:
+        # condition
+        g.genExpr(branch[0])
 
-      # discard condition and execute body
-      # after the body's executed, make one more jump to the very end of
-      # the statement
-      g.chunk.emitOpcode(opcDiscard)
-      g.chunk.emitU8(1)
-      g.withNewScope:
-        g.genStmtList(branch[1], isExpr)
-      afterIfBranches.add(g.chunk.emitJump(opcJumpFwd))
+        # jump past the body if the condition is falsey
+        let afterBody = g.chunk.emitJump(opcJumpFwdIfFalsey)
 
-      # if the branch is falsey, we land here and discard the condition
-      g.chunk.patchJump(afterBody)
-      g.chunk.emitOpcode(opcDiscard)
-      g.chunk.emitU8(1)
+        # discard condition and execute body
+        # after the body's executed, make one more jump to the very end of
+        # the statement
+        g.chunk.emitOpcode(opcDiscard)
+        g.chunk.emitU8(1)
+        g.withNewScope:
+          g.genStmtList(branch[1], isExpr, exprResult)
+        afterIfBranches.add(g.chunk.emitJump(opcJumpFwd))
 
-    of nkElseBranch:
-      # else doesn't need to do any magic
-      g.withNewScope:
-        g.genStmtList(branch[0], isExpr)
-      hadElse = true
+        # if the branch is falsey, we land here and discard the condition
+        g.chunk.patchJump(afterBody)
+        g.chunk.emitOpcode(opcDiscard)
+        g.chunk.emitU8(1)
 
-    else: unreachable
+      of nkElseBranch:
+        # else doesn't need to do any magic
+        g.withNewScope:
+          g.genStmtList(branch[0], isExpr, exprResult)
+        hadElse = true
+
+      else: unreachable
 
   if isExpr and not hadElse:
     g.error(n, ceIfExprMustHaveElse)

@@ -8,8 +8,8 @@ import tsuki/chunk
 import tsuki/codegen
 import tsuki/common
 import tsuki/disassembler
-import tsuki/parser
 import tsuki/lexer
+import tsuki/parser
 import tsuki/tsukilib
 import tsuki/value
 import tsuki/vm
@@ -211,11 +211,8 @@ run "loops/break", """
     var x = a + 10
     var y = x + 20
     a = a + 1
-    echo(a)
-    echo(x)
-    echo(y)
     if a == 10
-      var z = 10
+      var z = 10 + y
       break
     end
   end

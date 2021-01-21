@@ -1,3 +1,4 @@
+import std/options
 import std/strutils
 
 import chunk
@@ -5,6 +6,8 @@ import common
 import errors
 import lexer
 import value
+
+export options
 
 type
   State* = ref object of BaseState
@@ -370,17 +373,37 @@ proc interpret*(s: State, chunk: Chunk, name: string = "<main chunk>"): Value =
     chunk: chunk,
   ), args = @[], isMethodCall = false)
 
-proc call*(s: State, mid: MethodId, args: varargs[Value]): Value =
+proc safeCall*(s: State, mid: MethodId, args: varargs[Value]): Option[Value] =
   ## Calls the method with the given ID passing the given arguments to it.
   ## The first argument must always be present and is the receiver of
   ## the method.
-  ## Note that this only works for bytecode methods.
+  ## Unlike ``call``, this will never set an error in the state if the method
+  ## doesn't exist. Instead, it will simply return ``none``.
 
-  assert args.len > 0, "call receiver must always be present"
+  assert args.len >= 1, "call receiver must always be present"
 
-  let
-    vtable = s.a.vtables[args[0].vtable]
-    procedure = vtable.getMethod(mid.int)
+  let vtable = s.a.vtables[args[0].vtable]
+  if vtable.hasMethod(mid.int):
+    let procedure = vtable.getMethod(mid.int)
+    result = some s.interpret(procedure, @args, isMethodCall = true)
+  else:
+    result = none Value
 
-  s.interpret(procedure, @args, isMethodCall = true)
+template call*(s: State, mid: MethodId, args: varargs[Value]): Value =
+  ## A convenience wrapper over ``safeCall`` that sets an error in the state
+  ## and returns from the calling procedure when a method with the given ID
+  ## doesn't exist.
 
+  # really thinking about adopting disruptek/badresults at this point.
+
+  var result: Value
+  let opt = s.safeCall(mid, args)
+  if isSome(opt):  # templates don't like UFCS.
+    result = get(opt)
+  else:
+    let
+      receiver = s.a.vtables[args[0].vtable].name
+      sig = $s.a.getMethodSignature(mid.int)
+    s.setError('\'' & receiver & "' does not respond to '" & sig & '\'')
+    return
+  result

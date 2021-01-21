@@ -260,10 +260,9 @@ proc addMethod*(a: Assembly, vtable: int, name: string, paramCount: int,
 proc addMethod*(a: Assembly, vtable: int, name: string, paramCount: int,
                 impl: RawProcedureImpl) =
   ## Adds a native method to the given vtable in the given assembly.
-  ## This automatically adds one parameter for the receiver for convenience.
 
-  a.vtables[vtable].addMethod(a.getVtableIndex(name, paramCount + 1),
-                              name, paramCount + 1, impl)
+  a.vtables[vtable].addMethod(a.getVtableIndex(name, paramCount),
+                              name, paramCount, impl)
 
 proc addVtable*(a: Assembly, name: string): int =
   ## Adds a new, empty vtable to the given assembly.
