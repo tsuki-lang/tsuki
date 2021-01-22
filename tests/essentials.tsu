@@ -47,13 +47,18 @@ block
 
 #. [block.expression]
 #. tests: "`block` as an expression"
-#. expect_output: "15"
+#. expect_output: """
+#.   15
+#.   3
+#. """
 
 var a = block
   var b = 30
   b / 2
+var b = block 1 + 2
 
 output(a)
+output(b)
 
 
 #.before
