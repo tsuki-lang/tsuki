@@ -19,7 +19,7 @@ output(b)
 
 
 #. [variables.local]
-#. tests: "`block` construct, declaring local variables, discarding locals"
+#. tests: "nested `block` construct, declaring local variables"
 #. expect_output: """
 #.   10
 #.   20
@@ -32,10 +32,8 @@ block
   block
     var b = 20
     output(b)
-  end
   var c = 30
   output(c)
-end
 
 
 #. [block.statement]
@@ -45,7 +43,6 @@ end
 block
   var x = 10
   output(x)
-end
 
 
 #. [block.expression]
@@ -55,7 +52,6 @@ end
 var a = block
   var b = 30
   b / 2
-end
 
 output(a)
 
@@ -240,7 +236,6 @@ block
     i = iter._next
     output(i)
   end
-end
 
 
 #. [controlflow.break]

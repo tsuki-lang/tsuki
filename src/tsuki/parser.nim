@@ -32,8 +32,31 @@ proc parseExpr(l: var Lexer, precedence = -1): Node
 proc parseStmt(l: var Lexer): Node
 
 proc parseBlock(l: var Lexer, dest: var seq[Node],
-                fin: static set[TokenKind]) =
+                parentIndentLevel: int) =
+  ## Parses a block with the given indent level. If a token with an indent level
+  ## smaller than ``parentIndentLevel`` is found, the block is ended.
+  ## If the token directly after the block's start has an indent level smaller
+  ## than ``parentIndentLevel``, a single expression is parsed.
+  ## The expression's indent level must match ``parentIndentLevel``.
+
+  var count = 0
+  while true:
+    if l.peek().indentLevel <= parentIndentLevel:
+      if count == 0:
+        if l.peek().indentLevel != parentIndentLevel:
+          let errlevel = l.peek().indentLevel
+          l.error(peIndentLevel % [">= " & $parentIndentLevel, $errlevel])
+        dest.add(l.parseExpr())
+      break
+    dest.add(l.parseStmt())
+    l.skip(tkSemi)
+    inc count
+
+proc parseBlock(l: var Lexer, dest: var seq[Node],
+                fin: static set[TokenKind]) {.deprecated.} =
   ## Parses a block that ends with ``fin``.
+  ## This is kept here temporarily and superseded by the other parseBlock,
+  ## until I don't implement a fully indentation sensitive grammar.
 
   while true:
     if l.atEnd:
@@ -51,8 +74,7 @@ proc parseBlockExprOrStmt(l: var Lexer, token: Token, isStmt: bool): Node =
     else: nkBlockExpr
   var stmts = nkStmtList.tree()
   result = nodeKind.tree(stmts).lineInfoFrom(token)
-  l.parseBlock(stmts.sons, {tkEnd})
-  discard l.next()  # always tkEnd
+  l.parseBlock(stmts.sons, token.indentLevel)
 
 proc parseIf(l: var Lexer, token: Token, isStmt: bool): Node =
   ## Parses an if expression or statement.
