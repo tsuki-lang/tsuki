@@ -39,15 +39,30 @@ proc parseBlock(l: var Lexer, dest: var seq[Node],
   ## than ``parentIndentLevel``, a single expression is parsed.
   ## The expression's indent level must match ``parentIndentLevel``.
 
-  var count = 0
+  var
+    count = 0
+    indentLevel = -1
+
   while true:
-    if l.peek().indentLevel <= parentIndentLevel:
+
+    # indent level validation
+
+    let next = l.peek()
+    if next.indentLevel <= parentIndentLevel:
       if count == 0:
-        if l.peek().indentLevel != parentIndentLevel:
-          let errlevel = l.peek().indentLevel
-          l.error(peIndentLevel % [">= " & $parentIndentLevel, $errlevel])
+        if next.indentLevel != parentIndentLevel:
+          l.error(peIndentLevel % [">=" & $parentIndentLevel,
+                                   $next.indentLevel])
         dest.add(l.parseExpr())
       break
+
+    if indentLevel == -1:
+      indentLevel = next.indentLevel
+    else:
+      if next.indentLevel != indentLevel:
+        l.error(peIndentLevel % [$indentLevel, $next.indentLevel])
+
+    # the actual statement part
     dest.add(l.parseStmt())
     l.skip(tkSemi)
     inc count
@@ -224,9 +239,18 @@ proc parseExpr(l: var Lexer, precedence = -1): Node =
   ## Parses an expression.
 
   var token = l.next()
+  let
+    indentLevel = token.indentLevel
+    line = token.line
 
   result = l.parsePrefix(token)
   while precedence < precedence(l.peek()):
+
+    # check indent level
+    let t = l.peek()
+    if t.line > line and t.indentLevel <= indentLevel:
+      break
+
     token = l.next()
     if token.kind == tkEof:
       break

@@ -65,7 +65,7 @@ impl Test
     output("in test")
   end
   proc inside
-    output("in inside"); # gosh i really need to implement line sensitivity
+    output("in inside") # gosh i really need to implement line sensitivity
     .test()
   end
   proc set=(x)
