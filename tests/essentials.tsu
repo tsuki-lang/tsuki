@@ -278,7 +278,7 @@ end
 
 
 #. [proc.simple]
-#. tests: "simple procedure definition without parameters, calling user-defined procs"
+#. tests: "procedure definition without parameters, calling user-defined procs"
 #. expect_output: "hello"
 
 proc hello
