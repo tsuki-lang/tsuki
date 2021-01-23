@@ -346,3 +346,41 @@ output(c.value)
 while c.value < 5
   c.count()
   output(c.value)
+
+#. [objects.inheritance]
+#. tests: "object inheritance"
+
+object Parent = x
+
+impl Parent
+
+  proc parentMethod
+    output("hi from parent")
+    output(.x)
+
+object Child of Parent = y
+
+impl Child
+
+  proc childMethod
+    output("hi from child")
+    output(.y)
+
+  proc callParent
+    .parentMethod()
+
+impl Parent
+
+  proc extension
+    output("hi from extension")
+
+var a = Parent { x = 1 }
+var b = Child { x = 1, y = 2 }
+
+a.parentMethod()
+a.extension()
+
+b.parentMethod()
+b.childMethod()
+b.extension()
+
