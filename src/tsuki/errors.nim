@@ -10,6 +10,7 @@ const
   peUnexpectedToken* = "unexpected token: '$#'"
   peXExpected* = "$# expected"
   peTokenMissing* = "missing '$#'"
+  peIndentLevel* = "$# spaces for indentation expected, but got $#"
 
   # compile errors
   ceSymUndeclared* = "undeclared symbol '$#'"

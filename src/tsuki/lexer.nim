@@ -23,7 +23,7 @@ type
     tkFor = "for", tkIn = "in",
     tkBreak = "break", tkContinue = "continue"
     tkProc = "proc", tkReturn = "return"
-    tkBlock = "block", tkEnd = "end"
+    tkBlock = "block"
     tkObject = "object", tkImpl = "impl"
     tkImport = "import"
 
@@ -50,6 +50,8 @@ type
       precedence*: int
     else: discard
 
+    indentLevel*: int
+
   LineInfo* = tuple
     line, column: int
 
@@ -67,6 +69,7 @@ type
     filename: FilenameId
     lineInfo: LineInfo
     storedLineInfo: LineInfo
+    indentLevel: int
 
   ParseError* = object of ValueError
     filename*: string
@@ -169,12 +172,18 @@ proc operatorToken(operator: string): Token =
     precedence: getPrecedence(operator)
   )
 
+proc line*(t: Token): int =
+  ## Returns the line number where the token is. This little shortcut is used to
+  ## more conveniently implement line sensitivity in the parser.
+  t.lineInfo.line
+
 {.pop.}
 
 proc repr*(t: Token): string =
   ## Debug representation for tokens.
 
-  result.add("($#, $#) " % [$t.lineInfo.line, $t.lineInfo.column])
+  result.add("($#, $#) I=$# " % [$t.lineInfo.line, $t.lineInfo.column,
+                                 $t.indentLevel])
   result.add($t.kind)
 
   case t.kind
@@ -259,6 +268,7 @@ proc error*(l: var Lexer, token: Token, message: string) =
 proc readChars(l: var Lexer, set: set[char], dest: var string) =
   ## Reads as many characters from the ``set`` as there are available to the
   ## ``dest`` string.
+
   while l.get in set:
     dest.add(l.get)
     l.advance()
@@ -275,11 +285,13 @@ proc readString(l: var Lexer, quote: char, dest: var string) =
     dest.add(l.get)
     l.advance()
 
-proc discardChars(l: var Lexer, set: set[char]) =
-  ## Discards characters from the given set.
+proc discardChars(l: var Lexer, set: set[char]): int =
+  ## Discards characters from the given set. Returns the number of discarded
+  ## characters.
 
   while l.get in set:
     l.advance()
+    inc result
 
 proc matchChar(l: var Lexer, set: set[char], dest: var string): bool =
   ## Consumes a single character from the ``set``, and adds it into ``dest``.
@@ -293,6 +305,11 @@ proc matchChar(l: var Lexer, set: set[char], dest: var string): bool =
 
 {.pop.}
 
+proc readIndent(l: var Lexer) =
+  ## Reads the indentation at the start of a line.
+
+  l.indentLevel = l.discardChars({' '})
+
 proc matchLinebreak*(l: var Lexer): bool =
   ## Returns true if a line break was matched.
   ## This skips any whitespace and comments first, then looks for line breaks.
@@ -301,24 +318,30 @@ proc matchLinebreak*(l: var Lexer): bool =
   while true:
     case l.get
     of whitespace:
-      l.discardChars(whitespace)
+      discard l.discardChars(whitespace)
     of '#':
-      l.discardChars(allChars - lineBreaks)
+      discard l.discardChars(allChars - lineBreaks)
     else: break
 
   # handle linebreaks if there are any
   while true:
     case l.get
     of '\n':
-      l.advance()
       inc l.lineInfo.line
-      l.lineInfo.column = 0
       result = true
     of '\r':
-      l.advance()
-      l.lineInfo.column = 0
       result = true
     else: break
+
+    l.advance()
+    reset l.lineInfo.column
+    reset l.indentLevel
+
+  # handle indentation, but only after line breaks.
+  # matchLinebreak serves double duty: ignoring whitespace, and tracking lines,
+  # so we don't wanna match newline if the latter doesn't happen
+  if result:
+    l.readIndent()
 
 proc skipIgnored*(l: var Lexer) =
   ## Skips comments, whitespace, and line breaks.
@@ -397,6 +420,7 @@ proc next*(l: var Lexer): Token =
 
   result.filename = l.filename
   result.lineInfo = l.storedLineInfo
+  result.indentLevel = l.indentLevel
 
 {.push inline.}
 
@@ -449,12 +473,13 @@ proc initLexer*(cs: CompilerState, filename: FilenameId,
                 input: string): Lexer {.inline.} =
   ## Creates and initializes a new lexer.
 
-  Lexer(
+  result = Lexer(
     cs: cs,
     input: input,
     filename: filename,
     lineInfo: liStartOfFile,
   )
+  result.readIndent()
 
 {.pop.}
 
@@ -497,7 +522,12 @@ when isMainModule:
     () [] {}
     , ;
     .
-  """
+
+    # indentation sensitivity
+    unindented
+      indented_a_bit
+          quite_the_indented
+  """.dedent
 
   var
     cs = new(CompilerState)

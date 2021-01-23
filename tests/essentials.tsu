@@ -19,7 +19,7 @@ output(b)
 
 
 #. [variables.local]
-#. tests: "`block` construct, declaring local variables, discarding locals"
+#. tests: "nested `block` construct, declaring local variables"
 #. expect_output: """
 #.   10
 #.   20
@@ -32,10 +32,8 @@ block
   block
     var b = 20
     output(b)
-  end
   var c = 30
   output(c)
-end
 
 
 #. [block.statement]
@@ -45,19 +43,22 @@ end
 block
   var x = 10
   output(x)
-end
 
 
 #. [block.expression]
 #. tests: "`block` as an expression"
-#. expect_output: "15"
+#. expect_output: """
+#.   15
+#.   3
+#. """
 
 var a = block
   var b = 30
   b / 2
-end
+var b = block 1 + 2
 
 output(a)
+output(b)
 
 
 #.before
@@ -65,25 +66,24 @@ output(a)
 object Test = _
 
 impl Test
+
   proc test
     output("in test")
-  end
+
   proc inside
-    output("in inside"); # gosh i really need to implement line sensitivity
+    output("in inside")
     .test()
-  end
+
   proc set=(x)
     output("in set=")
-  end
+
   proc %
     output("in %(_)")
-  end
+
   proc %(b)
     output("in %(_, _)")
-  end
-end
 
-var t = Test { _ = nil };
+var t = Test { _ = nil }
 
 #. [method.syntax_nkCall]
 #. tests: "calling methods via the `a.b()` syntax"
@@ -135,7 +135,6 @@ var a = true
 
 if a
   output("yes")
-end
 
 #. [if.else]
 #. tests: "`if…else` statement"
@@ -147,7 +146,6 @@ if a
   output("yes")
 else
   output("no")
-end
 
 #. [if.elif_else]
 #. tests: "`if…else…elif` statement"
@@ -162,7 +160,6 @@ elif b
   output("maybe")
 else
   output("no")
-end
 
 #. [if.expression]
 #. tests: "`if` as an expression"
@@ -173,7 +170,6 @@ var kind =
   if   i < 0  "negative"
   elif i == 0 "zero"
   else        "positive"
-  end
 
 output(kind)
 
@@ -189,7 +185,6 @@ output(
   else
     var b = 32
     b / 2
-  end
 )
 
 #. [while]
@@ -206,7 +201,6 @@ var i = 1
 while i <= 5
   output(i)
   i = i + 1
-end
 
 
 #. [for.countup]
@@ -221,7 +215,6 @@ end
 
 for i in 1..5
   output(i)
-end
 
 #. [for.emulated]
 #. tests: "`for` loop emulated with a `while` loop"
@@ -239,8 +232,6 @@ block
   while iter._hasNext
     i = iter._next
     output(i)
-  end
-end
 
 
 #. [controlflow.break]
@@ -255,8 +246,6 @@ while true
   if a == 10
     var z = 10 + y
     break
-  end
-end
 
 #. [controlflow.continue]
 #. tests: "`continue` statements, its interaction between variables in scope"
@@ -272,9 +261,7 @@ for a in 1..5
   if a == 3
     var z = 20
     continue
-  end
   output(a)
-end
 
 
 #. [proc.simple]
@@ -283,7 +270,6 @@ end
 
 proc hello
   output("hello")
-end
 
 hello()
 
@@ -295,7 +281,6 @@ proc fib(n) =>
   if   n == 0  0
   elif n == 1  1
   else         fib(n - 1) + fib(n - 2)
-  end
 
 output(fib(10))
 
@@ -308,10 +293,7 @@ proc loop(x)
   while true
     if x >= 10
       return x + 10
-    end
     x = x + 3
-  end
-end
 
 output(loop(31))
 
@@ -323,8 +305,6 @@ proc fac(n)
   result = 1
   for i in 1..n
     result = result * i
-  end
-end
 
 output(fac(10))
 
@@ -354,11 +334,8 @@ impl Counter
 
   proc count()
     .i = .i + 1
-  end
 
   proc value => .i
-
-end
 
 proc newCounter(initialValue) =>
   Counter { i = initialValue }
@@ -369,4 +346,4 @@ output(c.value)
 while c.value < 5
   c.count()
   output(c.value)
-end
+
