@@ -379,6 +379,10 @@ proc genSpecialInfix(g: CodeGen, n: Node) =
   of "of": unreachable "of is NYI"
   else: unreachable "operator must be one of the special infix operators"
 
+const maxProcArgCount* = 255
+  ## The maximum number of arguments/parameters allowed in a procedure
+  ## declaration or call.
+
 proc genCall(g: CodeGen, n: Node) =
   ## Generates code for a procedure or method call.
 
@@ -398,7 +402,7 @@ proc genCall(g: CodeGen, n: Node) =
       case sym.kind
       of skProc:
         let p = g.a.procedures[sym.procId]
-        g.assert(n.len - 1 == p.paramCount, n, ceWrongParamCount % [
+        g.assert(n.len - 1 == p.paramCount, n, ceWrongArgCount % [
           sym.name.stringVal,
           $p.paramCount, $(n.len - 1)
         ])
@@ -421,6 +425,8 @@ proc genCall(g: CodeGen, n: Node) =
         g.pushVar(g.self)
 
         # push the args
+        g.assert(n.len < maxProcArgCount, n,
+                 ceTooManyX % ["arguments", "254", $(n.len - 1)])
         for arg in n[1..^1]:
           g.genExpr(arg)
 
@@ -618,6 +624,26 @@ proc addMethodRecursively(a: Assembly, objectSym: Symbol,
     if not a.vtables[vid].hasMethod(mid):
       addMethodRecursively(a, childSym, name, paramCount, chunk)
 
+proc operatorProcInfo(name: string,
+                      isOperator: var bool,
+                      allowedParamCounts: var set[uint8],
+                      countsStr: var string) =
+  ## Returns the allowed parameter counts for a proc with the given name,
+  ## along with a string for errors.
+
+  allowedParamCounts = {uint8.low .. uint8.high}
+
+  if name.len >= 2:
+    if name[0] in identChars and name[^1] == '=':
+      isOperator = true
+      allowedParamCounts = {uint8 1}
+      countsStr = "1"
+
+  elif name.allCharsInSet(operatorChars):
+    isOperator = true
+    allowedParamCounts = {uint8 0, 1}
+    countsStr = "0 or 1"
+
 proc genProc(g: CodeGen, n: Node) =
   ## Generates code for a procedure declaration, method, or closure.
 
@@ -630,14 +656,29 @@ proc genProc(g: CodeGen, n: Node) =
     isMethod = g.objectType != nil
   assert not isClosure, "closures are NYI"
 
-  # set up a new codegen
-  var cg = g.createSub()
-  cg.chunk = newChunk(g.chunk.filename)
+  # extract the important bits into named variables
   let
     (name, params, body) = (n[0], n[1], n[2])
     paramCount =
       if params.kind == nkEmpty: 0
       else: params.len
+
+  # set up a new codegen
+  var cg = g.createSub()
+  cg.chunk = newChunk(g.chunk.filename)
+
+  # validate name and param count
+  let maxParamCount = maxProcArgCount - ord(isMethod)
+  g.assert(paramCount in 0..maxParamCount, params,
+           ceTooManyX % ["parameters", $maxParamCount, $paramCount])
+  var
+    isOperator: bool
+    allowedCounts: set[uint8]
+    countsStr: string
+  operatorProcInfo(name.stringVal, isOperator, allowedCounts, countsStr)
+  g.assert(not (isOperator and not isMethod), n, ceOperatorInvalid)
+  g.assert(paramCount.uint8 in allowedCounts, params,
+           ceOperatorParamCount % [countsStr, $paramCount])
 
   # for methods, add them to the object's vtable
   if isMethod:

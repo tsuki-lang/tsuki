@@ -87,12 +87,12 @@ const
   allChars = {low(char)..high(char)}
 
   decDigits = {'0'..'9'}
-  identStartChars = {'a'..'z', 'A'..'Z', '_'} + utf8
-  identChars = identStartChars + decDigits
+  identStartChars* = {'a'..'z', 'A'..'Z', '_'} + utf8
+  identChars* = identStartChars + decDigits
   # operators follow nim's rules
-  operatorChars = {'=', '+', '-', '*', '/', '<', '>',
-                   '@', '$', '~', '&', '%', '|',
-                   '!', '?', '^', '.', ':', '\\'}
+  operatorChars* = {'=', '+', '-', '*', '/', '<', '>',
+                    '@', '$', '~', '&', '%', '|',
+                    '!', '?', '^', '.', ':', '\\'}
 
   tkKeywords = {tkNil, tkTrue, tkFalse, tkVar..tkImport}
   keywords = block:
