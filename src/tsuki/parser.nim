@@ -459,45 +459,39 @@ when isMainModule:
       _
     else
       _
-    end
   """, l.parseExpr())
 
   # statements
   test("script", """
     var x = 1
     var y = 2
-    x + y * w;  # semicolon is required here because the next line starts with (
+    x + y * w
     (a + 1) * 2
   """, l.parseScript())
 
   test("while", """
     while true
       _
-    end
   """, l.parseScript())
 
   test("for", """
     for i in 1..10
       _
-    end
   """, l.parseScript())
 
   test("procedures", """
     proc long(a, b, c)
       _
-    end
 
     proc no_params
       _
-    end
 
-    proc short = _
+    proc short => _
 
-    proc forward = ...
+    proc forward => ...
 
     var closure = proc
       _
-    end
   """, l.parseScript())
 
   test("objects", """
@@ -510,8 +504,7 @@ when isMainModule:
     object Vec2 = x, y
 
     impl Vec2
-      proc x = .x
-      proc y = .y
-    end
+      proc x => .x
+      proc y => .y
 
   """, l.parseScript())

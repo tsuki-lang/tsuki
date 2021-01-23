@@ -23,7 +23,7 @@ type
     tkFor = "for", tkIn = "in",
     tkBreak = "break", tkContinue = "continue"
     tkProc = "proc", tkReturn = "return"
-    tkBlock = "block", tkEnd = "end"
+    tkBlock = "block"
     tkObject = "object", tkImpl = "impl"
     tkImport = "import"
 
