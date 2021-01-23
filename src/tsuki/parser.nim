@@ -51,8 +51,8 @@ proc parseBlock(l: var Lexer, dest: var seq[Node],
     if next.indentLevel <= parentIndentLevel:
       if count == 0:
         if next.indentLevel != parentIndentLevel:
-          l.error(peIndentLevel % [">=" & $parentIndentLevel,
-                                   $next.indentLevel])
+          l.error(next, peIndentLevel % [">=" & $parentIndentLevel,
+                                         $next.indentLevel])
         dest.add(l.parseExpr())
       break
 
@@ -94,9 +94,11 @@ proc parseBlockExprOrStmt(l: var Lexer, token: Token, isStmt: bool): Node =
 proc parseIf(l: var Lexer, token: Token, isStmt: bool): Node =
   ## Parses an if expression or statement.
 
-  let astKind =
-    if isStmt: nkIfStmt
-    else: nkIfExpr
+  let
+    indentLevel = token.indentLevel
+    astKind =
+      if isStmt: nkIfStmt
+      else: nkIfExpr
   result = astKind.tree().lineInfoFrom(token)
 
   var hasElse = false
@@ -105,28 +107,33 @@ proc parseIf(l: var Lexer, token: Token, isStmt: bool): Node =
       condition = l.parseExpr()
       stmts = nkStmtList.tree().lineInfoFrom(l.peek())
       branch = nkIfBranch.tree(condition, stmts).lineInfoFrom(condition)
-    l.parseBlock(stmts.sons, {tkElif, tkElse, tkEnd})
+    l.parseBlock(stmts.sons, indentLevel)
     result.add(branch)
 
-    let token = l.next()
-    case token.kind
-    of tkElif: continue
-    of tkElse:
-      hasElse = true
+    let next = l.peek()
+    if next.kind in {tkElif, tkElse}:
+      discard l.next()
+      if next.indentLevel != indentLevel:
+        l.error(next, peIndentLevel % [$indentLevel, $next.indentLevel])
+      if next.kind == tkElif:
+        continue
+      else:
+        hasElse = true
+        break
+    else:
       break
-    of tkEnd: return
-    else: l.error(token, peXExpected % "'elif', 'else', or 'end'")
 
   if hasElse:
     var
       stmts = nkStmtList.tree().lineInfoFrom(l.peek())
       branch = nkElseBranch.tree(stmts).lineInfoFrom(stmts)
-    l.parseBlock(stmts.sons, {tkEnd})
+    l.parseBlock(stmts.sons, indentLevel)
     result.add(branch)
-    discard l.next()  # should always be 'end'
 
 proc parseProc(l: var Lexer, token: Token, anonymous: static bool): Node =
   ## Parses a procedure or a closure.
+
+  let indentLevel = token.indentLevel
 
   var name = emptyNode().lineInfoFrom(token)
   if not anonymous:
@@ -158,8 +165,7 @@ proc parseProc(l: var Lexer, token: Token, anonymous: static bool): Node =
     else:
       body.add(nkReturn.tree(l.parseExpr()).lineInfoFrom(eqToken))
   else:
-    l.parseBlock(body.sons, {tkEnd})
-    discard l.next()  # always tkEnd
+    l.parseBlock(body.sons, indentLevel)
 
   let astKind =
     if anonymous: nkClosure
@@ -277,8 +283,7 @@ proc parseWhile(l: var Lexer): Node =
   l.skip(tkSemi)
 
   var loop = nkStmtList.tree().lineInfoFrom(l.peek())
-  l.parseBlock(loop.sons, {tkEnd})
-  discard l.next()  # always tkEnd
+  l.parseBlock(loop.sons, whileToken.indentLevel)
 
   result = nkWhile.tree(condition, loop).lineInfoFrom(whileToken)
 
@@ -293,8 +298,7 @@ proc parseFor(l: var Lexer): Node =
   l.skip(tkSemi)
 
   var loop = nkStmtList.tree().lineInfoFrom(l.peek())
-  l.parseBlock(loop.sons, {tkEnd})
-  discard l.next()  # always tkEnd
+  l.parseBlock(loop.sons, forToken.indentLevel)
 
   let
     forVar = identNode(forVarName)
@@ -331,8 +335,7 @@ proc parseImpl(l: var Lexer): Node =
     objectName = identNode(objectNameToken)
 
   var body = nkStmtList.tree().lineInfoFrom(implToken)
-  l.parseBlock(body.sons, {tkEnd})
-  discard l.next()  # always tkEnd
+  l.parseBlock(body.sons, implToken.indentLevel)
 
   result = nkImpl.tree(objectName, body).lineInfoFrom(implToken)
 
