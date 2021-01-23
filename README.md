@@ -14,9 +14,6 @@ impl Greeter
   proc greet(target)
     echo(.greeting(target))
     .greetings = .greetings + 1
-  end
-
-end
 
 proc newGreeter =>
   Greeter { greetings = 0 }
