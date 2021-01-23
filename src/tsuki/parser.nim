@@ -32,8 +32,46 @@ proc parseExpr(l: var Lexer, precedence = -1): Node
 proc parseStmt(l: var Lexer): Node
 
 proc parseBlock(l: var Lexer, dest: var seq[Node],
-                fin: static set[TokenKind]) =
+                parentIndentLevel: int) =
+  ## Parses a block with the given indent level. If a token with an indent level
+  ## smaller than ``parentIndentLevel`` is found, the block is ended.
+  ## If the token directly after the block's start has an indent level smaller
+  ## than ``parentIndentLevel``, a single expression is parsed.
+  ## The expression's indent level must match ``parentIndentLevel``.
+
+  var
+    count = 0
+    indentLevel = -1
+
+  while true:
+
+    # indent level validation
+
+    let next = l.peek()
+    if next.indentLevel <= parentIndentLevel:
+      if count == 0:
+        if next.indentLevel != parentIndentLevel:
+          l.error(next, peIndentLevel % [">=" & $parentIndentLevel,
+                                         $next.indentLevel])
+        dest.add(l.parseExpr())
+      break
+
+    if indentLevel == -1:
+      indentLevel = next.indentLevel
+    else:
+      if next.indentLevel != indentLevel:
+        l.error(peIndentLevel % [$indentLevel, $next.indentLevel])
+
+    # the actual statement part
+    dest.add(l.parseStmt())
+    l.skip(tkSemi)
+    inc count
+
+proc parseBlock(l: var Lexer, dest: var seq[Node],
+                fin: static set[TokenKind]) {.deprecated.} =
   ## Parses a block that ends with ``fin``.
+  ## This is kept here temporarily and superseded by the other parseBlock,
+  ## until I don't implement a fully indentation sensitive grammar.
 
   while true:
     if l.atEnd:
@@ -51,15 +89,16 @@ proc parseBlockExprOrStmt(l: var Lexer, token: Token, isStmt: bool): Node =
     else: nkBlockExpr
   var stmts = nkStmtList.tree()
   result = nodeKind.tree(stmts).lineInfoFrom(token)
-  l.parseBlock(stmts.sons, {tkEnd})
-  discard l.next()  # always tkEnd
+  l.parseBlock(stmts.sons, token.indentLevel)
 
 proc parseIf(l: var Lexer, token: Token, isStmt: bool): Node =
   ## Parses an if expression or statement.
 
-  let astKind =
-    if isStmt: nkIfStmt
-    else: nkIfExpr
+  let
+    indentLevel = token.indentLevel
+    astKind =
+      if isStmt: nkIfStmt
+      else: nkIfExpr
   result = astKind.tree().lineInfoFrom(token)
 
   var hasElse = false
@@ -68,28 +107,33 @@ proc parseIf(l: var Lexer, token: Token, isStmt: bool): Node =
       condition = l.parseExpr()
       stmts = nkStmtList.tree().lineInfoFrom(l.peek())
       branch = nkIfBranch.tree(condition, stmts).lineInfoFrom(condition)
-    l.parseBlock(stmts.sons, {tkElif, tkElse, tkEnd})
+    l.parseBlock(stmts.sons, indentLevel)
     result.add(branch)
 
-    let token = l.next()
-    case token.kind
-    of tkElif: continue
-    of tkElse:
-      hasElse = true
+    let next = l.peek()
+    if next.kind in {tkElif, tkElse}:
+      discard l.next()
+      if next.indentLevel != indentLevel:
+        l.error(next, peIndentLevel % [$indentLevel, $next.indentLevel])
+      if next.kind == tkElif:
+        continue
+      else:
+        hasElse = true
+        break
+    else:
       break
-    of tkEnd: return
-    else: l.error(token, peXExpected % "'elif', 'else', or 'end'")
 
   if hasElse:
     var
       stmts = nkStmtList.tree().lineInfoFrom(l.peek())
       branch = nkElseBranch.tree(stmts).lineInfoFrom(stmts)
-    l.parseBlock(stmts.sons, {tkEnd})
+    l.parseBlock(stmts.sons, indentLevel)
     result.add(branch)
-    discard l.next()  # should always be 'end'
 
 proc parseProc(l: var Lexer, token: Token, anonymous: static bool): Node =
   ## Parses a procedure or a closure.
+
+  let indentLevel = token.indentLevel
 
   var name = emptyNode().lineInfoFrom(token)
   if not anonymous:
@@ -121,8 +165,7 @@ proc parseProc(l: var Lexer, token: Token, anonymous: static bool): Node =
     else:
       body.add(nkReturn.tree(l.parseExpr()).lineInfoFrom(eqToken))
   else:
-    l.parseBlock(body.sons, {tkEnd})
-    discard l.next()  # always tkEnd
+    l.parseBlock(body.sons, indentLevel)
 
   let astKind =
     if anonymous: nkClosure
@@ -202,9 +245,18 @@ proc parseExpr(l: var Lexer, precedence = -1): Node =
   ## Parses an expression.
 
   var token = l.next()
+  let
+    indentLevel = token.indentLevel
+    line = token.line
 
   result = l.parsePrefix(token)
   while precedence < precedence(l.peek()):
+
+    # check indent level
+    let t = l.peek()
+    if t.line > line and t.indentLevel <= indentLevel:
+      break
+
     token = l.next()
     if token.kind == tkEof:
       break
@@ -231,8 +283,7 @@ proc parseWhile(l: var Lexer): Node =
   l.skip(tkSemi)
 
   var loop = nkStmtList.tree().lineInfoFrom(l.peek())
-  l.parseBlock(loop.sons, {tkEnd})
-  discard l.next()  # always tkEnd
+  l.parseBlock(loop.sons, whileToken.indentLevel)
 
   result = nkWhile.tree(condition, loop).lineInfoFrom(whileToken)
 
@@ -247,8 +298,7 @@ proc parseFor(l: var Lexer): Node =
   l.skip(tkSemi)
 
   var loop = nkStmtList.tree().lineInfoFrom(l.peek())
-  l.parseBlock(loop.sons, {tkEnd})
-  discard l.next()  # always tkEnd
+  l.parseBlock(loop.sons, forToken.indentLevel)
 
   let
     forVar = identNode(forVarName)
@@ -285,8 +335,7 @@ proc parseImpl(l: var Lexer): Node =
     objectName = identNode(objectNameToken)
 
   var body = nkStmtList.tree().lineInfoFrom(implToken)
-  l.parseBlock(body.sons, {tkEnd})
-  discard l.next()  # always tkEnd
+  l.parseBlock(body.sons, implToken.indentLevel)
 
   result = nkImpl.tree(objectName, body).lineInfoFrom(implToken)
 
@@ -410,45 +459,39 @@ when isMainModule:
       _
     else
       _
-    end
   """, l.parseExpr())
 
   # statements
   test("script", """
     var x = 1
     var y = 2
-    x + y * w;  # semicolon is required here because the next line starts with (
+    x + y * w
     (a + 1) * 2
   """, l.parseScript())
 
   test("while", """
     while true
       _
-    end
   """, l.parseScript())
 
   test("for", """
     for i in 1..10
       _
-    end
   """, l.parseScript())
 
   test("procedures", """
     proc long(a, b, c)
       _
-    end
 
     proc no_params
       _
-    end
 
-    proc short = _
+    proc short => _
 
-    proc forward = ...
+    proc forward => ...
 
     var closure = proc
       _
-    end
   """, l.parseScript())
 
   test("objects", """
@@ -461,8 +504,7 @@ when isMainModule:
     object Vec2 = x, y
 
     impl Vec2
-      proc x = .x
-      proc y = .y
-    end
+      proc x => .x
+      proc y => .y
 
   """, l.parseScript())
