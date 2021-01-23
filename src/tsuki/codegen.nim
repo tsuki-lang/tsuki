@@ -607,11 +607,12 @@ proc addMethodRecursively(a: Assembly, objectSym: Symbol,
   assert objectSym.kind == skObject
 
   # first, *always* add the method to the object itself
+  let mid = a.getVtableIndex(name, paramCount)
   a.addMethod(int objectSym.vtable, name, paramCount, chunk)
+  objectSym.methods.incl(mid.uint16)
 
   # then update children recursively if and only if they haven't implemented
   # the method themselves
-  let mid = a.getVtableIndex(name, paramCount)
   for childSym in objectSym.children:
     let vid = childSym.vtable
     if not a.vtables[vid].hasMethod(mid):
@@ -875,6 +876,8 @@ proc genObject(g: CodeGen, n: Node) =
     let parentvt = g.a.vtables[parent.vtable]
     for mid in parent.methods:
       if parentvt.hasMethod(int mid):
+        if g.a.vtables[sym.vtable].methods.len <= int mid:
+          g.a.vtables[sym.vtable].methods.setLen(mid + 1)
         g.a.vtables[sym.vtable].methods[mid] = parentvt.methods[mid]
 
   for nameNode in fields:
