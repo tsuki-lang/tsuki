@@ -349,6 +349,18 @@ while c.value < 5
 
 #. [objects.inheritance]
 #. tests: "object inheritance"
+#. expect_output: """
+#.   hi from parent
+#.   1
+#.   hi from extension
+#.   hi from parent
+#.   2
+#.   hi from child
+#.   3
+#.   hi from parent
+#.   2
+#.   hi from extension
+#. """
 
 object Parent = x
 
@@ -375,12 +387,12 @@ impl Parent
     output("hi from extension")
 
 var a = Parent { x = 1 }
-var b = Child { x = 1, y = 2 }
+var b = Child { x = 2, y = 3 }
 
 a.parentMethod()
 a.extension()
 
 b.parentMethod()
 b.childMethod()
+b.callParent()
 b.extension()
-
