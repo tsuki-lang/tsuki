@@ -111,6 +111,14 @@ impl Ast {
    pub fn set_second_handle(&mut self, handle: NodeHandle, second: NodeHandle) {
       self.second[handle.0] = second.0;
    }
+
+   /// Returns an iterator over all node handles in the AST.
+   pub fn node_handles(&self) -> NodeHandles {
+      NodeHandles {
+         i: 0,
+         len: self.kinds.len(),
+      }
+   }
 }
 
 /// A handle to a single node in the AST. The actual AST is not stored next to the handle for
@@ -174,4 +182,24 @@ pub enum NodeKind {
 pub enum NodeData {
    None,
    UsizeVec(Vec<usize>),
+}
+
+/// An iterator over node handles in an AST.
+pub struct NodeHandles {
+   i: usize,
+   len: usize,
+}
+
+impl Iterator for NodeHandles {
+   type Item = NodeHandle;
+
+   fn next(&mut self) -> Option<Self::Item> {
+      if self.i < self.len {
+         let id = self.i;
+         self.i += 1;
+         Some(NodeHandle(id))
+      } else {
+         None
+      }
+   }
 }

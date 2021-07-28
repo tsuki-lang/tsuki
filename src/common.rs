@@ -48,11 +48,41 @@ impl Span {
 
    /// Returns whether the span is an _invalid_ span, that is, its positions are `INVALID_LINE` and
    /// `INVALID_COLUMN`.
-   pub fn is_invalid(&mut self) -> bool {
+   pub fn is_invalid(&self) -> bool {
       self.line_start == Self::INVALID_LINE
          || self.column_start == Self::INVALID_COLUMN
          || self.line_end == Self::INVALID_LINE
          || self.column_end == Self::INVALID_COLUMN
+   }
+
+   /// Joins two spans into one. The span `a` must be placed than `b`.
+   pub fn join(a: &Span, b: &Span) -> Span {
+      // We want to find the minimal and maximal lines and columns. Note that `a` is always at an
+      // earlier position than `b`.
+
+      // In the first check, we use <=, because if the starting lines are equal, we want to pick the
+      // column number from `a`.
+      let (line_start, column_start) = if a.line_start <= b.line_start {
+         (a.line_start, a.column_start)
+      } else {
+         (b.line_start, b.column_start)
+      };
+
+      // In the second check, we use <, because if the starting lines are equal, we want to pick the
+      // column number from `b`.
+      let (line_end, column_end) = if a.line_end < b.line_end {
+         (a.line_end, a.column_end)
+      } else {
+         (b.line_end, b.column_end)
+      };
+
+      // Then we just join those into a final span.
+      Span {
+         line_start,
+         column_start,
+         line_end,
+         column_end,
+      }
    }
 }
 

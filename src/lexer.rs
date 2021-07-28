@@ -155,17 +155,17 @@ impl TokenKind {
          | Self::Dot
          | Self::Pointer
          | Self::Check
-         | Self::Unwrap => 9,
-         Self::Pow => 8,
+         | Self::Unwrap => precedence::CHAIN,
+         Self::Pow => precedence::EXPONENT,
          | Self::Mul
          | Self::Div
          | Self::Lshift
          | Self::Rshift
          | Self::BitAnd
          | Self::BitOr
-         | Self::BitXor => 7,
-         Self::Plus | Self::Minus | Self::Tilde => 6,
-         Self::UpTo | Self::UpToInclusive => 5,
+         | Self::BitXor => precedence::PRODUCT,
+         Self::Plus | Self::Minus | Self::Tilde => precedence::SUM,
+         Self::UpTo | Self::UpToInclusive => precedence::RANGE,
          | Self::Equal
          | Self::NotEqual
          | Self::Less
@@ -174,16 +174,16 @@ impl TokenKind {
          | Self::GreaterEqual
          | Self::Is
          | Self::Of
-         | Self::In => 4,
-         Self::And => 3,
-         Self::Or => 2,
+         | Self::In => precedence::COMPARISON,
+         Self::And => precedence::AND,
+         Self::Or => precedence::OR,
          | Self::Assign
          | Self::PlusAssign
          | Self::MinusAssign
          | Self::MulAssign
          | Self::DivAssign
-         | Self::Push => 1,
-         _ => -1,
+         | Self::Push => precedence::ASSIGNMENT,
+         _ => precedence::INVALID,
       }
    }
 
@@ -194,6 +194,19 @@ impl TokenKind {
          _ => Associativity::Left,
       }
    }
+}
+
+pub mod precedence {
+   pub const INVALID: i8 = -1;
+   pub const ASSIGNMENT: i8 = 1;
+   pub const OR: i8 = 2;
+   pub const AND: i8 = 3;
+   pub const COMPARISON: i8 = 4;
+   pub const RANGE: i8 = 5;
+   pub const SUM: i8 = 6;
+   pub const PRODUCT: i8 = 7;
+   pub const EXPONENT: i8 = 8;
+   pub const CHAIN: i8 = 9;
 }
 
 /// A map of identifiers corresponding to keywords.
@@ -635,7 +648,7 @@ impl<'i> Lexer<'i> {
                // code points and not scalar values.
                let ch = unsafe { char::from_u32_unchecked(u) };
                ch.encode_utf8(&mut bytes);
-               self.string_data.extend(bytes.iter());
+               self.string_data.extend(bytes[0..ch.len_utf8()].iter());
             }
          }
       }
