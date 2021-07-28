@@ -14,7 +14,7 @@ Comments in tsuki start with `#` and end with the end of the line:
 # hello, world!
 ```
 
-Cocumentation comments are similar, but begin with two hashes:
+Documentation comments are similar, but begin with two hashes:
 
 ```
 ## this is documentation. hello!
