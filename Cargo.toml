@@ -7,3 +7,4 @@ edition = "2018"
 [dependencies]
 thiserror = "1.0.26"
 phf = { version = "0.9.0", features = ["macros"] }
+smallvec = "1.6.1"

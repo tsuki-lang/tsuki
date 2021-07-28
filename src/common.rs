@@ -15,6 +15,9 @@ impl Span {
    pub const FIRST_LINE: usize = 1;
    pub const FIRST_COLUMN: usize = 1;
 
+   pub const INVALID_LINE: usize = 0;
+   pub const INVALID_COLUMN: usize = 0;
+
    /// Creates and initializes a new span starting at the first possible position in a file.
    pub fn new() -> Self {
       // The first possible position is 1:1..1:1.
@@ -42,6 +45,15 @@ impl Span {
       self.line_end += 1;
       self.column_end = Self::FIRST_COLUMN;
    }
+
+   /// Returns whether the span is an _invalid_ span, that is, its positions are `INVALID_LINE` and
+   /// `INVALID_COLUMN`.
+   pub fn is_invalid(&mut self) -> bool {
+      self.line_start == Self::INVALID_LINE
+         || self.column_start == Self::INVALID_COLUMN
+         || self.line_end == Self::INVALID_LINE
+         || self.column_end == Self::INVALID_COLUMN
+   }
 }
 
 impl fmt::Display for Span {
@@ -59,8 +71,22 @@ impl fmt::Display for Span {
    }
 }
 
+impl Default for Span {
+   fn default() -> Self {
+      Self {
+         line_start: Self::FIRST_LINE,
+         column_start: Self::FIRST_COLUMN,
+         line_end: Self::FIRST_LINE,
+         column_end: Self::FIRST_COLUMN,
+      }
+   }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum ErrorKind {
+   /*
+    * Lexer errors
+    */
    #[error("unexpected character: {0:?}")]
    UnexpectedCharacter(char),
    #[error("indentation too deep; something's wrong with Your program.")]
@@ -81,6 +107,15 @@ pub enum ErrorKind {
    UnicodeEscapeOutOfRange32,
    #[error("unclosed string literal")]
    UnclosedStringLiteral,
+
+   /*
+    * Parser errors
+    */
+   // TODO: make Token implement Display so that error messages are more clear
+   #[error("unexpected token in prefix position: {0:?}")]
+   UnexpectedPrefixToken(crate::lexer::Token),
+   #[error("unexpected token in infix position: {0:?}")]
+   UnexpectedInfixToken(crate::lexer::Token),
 }
 
 /// An error that can occur during lexing, parsing, semantic analysis, or code generation.
