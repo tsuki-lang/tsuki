@@ -55,10 +55,15 @@ impl<'l, 's> Parser<'l, 's> {
 
    /// Checks if the next token's kind matches `kind`. If not, emits an `error` of the given kind
    /// and returns `None`. Otherwise returns `Some` with the token.
-   fn expect_token(&mut self, kind: TokenKind, error: ErrorKind) -> Result<Option<Token>, Error> {
+   fn expect_token(
+      &mut self,
+      kind: TokenKind,
+      error: impl FnOnce(Token) -> ErrorKind,
+   ) -> Result<Option<Token>, Error> {
       let token = self.lexer.next()?;
       if token.kind != kind {
-         self.emit_error(error, token.span);
+         let span = token.span.clone();
+         self.emit_error(error(token), span);
          Ok(None)
       } else {
          Ok(Some(token))
@@ -143,7 +148,7 @@ impl<'l, 's> Parser<'l, 's> {
       loop {
          match &self.lexer.peek()?.kind {
             TokenKind::Eof => {
-               let error = ErrorKind::MissingClosingToken(end.clone());
+               let error = ErrorKind::MissingClosingToken(end.clone(), start.clone());
                dest.push(self.error(error, start.span.clone()));
                return self.lexer.next();
             }
@@ -160,7 +165,7 @@ impl<'l, 's> Parser<'l, 's> {
             } => (),
             t if t.kind == end => return Ok(t),
             other => {
-               let error = ErrorKind::MissingCommaOrClosingToken(end.clone());
+               let error = ErrorKind::ExpectedCommaOrClosingToken(end.clone(), start.clone());
                dest.push(self.error(error, other.span.clone()));
                return Ok(other);
             }
@@ -204,7 +209,7 @@ impl<'l, 's> Parser<'l, 's> {
          TokenKind::Tilde => self.unary_prefix(token, NodeKind::BitNot)?,
          TokenKind::Dot => self.unary_prefix(token, NodeKind::Member)?,
          TokenKind::Pointer => self.unary_prefix(token, NodeKind::Ref)?,
-         _ => self.error(ErrorKind::UnexpectedPrefixToken(token), span),
+         _ => self.error(ErrorKind::UnexpectedPrefixToken(token.kind), span),
       })
    }
 
@@ -251,8 +256,9 @@ impl<'l, 's> Parser<'l, 's> {
       node_kind: NodeKind,
    ) -> Result<NodeHandle, Error> {
       let right = self.parse_expression(0)?;
-      let error = ErrorKind::MissingClosingToken(rparen_kind.clone());
-      let maybe_rparen = self.expect_token(rparen_kind, error)?;
+      let maybe_rparen = self.expect_token(rparen_kind.clone(), |_| {
+         ErrorKind::MissingClosingToken(rparen_kind, lparen.clone())
+      })?;
       if let Some(rparen) = maybe_rparen {
          let node = self.create_node_with_handles(node_kind, left, right);
          self.ast.set_span(node, Span::join(self.ast.span(left), &rparen.span));
@@ -312,7 +318,7 @@ impl<'l, 's> Parser<'l, 's> {
          TokenKind::LeftBrace => {
             self.parse_index(left, token, TokenKind::RightBrace, NodeKind::IndexAlt)?
          }
-         _ => self.error(ErrorKind::UnexpectedInfixToken(token), span),
+         _ => self.error(ErrorKind::UnexpectedInfixToken(token.kind), span),
       })
    }
 
@@ -335,7 +341,9 @@ impl<'l, 's> Parser<'l, 's> {
 
    /// Parses the entire source code of a module.
    fn parse_module(&mut self) -> Result<NodeHandle, Error> {
-      Ok(self.parse_expression(0)?)
+      let expr = self.parse_expression(0)?;
+      self.expect_token(TokenKind::Eof, |token| ErrorKind::UnexpectedEofToken(token.kind))?;
+      Ok(expr)
    }
 }
 

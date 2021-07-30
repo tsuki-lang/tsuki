@@ -3,6 +3,7 @@
 //! tsuki uses a flat data structure for storing tokens to avoid memory fragmentation and improve
 //! performance.
 
+use std::fmt;
 use std::ops::Range;
 
 use crate::common::{Error, ErrorKind, Span};
@@ -207,6 +208,96 @@ pub mod precedence {
    pub const PRODUCT: i8 = 7;
    pub const EXPONENT: i8 = 8;
    pub const CHAIN: i8 = 9;
+}
+
+impl fmt::Display for TokenKind {
+   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+      write!(f, "{}", match self {
+         TokenKind::Nil => "nil",
+         TokenKind::True => "true",
+         TokenKind::False => "false",
+         TokenKind::Integer(_) => "<integer literal>",
+         TokenKind::Float(_) => "<float literal>",
+         TokenKind::Atom(_) => "<atom literal>",
+         TokenKind::Character(_) => "<character literal>",
+         TokenKind::String(_) => "<string literal>",
+         TokenKind::DocComment(_) => "<documentation comment>",
+         TokenKind::Identifier(_) => "<identifier>",
+         TokenKind::Underscore => "_",
+         TokenKind::And => "and",
+         TokenKind::Catch => "catch",
+         TokenKind::Derive => "derive",
+         TokenKind::Do => "do",
+         TokenKind::Elif => "elif",
+         TokenKind::Else => "else",
+         TokenKind::For => "for",
+         TokenKind::Fun => "fun",
+         TokenKind::If => "if",
+         TokenKind::Impl => "impl",
+         TokenKind::In => "in",
+         TokenKind::Is => "is",
+         TokenKind::Macro => "macro",
+         TokenKind::Match => "match",
+         TokenKind::Not => "not",
+         TokenKind::Object => "object",
+         TokenKind::Of => "of",
+         TokenKind::Or => "or",
+         TokenKind::Pub => "pub",
+         TokenKind::Return => "return",
+         TokenKind::Try => "try",
+         TokenKind::Type => "type",
+         TokenKind::Union => "union",
+         TokenKind::While => "while",
+         TokenKind::Val => "val",
+         TokenKind::Var => "var",
+         TokenKind::Dot => ".",
+         TokenKind::Plus => "+",
+         TokenKind::Minus => "-",
+         TokenKind::Mul => "*",
+         TokenKind::Div => "/",
+         TokenKind::Pow => "**",
+         TokenKind::Tilde => "~",
+         TokenKind::Lshift => "<<",
+         TokenKind::Rshift => ">>",
+         TokenKind::BitAnd => "&",
+         TokenKind::BitOr => "|",
+         TokenKind::BitXor => "^^",
+         TokenKind::Equal => "==",
+         TokenKind::NotEqual => "!=",
+         TokenKind::Less => "<",
+         TokenKind::Greater => ">",
+         TokenKind::LessEqual => "<=",
+         TokenKind::GreaterEqual => ">=",
+         TokenKind::Pointer => "^",
+         TokenKind::Check => "?",
+         TokenKind::Unwrap => "!",
+         TokenKind::UpTo => "..",
+         TokenKind::UpToInclusive => "..=",
+         TokenKind::Assign => "=",
+         TokenKind::PlusAssign => "+=",
+         TokenKind::MinusAssign => "-=",
+         TokenKind::MulAssign => "*=",
+         TokenKind::DivAssign => "/=",
+         TokenKind::Push => "<-",
+         TokenKind::LeftParen => "(",
+         TokenKind::RightParen => ")",
+         TokenKind::LeftBracket => "[",
+         TokenKind::RightBracket => "]",
+         TokenKind::LeftBrace => "{",
+         TokenKind::RightBrace => "}",
+         TokenKind::Comma => ",",
+         TokenKind::Colon => ":",
+         TokenKind::Colons => "::",
+         TokenKind::Semicolon => ";",
+         TokenKind::Eof => "<end of file>",
+      })
+   }
+}
+
+impl fmt::Display for Token {
+   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+      write!(f, "'{}' at {}", self.kind, self.span)
+   }
 }
 
 /// A map of identifiers corresponding to keywords.

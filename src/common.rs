@@ -2,6 +2,8 @@
 
 use std::fmt;
 
+use crate::lexer::{TokenKind, Token};
+
 /// A structure representing a span of text in a source file.
 #[derive(Clone, Debug)]
 pub struct Span {
@@ -142,15 +144,16 @@ pub enum ErrorKind {
    /*
     * Parser errors
     */
-   // TODO: make Token implement Display so that error messages are more clear
-   #[error("unexpected token in prefix position: {0:?}")]
-   UnexpectedPrefixToken(crate::lexer::Token),
-   #[error("unexpected token in infix position: {0:?}")]
-   UnexpectedInfixToken(crate::lexer::Token),
-   #[error("missing closing token {0:?}")]
-   MissingClosingToken(crate::lexer::TokenKind),
-   #[error("missing comma ',' or closing token {0:?}")]
-   MissingCommaOrClosingToken(crate::lexer::TokenKind),
+   #[error("unexpected token in prefix position: '{0}'")]
+   UnexpectedPrefixToken(TokenKind),
+   #[error("unexpected token in infix position: '{0}'")]
+   UnexpectedInfixToken(TokenKind),
+   #[error("missing '{0}' to close {1}")]
+   MissingClosingToken(TokenKind, Token),
+   #[error("expected comma ',' or '{0}' to close {1}")]
+   ExpectedCommaOrClosingToken(TokenKind, Token),
+   #[error("unexpected token at the end of the file: '{0}'")]
+   UnexpectedEofToken(TokenKind),
 }
 
 /// An error that can occur during lexing, parsing, semantic analysis, or code generation.
