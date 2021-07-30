@@ -24,16 +24,21 @@ pub struct Ast {
 impl Ast {
    /// Constructs a new AST.
    pub fn new() -> Self {
-      Self {
+      let mut ast = Self {
          kinds: Vec::new(),
          spans: Vec::new(),
          first: Vec::new(),
          second: Vec::new(),
          extra: Vec::new(),
-      }
+      };
+      // Create a Nil node at ID 0 so that if some invalid AST node reference is dumped, it'll
+      // instead go to this Error node.
+      let _ = ast.create_node(NodeKind::Error);
+      ast
    }
 
    /// Creates a new node of the given kind and returns a handle to it.
+   #[must_use]
    pub fn create_node(&mut self, kind: NodeKind) -> NodeHandle {
       let id = self.kinds.len();
       self.kinds.push(kind);
@@ -112,10 +117,23 @@ impl Ast {
       self.second[handle.0] = second.0;
    }
 
+   /// Returns a reference to the extra data for the node with the given handle.
+   #[inline(always)]
+   pub fn extra(&self, handle: NodeHandle) -> &NodeData {
+      &self.extra[handle.0]
+   }
+
+   /// Sets the extra data for the node with the given handle.
+   #[inline(always)]
+   pub fn set_extra(&mut self, handle: NodeHandle, data: NodeData) {
+      self.extra[handle.0] = data;
+   }
+
    /// Returns an iterator over all node handles in the AST.
    pub fn node_handles(&self) -> NodeHandles {
       NodeHandles {
-         i: 0,
+         // Start from 1 to skip the Error node at ID 0.
+         i: 1,
          len: self.kinds.len(),
       }
    }
@@ -146,14 +164,24 @@ pub enum NodeKind {
    DocComment,
    Identifier,
 
-   // Operators
+   // Nullary operators
+   FullRange,
+
+   // Unary operators
+   Not,
+   Neg,    // -
+   BitNot, // ~
+   Member, // .
+   Ref,    // ^
+
+   // Binary operators
    Dot,           // .
    Plus,          // +
    Minus,         // -
    Mul,           // *
    Div,           // /
    Pow,           // **
-   Tilde,         // ~
+   Concat,        // ~
    Lshift,        // <<
    Rshift,        // >>
    BitAnd,        // &
@@ -165,7 +193,7 @@ pub enum NodeKind {
    Greater,       // >
    LessEqual,     // <=
    GreaterEqual,  // >=
-   Pointer,       // ^
+   Deref,         // ^
    Check,         // ?
    Unwrap,        // !
    UpTo,          // ..
@@ -176,12 +204,17 @@ pub enum NodeKind {
    MulAssign,     // *=
    DivAssign,     // /=
    Push,          // <-
+
+   // Other operations
+   Call,
+   Index,
+   IndexAlt,
 }
 
-/// Extra node data, for storing inside of the `Extra` field.
+/// Extra node data, for storing inside of the `extra` field.
 pub enum NodeData {
    None,
-   UsizeVec(Vec<usize>),
+   NodeList(Vec<NodeHandle>),
 }
 
 /// An iterator over node handles in an AST.

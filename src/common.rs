@@ -55,7 +55,7 @@ impl Span {
          || self.column_end == Self::INVALID_COLUMN
    }
 
-   /// Joins two spans into one. The span `a` must be placed than `b`.
+   /// Joins two spans into one. The span `a` must be placed earlier in the text than `b`.
    pub fn join(a: &Span, b: &Span) -> Span {
       // We want to find the minimal and maximal lines and columns. Note that `a` is always at an
       // earlier position than `b`.
@@ -102,12 +102,13 @@ impl fmt::Display for Span {
 }
 
 impl Default for Span {
+   /// Initializes a span at a default, _invalid_ position. This is _not_ the same as [`Span::new`]!
    fn default() -> Self {
       Self {
-         line_start: Self::FIRST_LINE,
-         column_start: Self::FIRST_COLUMN,
-         line_end: Self::FIRST_LINE,
-         column_end: Self::FIRST_COLUMN,
+         line_start: Self::INVALID_LINE,
+         column_start: Self::INVALID_COLUMN,
+         line_end: Self::INVALID_LINE,
+         column_end: Self::INVALID_COLUMN,
       }
    }
 }
@@ -146,6 +147,10 @@ pub enum ErrorKind {
    UnexpectedPrefixToken(crate::lexer::Token),
    #[error("unexpected token in infix position: {0:?}")]
    UnexpectedInfixToken(crate::lexer::Token),
+   #[error("missing closing token {0:?}")]
+   MissingClosingToken(crate::lexer::TokenKind),
+   #[error("missing comma ',' or closing token {0:?}")]
+   MissingCommaOrClosingToken(crate::lexer::TokenKind),
 }
 
 /// An error that can occur during lexing, parsing, semantic analysis, or code generation.

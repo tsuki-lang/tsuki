@@ -6,7 +6,7 @@ mod parser;
 
 fn main() -> Result<(), common::Error> {
    let source = r#"
-      2 + 3 * 4
+      io.stdout.write(stuff, array[..])
    "#;
    let mut lexer = lexer::Lexer::new("test.tsu", source);
    let (ast, root_node) = match parser::parse(&mut lexer) {
@@ -17,9 +17,15 @@ fn main() -> Result<(), common::Error> {
       }
    };
 
+   println!("{}", source);
+
    for handle in ast.node_handles() {
-      assert!(!ast.span(handle).is_invalid());
+      if ast.span(handle).is_invalid() {
+         println!("warning: node with invalid span: {:?}\nAST dump:", handle);
+         astdump::dump_ast(&lexer, &ast, handle);
+      }
    }
+   println!("———");
 
    astdump::dump_ast(&lexer, &ast, root_node);
 

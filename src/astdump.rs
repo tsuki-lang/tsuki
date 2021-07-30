@@ -7,6 +7,7 @@ use crate::lexer::Lexer;
 enum Prefix {
    L,
    R,
+   Fun,
 }
 
 fn print_indentation(depth: usize) {
@@ -53,7 +54,7 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
       | NodeKind::Mul
       | NodeKind::Div
       | NodeKind::Pow
-      | NodeKind::Tilde
+      | NodeKind::Concat
       | NodeKind::Lshift
       | NodeKind::Rshift
       | NodeKind::BitAnd
@@ -65,9 +66,6 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
       | NodeKind::Greater
       | NodeKind::LessEqual
       | NodeKind::GreaterEqual
-      | NodeKind::Pointer
-      | NodeKind::Check
-      | NodeKind::Unwrap
       | NodeKind::UpTo
       | NodeKind::UpToInclusive
       | NodeKind::Assign
@@ -75,12 +73,36 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
       | NodeKind::MinusAssign
       | NodeKind::MulAssign
       | NodeKind::DivAssign
-      | NodeKind::Push => {
+      | NodeKind::Push
+      | NodeKind::Index
+      | NodeKind::IndexAlt => {
          let (left, right) = (ast.first_handle(node), ast.second_handle(node));
          dump_node(lexer, ast, left, depth + 1, Some(Prefix::L));
          dump_node(lexer, ast, right, depth + 1, Some(Prefix::R));
-      },
+      }
+      | NodeKind::Check | NodeKind::Unwrap | NodeKind::Deref => {
+         let left = ast.first_handle(node);
+         dump_node(lexer, ast, left, depth + 1, Some(Prefix::L));
+      }
+      NodeKind::Call => {
+         let fun = ast.first_handle(node);
+         dump_node(lexer, ast, fun, depth + 1, Some(Prefix::Fun));
+      }
+      | NodeKind::Not | NodeKind::Neg | NodeKind::BitNot | NodeKind::Member | NodeKind::Ref => {
+         let right = ast.first_handle(node);
+         dump_node(lexer, ast, right, depth + 1, Some(Prefix::R));
+      }
       _ => (),
+   }
+
+   let extra = ast.extra(node);
+   match extra {
+      NodeData::None => (),
+      NodeData::NodeList(list) => {
+         for &node in list {
+            dump_node(lexer, ast, node, depth + 1, None);
+         }
+      }
    }
 }
 

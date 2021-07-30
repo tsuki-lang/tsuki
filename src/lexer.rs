@@ -553,8 +553,8 @@ impl<'i> Lexer<'i> {
    }
 
    /// Reads a single character from a string.
-   fn read_string_character(&mut self) -> Result<StringCharacter, Error> {
-      if self.get() == b'\\' {
+   fn read_string_character(&mut self, allow_escapes: bool) -> Result<StringCharacter, Error> {
+      if allow_escapes && self.get() == b'\\' {
          self.advance(); // skip \
          let kind = self.get();
          self.advance(); // skip kind, because it's always a single character
@@ -637,7 +637,7 @@ impl<'i> Lexer<'i> {
       self.advance_by(if long { 3 } else { 1 });
       let start = self.string_data.len();
       while self.has_more() && !self.at_string_quotes(long) {
-         let ch = self.read_string_character()?;
+         let ch = self.read_string_character(!long)?;
          match ch {
             StringCharacter::Byte(b) => {
                self.string_data.push(b);
@@ -727,7 +727,7 @@ impl<'i> Lexer<'i> {
       if let Some((position, span, token)) = self.peek_cache.take() {
          self.position = position;
          self.span = span;
-         return Ok(token)
+         return Ok(token);
       }
 
       self.skip_whitespace_and_comments()?;
@@ -770,7 +770,7 @@ impl<'i> Lexer<'i> {
          // Character literals and strings
          b'\'' => {
             self.advance();
-            let ch = self.read_string_character()?.to_unicode();
+            let ch = self.read_string_character(true)?.to_unicode();
             if self.get() != b'\'' {
                Err(self.error(ErrorKind::UnclosedCharacterLiteral))
             } else {
