@@ -143,6 +143,13 @@ impl<'l, 's> Parser<'l, 's> {
       }
    }
 
+   fn some_or_next(&mut self, maybe_token: Option<Token>) -> Result<Token, Error> {
+      match maybe_token {
+         Some(token) => Ok(token),
+         None => self.lexer.next(),
+      }
+   }
+
    /// Parses a list of comma-separated values.
    /// `start` is the starting token, used for error reporting.
    /// `end` is the kind of ending token that should be matched against.
@@ -213,7 +220,8 @@ impl<'l, 's> Parser<'l, 's> {
    }
 
    /// Parses a prefix `do` expression (or statement).
-   fn parse_do_expression(&mut self, token: Token, is_statement: bool) -> Result<NodeHandle, Error> {
+   fn parse_do_expression(&mut self, token: Option<Token>, is_statement: bool) -> Result<NodeHandle, Error> {
+      let token = self.some_or_next(token)?;
       let node = self.ast.create_node(if is_statement { NodeKind::DoStatement } else { NodeKind::DoExpression });
       let mut statements = Vec::new();
       let indent_level = token.indent_level;
@@ -246,7 +254,7 @@ impl<'l, 's> Parser<'l, 's> {
          TokenKind::Dot => self.unary_prefix(token, NodeKind::Member)?,
          TokenKind::Pointer => self.unary_prefix(token, NodeKind::Ref)?,
          // Control flow structures
-         TokenKind::Do => self.parse_do_expression(token, false)?,
+         TokenKind::Do => self.parse_do_expression(Some(token), false)?,
          // Unknown tokens
          _ => self.error(ErrorKind::UnexpectedPrefixToken(token.kind), span),
       })
@@ -389,7 +397,9 @@ impl<'l, 's> Parser<'l, 's> {
 
    /// Parses a statement.
    fn parse_statement(&mut self) -> Result<NodeHandle, Error> {
-      Ok(match self.lexer.peek()? {
+      let token_kind = self.lexer.peek()?.kind.clone();
+      Ok(match token_kind {
+         TokenKind::Do => self.parse_do_expression(None, true)?,
          _ => self.parse_expression(0)?,
       })
    }
