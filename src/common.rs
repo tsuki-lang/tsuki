@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::lexer::{TokenKind, Token};
+use crate::lexer::{Token, TokenKind};
 
 /// A structure representing a span of text in a source file.
 #[derive(Clone, Debug)]
@@ -152,8 +152,8 @@ pub enum ErrorKind {
    MissingClosingToken(TokenKind, Token),
    #[error("expected comma ',' or '{0}' to close {1}")]
    ExpectedCommaOrClosingToken(TokenKind, Token),
-   #[error("unexpected token at the end of the file: '{0}'")]
-   UnexpectedEofToken(TokenKind),
+   #[error("statements must be separated by line breaks")]
+   MissingLineBreakAfterStatement,
 }
 
 /// An error that can occur during lexing, parsing, semantic analysis, or code generation.

@@ -6,7 +6,16 @@ mod parser;
 
 fn main() -> Result<(), common::Error> {
    let source = r#"
-      io.stdout.write(stuff, array[..,]) beniz
+      a + b + c
+        + d
+        * e
+        ** 2
+        + 3
+      print("test")
+      do
+        print("test2")
+        print("asdd")
+      print("yeah")
    "#;
    let mut lexer = lexer::Lexer::new("test.tsu", source);
    let (ast, root_node) = match parser::parse(&mut lexer) {

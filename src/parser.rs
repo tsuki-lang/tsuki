@@ -6,7 +6,7 @@ use smallvec::{smallvec, SmallVec};
 
 use crate::ast::*;
 use crate::common::{Error, ErrorKind, Span};
-use crate::lexer::{Associativity, Lexer, Token, TokenKind};
+use crate::lexer::{Associativity, IndentLevel, Lexer, Token, TokenKind};
 
 pub type ParseErrors = SmallVec<[Error; 8]>;
 
@@ -105,6 +105,16 @@ impl<'l, 's> Parser<'l, 's> {
       self.create_node_with(kind, range.start, range.end)
    }
 
+   fn span_all_nodes(&self, nodes: &[NodeHandle]) -> Span {
+      if nodes.len() >= 2 {
+         Span::join(self.ast.span(nodes[0]), self.ast.span(nodes[1]))
+      } else if nodes.len() == 1 {
+         self.ast.span(nodes[0]).clone()
+      } else {
+         Span::new()
+      }
+   }
+
    /// Parses a literal token and returns the node corresponding to it.
    fn parse_literal(&mut self, token: Token) -> NodeHandle {
       let literal = match token.kind {
@@ -173,6 +183,18 @@ impl<'l, 's> Parser<'l, 's> {
       }
    }
 
+   fn parse_indented_block(
+      &mut self,
+      dest: &mut Vec<NodeHandle>,
+      parent_indent_level: IndentLevel,
+      mut next: impl FnMut(&mut Self) -> Result<NodeHandle, Error>,
+   ) -> Result<(), Error> {
+      while self.lexer.peek()?.indent_level > parent_indent_level {
+         dest.push(next(self)?);
+      }
+      Ok(())
+   }
+
    /// Creates a node for a nullary operator.
    fn nullary_operator(&mut self, operator: Token, node_kind: NodeKind) -> NodeHandle {
       let node = self.create_node_with(node_kind, 0, 0);
@@ -190,10 +212,22 @@ impl<'l, 's> Parser<'l, 's> {
       Ok(node)
    }
 
+   /// Parses a prefix `do` expression (or statement).
+   fn parse_do_expression(&mut self, token: Token, is_statement: bool) -> Result<NodeHandle, Error> {
+      let node = self.ast.create_node(if is_statement { NodeKind::DoStatement } else { NodeKind::DoExpression });
+      let mut statements = Vec::new();
+      let indent_level = token.indent_level;
+      self.parse_indented_block(&mut statements, indent_level, |p| p.parse_statement())?;
+      self.ast.set_span(node, Span::join(&token.span, &self.span_all_nodes(&statements)));
+      self.ast.set_extra(node, NodeData::NodeList(statements));
+      Ok(node)
+   }
+
    /// Parses a prefix from the given token.
    fn parse_prefix(&mut self, token: Token) -> Result<NodeHandle, Error> {
       let span = token.span.clone();
       Ok(match token.kind {
+         // Literals
          | TokenKind::Nil
          | TokenKind::True
          | TokenKind::False
@@ -203,12 +237,17 @@ impl<'l, 's> Parser<'l, 's> {
          | TokenKind::Character(..)
          | TokenKind::String(..) => self.parse_literal(token),
          TokenKind::Identifier(..) => self.create_identifier(token),
+         // Nullary operators
          TokenKind::UpTo => self.nullary_operator(token, NodeKind::FullRange),
+         // Unary prefix operators
          TokenKind::Not => self.unary_prefix(token, NodeKind::Not)?,
          TokenKind::Minus => self.unary_prefix(token, NodeKind::Neg)?,
          TokenKind::Tilde => self.unary_prefix(token, NodeKind::BitNot)?,
          TokenKind::Dot => self.unary_prefix(token, NodeKind::Member)?,
          TokenKind::Pointer => self.unary_prefix(token, NodeKind::Ref)?,
+         // Control flow structures
+         TokenKind::Do => self.parse_do_expression(token, false)?,
+         // Unknown tokens
          _ => self.error(ErrorKind::UnexpectedPrefixToken(token.kind), span),
       })
    }
@@ -326,9 +365,18 @@ impl<'l, 's> Parser<'l, 's> {
    /// precedence level.
    fn parse_expression(&mut self, precedence: i8) -> Result<NodeHandle, Error> {
       let mut token = self.lexer.next()?;
+      let expr_indent_level = token.indent_level;
+      let expr_line = token.line();
       let mut left = self.parse_prefix(token)?;
 
       while precedence < self.lexer.peek()?.kind.precedence() {
+         // Operators continuing an expression on the next line must have their indent level greater
+         // than the first token of the expression.
+         let next = self.lexer.peek()?;
+         if next.line() > expr_line && next.indent_level <= expr_indent_level {
+            break;
+         }
+
          token = self.lexer.next()?;
          if token.kind == TokenKind::Eof {
             break;
@@ -339,11 +387,33 @@ impl<'l, 's> Parser<'l, 's> {
       Ok(left)
    }
 
+   /// Parses a statement.
+   fn parse_statement(&mut self) -> Result<NodeHandle, Error> {
+      Ok(match self.lexer.peek()? {
+         _ => self.parse_expression(0)?,
+      })
+   }
+
    /// Parses the entire source code of a module.
    fn parse_module(&mut self) -> Result<NodeHandle, Error> {
-      let expr = self.parse_expression(0)?;
-      self.expect_token(TokenKind::Eof, |token| ErrorKind::UnexpectedEofToken(token.kind))?;
-      Ok(expr)
+      let node = self.ast.create_node(NodeKind::StatementList);
+      let mut statements = Vec::new();
+      let mut previous_line = Span::INVALID_LINE;
+      while self.lexer.peek()?.kind != TokenKind::Eof {
+         let next = self.lexer.peek()?;
+         let (line, span) = (next.line(), next.span.clone());
+         drop(next);
+         let statement = if next.line() == previous_line {
+            return Ok(self.error(ErrorKind::MissingLineBreakAfterStatement, span));
+         } else {
+            self.parse_statement()?
+         };
+         statements.push(statement);
+         previous_line = line;
+      }
+      self.ast.set_span(node, self.span_all_nodes(&statements));
+      self.ast.set_extra(node, NodeData::NodeList(statements));
+      Ok(node)
    }
 }
 

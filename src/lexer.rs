@@ -212,91 +212,89 @@ pub mod precedence {
 
 impl fmt::Display for TokenKind {
    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-      write!(f, "{}", match self {
-         TokenKind::Nil => "nil",
-         TokenKind::True => "true",
-         TokenKind::False => "false",
-         TokenKind::Integer(_) => "<integer literal>",
-         TokenKind::Float(_) => "<float literal>",
-         TokenKind::Atom(_) => "<atom literal>",
-         TokenKind::Character(_) => "<character literal>",
-         TokenKind::String(_) => "<string literal>",
-         TokenKind::DocComment(_) => "<documentation comment>",
-         TokenKind::Identifier(_) => "<identifier>",
-         TokenKind::Underscore => "_",
-         TokenKind::And => "and",
-         TokenKind::Catch => "catch",
-         TokenKind::Derive => "derive",
-         TokenKind::Do => "do",
-         TokenKind::Elif => "elif",
-         TokenKind::Else => "else",
-         TokenKind::For => "for",
-         TokenKind::Fun => "fun",
-         TokenKind::If => "if",
-         TokenKind::Impl => "impl",
-         TokenKind::In => "in",
-         TokenKind::Is => "is",
-         TokenKind::Macro => "macro",
-         TokenKind::Match => "match",
-         TokenKind::Not => "not",
-         TokenKind::Object => "object",
-         TokenKind::Of => "of",
-         TokenKind::Or => "or",
-         TokenKind::Pub => "pub",
-         TokenKind::Return => "return",
-         TokenKind::Try => "try",
-         TokenKind::Type => "type",
-         TokenKind::Union => "union",
-         TokenKind::While => "while",
-         TokenKind::Val => "val",
-         TokenKind::Var => "var",
-         TokenKind::Dot => ".",
-         TokenKind::Plus => "+",
-         TokenKind::Minus => "-",
-         TokenKind::Mul => "*",
-         TokenKind::Div => "/",
-         TokenKind::Pow => "**",
-         TokenKind::Tilde => "~",
-         TokenKind::Lshift => "<<",
-         TokenKind::Rshift => ">>",
-         TokenKind::BitAnd => "&",
-         TokenKind::BitOr => "|",
-         TokenKind::BitXor => "^^",
-         TokenKind::Equal => "==",
-         TokenKind::NotEqual => "!=",
-         TokenKind::Less => "<",
-         TokenKind::Greater => ">",
-         TokenKind::LessEqual => "<=",
-         TokenKind::GreaterEqual => ">=",
-         TokenKind::Pointer => "^",
-         TokenKind::Check => "?",
-         TokenKind::Unwrap => "!",
-         TokenKind::UpTo => "..",
-         TokenKind::UpToInclusive => "..=",
-         TokenKind::Assign => "=",
-         TokenKind::PlusAssign => "+=",
-         TokenKind::MinusAssign => "-=",
-         TokenKind::MulAssign => "*=",
-         TokenKind::DivAssign => "/=",
-         TokenKind::Push => "<-",
-         TokenKind::LeftParen => "(",
-         TokenKind::RightParen => ")",
-         TokenKind::LeftBracket => "[",
-         TokenKind::RightBracket => "]",
-         TokenKind::LeftBrace => "{",
-         TokenKind::RightBrace => "}",
-         TokenKind::Comma => ",",
-         TokenKind::Colon => ":",
-         TokenKind::Colons => "::",
-         TokenKind::Semicolon => ";",
-         TokenKind::Eof => "<end of file>",
-      })
-   }
-}
-
-impl fmt::Display for Token {
-   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-      write!(f, "'{}' at {}", self.kind, self.span)
+      write!(
+         f,
+         "{}",
+         match self {
+            TokenKind::Nil => "nil",
+            TokenKind::True => "true",
+            TokenKind::False => "false",
+            TokenKind::Integer(_) => "<integer literal>",
+            TokenKind::Float(_) => "<float literal>",
+            TokenKind::Atom(_) => "<atom literal>",
+            TokenKind::Character(_) => "<character literal>",
+            TokenKind::String(_) => "<string literal>",
+            TokenKind::DocComment(_) => "<documentation comment>",
+            TokenKind::Identifier(_) => "<identifier>",
+            TokenKind::Underscore => "_",
+            TokenKind::And => "and",
+            TokenKind::Catch => "catch",
+            TokenKind::Derive => "derive",
+            TokenKind::Do => "do",
+            TokenKind::Elif => "elif",
+            TokenKind::Else => "else",
+            TokenKind::For => "for",
+            TokenKind::Fun => "fun",
+            TokenKind::If => "if",
+            TokenKind::Impl => "impl",
+            TokenKind::In => "in",
+            TokenKind::Is => "is",
+            TokenKind::Macro => "macro",
+            TokenKind::Match => "match",
+            TokenKind::Not => "not",
+            TokenKind::Object => "object",
+            TokenKind::Of => "of",
+            TokenKind::Or => "or",
+            TokenKind::Pub => "pub",
+            TokenKind::Return => "return",
+            TokenKind::Try => "try",
+            TokenKind::Type => "type",
+            TokenKind::Union => "union",
+            TokenKind::While => "while",
+            TokenKind::Val => "val",
+            TokenKind::Var => "var",
+            TokenKind::Dot => ".",
+            TokenKind::Plus => "+",
+            TokenKind::Minus => "-",
+            TokenKind::Mul => "*",
+            TokenKind::Div => "/",
+            TokenKind::Pow => "**",
+            TokenKind::Tilde => "~",
+            TokenKind::Lshift => "<<",
+            TokenKind::Rshift => ">>",
+            TokenKind::BitAnd => "&",
+            TokenKind::BitOr => "|",
+            TokenKind::BitXor => "^^",
+            TokenKind::Equal => "==",
+            TokenKind::NotEqual => "!=",
+            TokenKind::Less => "<",
+            TokenKind::Greater => ">",
+            TokenKind::LessEqual => "<=",
+            TokenKind::GreaterEqual => ">=",
+            TokenKind::Pointer => "^",
+            TokenKind::Check => "?",
+            TokenKind::Unwrap => "!",
+            TokenKind::UpTo => "..",
+            TokenKind::UpToInclusive => "..=",
+            TokenKind::Assign => "=",
+            TokenKind::PlusAssign => "+=",
+            TokenKind::MinusAssign => "-=",
+            TokenKind::MulAssign => "*=",
+            TokenKind::DivAssign => "/=",
+            TokenKind::Push => "<-",
+            TokenKind::LeftParen => "(",
+            TokenKind::RightParen => ")",
+            TokenKind::LeftBracket => "[",
+            TokenKind::RightBracket => "]",
+            TokenKind::LeftBrace => "{",
+            TokenKind::RightBrace => "}",
+            TokenKind::Comma => ",",
+            TokenKind::Colon => ":",
+            TokenKind::Colons => "::",
+            TokenKind::Semicolon => ";",
+            TokenKind::Eof => "<end of file>",
+         }
+      )
    }
 }
 
@@ -335,7 +333,7 @@ static KEYWORDS: phf::Map<&'static str, TokenKind> = phf::phf_map! {
 };
 
 /// The integer type representing an indent level.
-type IndentLevel = u32;
+pub type IndentLevel = u32;
 
 /// A token with an associated span.
 #[derive(Clone, Debug)]
@@ -343,6 +341,21 @@ pub struct Token {
    pub kind: TokenKind,
    pub span: Span,
    pub indent_level: IndentLevel,
+}
+
+impl Token {
+   /// Returns the line at which the token is located.
+   ///
+   /// This is a shortcut for `token.span.line_start`.
+   pub fn line(&self) -> usize {
+      self.span.line_start
+   }
+}
+
+impl fmt::Display for Token {
+   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+      write!(f, "'{}' at {}", self.kind, self.span)
+   }
 }
 
 /// Lexer state. This struct stores all the data needed for lexing, emitting tokens, and reporting
@@ -392,6 +405,13 @@ impl<'i> Lexer<'i> {
       // Safety: `self.input` is guaranteed to be valid UTF-8 as it is provided by an external
       // caller, and only interpreted as bytes by the lexer.
       unsafe { std::str::from_utf8_unchecked(self.input) }
+   }
+
+   /// Returns the lexer's string data.
+   pub fn string_data(&self) -> &str {
+      // Safety: `self.string_data` is guaranteed to be valid UTF-8 as it consists of parts of
+      // `self.input` sliced at ASCII boundaries.
+      unsafe { std::str::from_utf8_unchecked(&self.string_data) }
    }
 
    /// Returns whether the lexer still has more input to read.

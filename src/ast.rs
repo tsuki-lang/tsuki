@@ -150,6 +150,9 @@ pub enum NodeKind {
    /// during parsing.
    Error,
 
+   // Grouping
+   StatementList,
+
    // Literals
    Nil,
    True,
@@ -209,6 +212,13 @@ pub enum NodeKind {
    Call,
    Index,
    IndexAlt,
+
+   // Control flow
+   // ---
+   // *Expression kinds differ from *Statement kinds in that the last statement in the block must
+   // be an expression statement.
+   DoExpression,
+   DoStatement,
 }
 
 /// Extra node data, for storing inside of the `extra` field.

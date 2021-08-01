@@ -20,6 +20,10 @@ fn print_source_range(lexer: &Lexer, start: usize, end: usize) {
    print!("{}", &lexer.input()[start..end]);
 }
 
+fn print_string_range(lexer: &Lexer, start: usize, end: usize) {
+   print!("{}", &lexer.string_data()[start..end]);
+}
+
 fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: Option<Prefix>) {
    print_indentation(depth);
 
@@ -36,11 +40,13 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
       | NodeKind::Integer
       | NodeKind::Float
       | NodeKind::Atom
-      | NodeKind::String
-      | NodeKind::DocComment
       | NodeKind::Identifier => {
          let (start, end) = (ast.first(node), ast.second(node));
          print_source_range(lexer, start, end);
+      }
+      NodeKind::String | NodeKind::DocComment => {
+         let (start, end) = (ast.first(node), ast.second(node));
+         print_string_range(lexer, start, end);
       }
       NodeKind::Character => print!("{:?}", char::from_u32(ast.first(node) as u32)),
       _ => (),
