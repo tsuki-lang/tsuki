@@ -104,7 +104,9 @@ do
   _ # statements go here
 ```
 
-The special identifier `_` may be used when a dummy no-op statement is needed, ala `pass` from python.
+The special identifier `_` may be used when a dummy no-op statement is needed, ala `pass` from Python.
+
+The standard indent size is 2 spaces, but a different amout may be used depending on the developer's preferences.
 
 ## Operators
 
@@ -148,6 +150,18 @@ Expressions in tsuki are made up of two types of operations: _prefix_, and _infi
 An expression starts with a prefix, and literals are prefixes, so `1` is read. Then, the next token is examined, to determine whether it's a valid infix - in our case `+` is a valid infix, so parsing continues in the `+` rule, which expects another expression on its right-hand side.
 
 This is also where precedence comes in: if it's part of a statement, an expression is parsed with the precedence 0, which is lower than any other precedence level. The precedence level determines which infix operators are treated as part of the current expression; if an operator's precedence level is lower than that of the current expression, it cannot be part of this expression, so it's skipped, and later picked up by an expression with a lower precedence level. This algorithm is known as *Pratt parsing*, or *precedence climbing*.
+
+Infix tokens that continue a line must have an indentation level greater than the first token of the expression:
+```
+val test = "hello" ~ " world "
+  ~ "this" ~ " is " ~ "a "
+  ~ "test"
+# or
+val test = "hello" ~ " world " ~
+  "this" ~ " is " ~ "a " ~
+  "test"
+```
+
 
 ## Prefixes
 
@@ -327,16 +341,16 @@ val int = err catch |err_atom|
 A more advanced use case for `match` would be unpacking unions. Unions carry extra data with them, and this data can be captured using `||`, just like shown previously with `else` and ranges.
 ```
 union Shape
-  :rectangle: (Float, Float, Float, Float)
-  :circle: (Float, Float, Float)
+  :rectangle(Float, Float, Float, Float)
+  :circle(Float, Float, Float)
 
 val rect = Shape:rectangle((32, 32, 64, 64))
 match rect
-  :rectangle |x, y, width, height| ->
+  :rectangle(x, y, width, height) ->
     print("Rectangle")
     print("X: " ~ x.to_string ~ "  Y: " ~ y.to_string)
     print(width.to_string ~ "x" ~ height.to_string)
-  :circle |x, y, radius| ->
+  :circle(x, y, radius) ->
     print("Circle")
     print("X: " ~ x.to_string ~ "  Y: " ~ y.to_string)
     print("radius: " ~ radius.to_string)
