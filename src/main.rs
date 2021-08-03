@@ -1,8 +1,4 @@
-mod ast;
-mod astdump;
-mod common;
-mod lexer;
-mod parser;
+use tsuki_frontend::{astdump, common, lexer, parser};
 
 fn main() -> Result<(), common::Error> {
    let source = r#"
@@ -16,7 +12,7 @@ fn main() -> Result<(), common::Error> {
       if a
         _
       elif b
-      _
+        _
       elif c
         _
       else

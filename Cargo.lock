@@ -186,6 +186,13 @@ dependencies = [
 name = "tsuki"
 version = "0.1.0"
 dependencies = [
+ "tsuki-frontend",
+]
+
+[[package]]
+name = "tsuki-frontend"
+version = "0.1.0"
+dependencies = [
  "phf",
  "smallvec",
  "thiserror",
