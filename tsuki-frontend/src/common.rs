@@ -2,6 +2,8 @@
 
 use std::fmt;
 
+use smallvec::SmallVec;
+
 use crate::lexer::{IndentLevel, Token, TokenKind};
 
 /// A structure representing a span of text in a source file.
@@ -180,3 +182,5 @@ impl fmt::Display for Error {
       Ok(())
    }
 }
+
+pub type Errors = SmallVec<[Error; 8]>;

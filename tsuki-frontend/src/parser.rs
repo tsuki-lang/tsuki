@@ -5,10 +5,8 @@ use std::ops::Range;
 use smallvec::{smallvec, SmallVec};
 
 use crate::ast::*;
-use crate::common::{Error, ErrorKind, Span};
+use crate::common::{Error, Errors, ErrorKind, Span};
 use crate::lexer::{Associativity, IndentLevel, Lexer, Token, TokenKind};
-
-pub type ParseErrors = SmallVec<[Error; 8]>;
 
 /// The parser state.
 struct Parser<'l, 's> {
@@ -22,7 +20,7 @@ struct Parser<'l, 's> {
    /// node.
    ///
    /// This vector is empty if no errors occur during parsing.
-   errors: ParseErrors,
+   errors: Errors,
 }
 
 impl<'l, 's> Parser<'l, 's> {
@@ -547,11 +545,15 @@ impl<'l, 's> Parser<'l, 's> {
 
 /// Parses a source file with the given filename and source code. On success, returns the AST and
 /// the handle to the root node. On failure, returns a list of errors.
-pub fn parse(lexer: &mut Lexer) -> Result<(Ast, NodeHandle), ParseErrors> {
+pub fn parse(lexer: &mut Lexer) -> Result<(Ast, NodeHandle), Errors> {
    let mut parser = Parser::new(lexer);
    let root_node = match parser.parse_module() {
       Ok(node) => node,
-      Err(error) => return Err(smallvec![error]),
+      Err(error) => return Err({
+         let mut errors = Errors::new();
+         errors.push(error);
+         errors
+      }),
    };
 
    if parser.errors.len() > 0 {
