@@ -8,6 +8,7 @@ enum Prefix {
    L,
    R,
    Fun,
+   Cond,
 }
 
 fn print_indentation(depth: usize) {
@@ -31,16 +32,13 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
 
    // Optional prefix.
    if let Some(prefix) = prefix {
-      print!("{:?} -> ", prefix);
+      print!("{:?}: ", prefix);
    }
 
    // Node header: the name, and optionally some source code.
    print!("{:?} ", kind);
    match kind {
-      | NodeKind::Integer
-      | NodeKind::Float
-      | NodeKind::Atom
-      | NodeKind::Identifier => {
+      NodeKind::Integer | NodeKind::Float | NodeKind::Atom | NodeKind::Identifier => {
          let (start, end) = (ast.first(node), ast.second(node));
          print_source_range(lexer, start, end);
       }
@@ -86,17 +84,28 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
          dump_node(lexer, ast, left, depth + 1, Some(Prefix::L));
          dump_node(lexer, ast, right, depth + 1, Some(Prefix::R));
       }
-      | NodeKind::Check | NodeKind::Unwrap | NodeKind::Deref => {
+      | NodeKind::Check
+      | NodeKind::Unwrap
+      | NodeKind::Deref
+      | NodeKind::Call
+      | NodeKind::Not
+      | NodeKind::Neg
+      | NodeKind::BitNot
+      | NodeKind::Member
+      | NodeKind::Ref
+      | NodeKind::IfBranch => {
          let left = ast.first_handle(node);
-         dump_node(lexer, ast, left, depth + 1, Some(Prefix::L));
-      }
-      NodeKind::Call => {
-         let fun = ast.first_handle(node);
-         dump_node(lexer, ast, fun, depth + 1, Some(Prefix::Fun));
-      }
-      | NodeKind::Not | NodeKind::Neg | NodeKind::BitNot | NodeKind::Member | NodeKind::Ref => {
-         let right = ast.first_handle(node);
-         dump_node(lexer, ast, right, depth + 1, Some(Prefix::R));
+         dump_node(lexer, ast, left, depth + 1, Some(match kind {
+            NodeKind::Check | NodeKind::Unwrap | NodeKind::Deref => Prefix::L,
+            | NodeKind::Not
+            | NodeKind::Neg
+            | NodeKind::BitNot
+            | NodeKind::Member
+            | NodeKind::Ref => Prefix::R,
+            NodeKind::Call => Prefix::Fun,
+            NodeKind::IfBranch => Prefix::Cond,
+            _ => unreachable!(),
+         }));
       }
       _ => (),
    }

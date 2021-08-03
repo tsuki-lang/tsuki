@@ -6,16 +6,21 @@ mod parser;
 
 fn main() -> Result<(), common::Error> {
    let source = r#"
-      a + b + c
-        + d
-        * e
-        ** 2
-        + 3
       print("test")
       do
         print("test2")
         print("asdd")
-      print("yeah")
+      if test
+        print("hi")
+      if single_expr -> "yes"
+      if a
+        _
+      elif b
+      _
+      elif c
+        _
+      else
+        _
    "#;
    let mut lexer = lexer::Lexer::new("test.tsu", source);
    let (ast, root_node) = match parser::parse(&mut lexer) {

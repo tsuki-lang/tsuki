@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::lexer::{Token, TokenKind};
+use crate::lexer::{IndentLevel, Token, TokenKind};
 
 /// A structure representing a span of text in a source file.
 #[derive(Clone, Debug)]
@@ -154,6 +154,8 @@ pub enum ErrorKind {
    ExpectedCommaOrClosingToken(TokenKind, Token),
    #[error("statements must be separated by line breaks")]
    MissingLineBreakAfterStatement,
+   #[error("indented block of level greater than {0} expected")]
+   IndentedBlockExpected(IndentLevel),
 }
 
 /// An error that can occur during lexing, parsing, semantic analysis, or code generation.

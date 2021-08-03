@@ -46,7 +46,7 @@ true false  # booleans
 
 3.1415      # floats; as with integers, size can be provided
 3_f32       # if the size isn't provided, it defaults to _f64, and is narrowed
-  # down to 32-bits if context requires that
+            # down to 32-bits if context requires that
 3.1e5       # floats can have exponents attached
 
 :enoent     # atoms; they are valid identifiers prefixed by :
@@ -70,24 +70,21 @@ world"""    # multiline string literals
 
 ## Identifiers
 
-_Identifiers_ start with characters from the set `[a-zA-Z_]`, and may continue
-with zero or more characters from the set `[a-zA-Z0-9_]`.
+_Identifiers_ start with characters from the set `[a-zA-Z_]`, and may continue with zero or more characters from the set `[a-zA-Z0-9_]`.
 
-A _symbol_ is a _resolved identifier_, that is, an identifier that refers to
-something within scope, such as an object, or a function, or a variable.
+A _symbol_ is a _resolved identifier_, that is, an identifier that refers to something within scope, such as an object, or a function, or a variable.
 
 Identifiers in are separated into two groups:
 
 - Type names, written in `PascalCase`,
 - Other names, written in `snake_case`.
 
-This is enforced by the compiler to keep a consistent coding style across
-various codebases.
+This is enforced by the compiler to keep a consistent coding style across various codebases.
 
 The following identifiers are reserved as _keywords_:
 ```
-_ and catch derive do for fun if impl in is macro match not object of or pub
-return try type union while val var
+_ and atom catch derive do for fun if impl in is macro match not object of or
+pub return try type union while val var
 ```
 
 The identifier `_` is special; it's an identifier that is used for ignoring things. Variables with the name `_` cannot be read from, and the identifier cannot be used as a valid function or object name. Additionally, when used as a statement, it's a no-op, and can be used to create empty blocks.
@@ -132,6 +129,8 @@ or
 
 Most of the listed operators are overloadable, see [Operator overloading](#operator-overloading).
 
+The token `->` appears inside the syntax, but is _not_ an operator - it's only used for punctuation. This token is the "then" arrow, used in `if` and `match` expressions to separate the condition from a single-line expression body.
+
 # Parsing
 
 tsuki programs are read in lines from top to bottom, left to right, until the end of a file is reached.
@@ -161,7 +160,6 @@ val test = "hello" ~ " world " ~
   "this" ~ " is " ~ "a " ~
   "test"
 ```
-
 
 ## Prefixes
 
@@ -239,7 +237,7 @@ print(do
 )  # 3
 ```
 
-Note that the last statement *must* be an expression statement, as the statement must have a result.
+Note that the last statement *must* be an expression statement, as the `do` expression must have a result.
 
 ## `if` expressions
 
@@ -260,6 +258,15 @@ print(
 ```
 
 Just like with `do`, the last statement in each arm must be an expression statement.
+
+An `if` expression can be written in a shorthand way by using `->` after the condition.
+```
+print(
+  if name == "Mark" -> "Oh hi Mark"
+  elif name == "Gabe" -> "How's that 3rd game going?"
+  else -> "Hello, " ~ name ~ "!"
+)
+```
 
 ### `if val`
 
@@ -365,12 +372,9 @@ The current function must have a compatible result as its return type for this t
 
 ```
 fun fallible(x: Int): !Int
-  if x == 0
-    :zero
-  elif x == 3
-    :gabe
-  else
-    x + 4
+  if x == 0 -> :zero
+  elif x == 3 -> :gabe
+  else -> x + 4
 
 fun try_example(): !()
   var x = try fallible(2)
@@ -384,8 +388,8 @@ As an alternative to `try`, it's possible to unwrap an error while still preserv
 ```
 fun catch_example()
   var x = fallible(2) catch |err|
-    if err == :zero  print("Zero was passed to fallible()")
-    elif err == :gabe  print("Gabe isn't gonna be very happy about this")
+    if err == :zero -> print("Zero was passed to fallible()")
+    elif err == :gabe -> print("Gabe isn't gonna be very happy about this")
     return
 ```
 
@@ -623,7 +627,7 @@ This type can be automatically converted into any other type. Thanks to this pro
 atom Error
   :nil_option
 
-fun some_or_error[T](opt: ?T) T
+fun some_or_error[T](opt: ?T) !T
   val v = opt or return :nil_option
   v
 ```
@@ -716,9 +720,8 @@ atom Cmyk in Color
   :black
 
 atom Rgb in Color
-  :red
-  :green
-  :blue
+  # shorthand form, useful for big atom subsets
+  :red, :green, :blue
 ```
 In this example, any `Cmyk` or `Rgb` value can be implicitly converted to a `Color` value, but not the other way around.
 

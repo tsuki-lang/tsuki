@@ -144,6 +144,15 @@ impl Ast {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct NodeHandle(usize);
 
+impl NodeHandle {
+   /// Returns the null node handle. This handle always points to an error node and denotes the lack
+   /// of a usable node.
+   #[inline(always)]
+   pub fn null() -> NodeHandle {
+      NodeHandle(0)
+   }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum NodeKind {
    /// The error node is used for returning a valid, unique node handle in case an error occurs
@@ -217,8 +226,13 @@ pub enum NodeKind {
    // ---
    // *Expression kinds differ from *Statement kinds in that the last statement in the block must
    // be an expression statement.
+   Pass,
    DoExpression,
    DoStatement,
+   IfExpression,
+   IfStatement,
+   IfBranch,    // if, elif
+   ElseBranch,  // else
 }
 
 /// Extra node data, for storing inside of the `extra` field.

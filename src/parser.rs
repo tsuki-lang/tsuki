@@ -53,6 +53,18 @@ impl<'l, 's> Parser<'l, 's> {
       self.ast.create_node(NodeKind::Error)
    }
 
+   /// Peeks at the next token and checks if its kind matches `kind`. If yes, returns `Some(token)`.
+   /// Otherwise returns `None`.
+   fn match_token(&mut self, kind: TokenKind) -> Result<Option<Token>, Error> {
+      let token = self.lexer.peek()?;
+      if token.kind != kind {
+         Ok(None)
+      } else {
+         let token = self.lexer.next()?;
+         Ok(Some(token))
+      }
+   }
+
    /// Checks if the next token's kind matches `kind`. If not, emits an `error` of the given kind
    /// and returns `None`. Otherwise returns `Some` with the token.
    fn expect_token(
@@ -143,6 +155,8 @@ impl<'l, 's> Parser<'l, 's> {
       }
    }
 
+   /// Unwraps the `Option<Token>`, such that when it's `None`, the next token is read and returned.
+   /// Otherwise the existing token is used.
    fn some_or_next(&mut self, maybe_token: Option<Token>) -> Result<Token, Error> {
       match maybe_token {
          Some(token) => Ok(token),
@@ -190,13 +204,29 @@ impl<'l, 's> Parser<'l, 's> {
       }
    }
 
+   /// Parses rules in an indented block.
+   ///
+   /// `parent_indent_level` specifies which indent level the tokens in the block must exceed to be
+   /// in the block.
+   ///
+   /// `allow_immediate_expression` specifies whether an expression can be used instead of a block.
    fn parse_indented_block(
       &mut self,
       dest: &mut Vec<NodeHandle>,
       parent_indent_level: IndentLevel,
       mut next: impl FnMut(&mut Self) -> Result<NodeHandle, Error>,
    ) -> Result<(), Error> {
-      while self.lexer.peek()?.indent_level > parent_indent_level {
+      let indent_level = {
+         let next = self.lexer.peek()?;
+         if next.indent_level <= parent_indent_level {
+            let span = next.span.clone();
+            drop(next);
+            self.emit_error(ErrorKind::IndentedBlockExpected(parent_indent_level), span);
+            return Ok(());
+         }
+         next.indent_level
+      };
+      while self.lexer.peek()?.indent_level == indent_level {
          dest.push(next(self)?);
       }
       Ok(())
@@ -216,18 +246,6 @@ impl<'l, 's> Parser<'l, 's> {
       let right = self.parse_prefix(token)?;
       let node = self.create_node_with_handle(node_kind, right);
       self.ast.set_span(node, Span::join(&operator_span, &self.ast.span(right)));
-      Ok(node)
-   }
-
-   /// Parses a prefix `do` expression (or statement).
-   fn parse_do_expression(&mut self, token: Option<Token>, is_statement: bool) -> Result<NodeHandle, Error> {
-      let token = self.some_or_next(token)?;
-      let node = self.ast.create_node(if is_statement { NodeKind::DoStatement } else { NodeKind::DoExpression });
-      let mut statements = Vec::new();
-      let indent_level = token.indent_level;
-      self.parse_indented_block(&mut statements, indent_level, |p| p.parse_statement())?;
-      self.ast.set_span(node, Span::join(&token.span, &self.span_all_nodes(&statements)));
-      self.ast.set_extra(node, NodeData::NodeList(statements));
       Ok(node)
    }
 
@@ -255,9 +273,98 @@ impl<'l, 's> Parser<'l, 's> {
          TokenKind::Pointer => self.unary_prefix(token, NodeKind::Ref)?,
          // Control flow structures
          TokenKind::Do => self.parse_do_expression(Some(token), false)?,
+         TokenKind::If => self.parse_if_expression(Some(token), false)?,
          // Unknown tokens
          _ => self.error(ErrorKind::UnexpectedPrefixToken(token.kind), span),
       })
+   }
+
+   /// Parses a prefix `do` expression (or statement).
+   fn parse_do_expression(
+      &mut self,
+      token: Option<Token>,
+      is_statement: bool,
+   ) -> Result<NodeHandle, Error> {
+      let token = self.some_or_next(token)?;
+      let node = self.ast.create_node(if is_statement {
+         NodeKind::DoStatement
+      } else {
+         NodeKind::DoExpression
+      });
+      let mut statements = Vec::new();
+      let indent_level = token.indent_level;
+      self.parse_indented_block(&mut statements, indent_level, |p| p.parse_statement())?;
+      self.ast.set_span(
+         node,
+         Span::join(&token.span, &self.span_all_nodes(&statements)),
+      );
+      self.ast.set_extra(node, NodeData::NodeList(statements));
+      Ok(node)
+   }
+
+   fn parse_if_expression(
+      &mut self,
+      token: Option<Token>,
+      is_statement: bool,
+   ) -> Result<NodeHandle, Error> {
+      let mut branch_token = self.some_or_next(token)?;
+      let mut branches = Vec::new();
+      let mut is_elif = true;
+      loop {
+         // If it's an else, the condition is always the null node.
+         let condition = if is_elif {
+            self.parse_expression(0)?
+         } else {
+            NodeHandle::null()
+         };
+         // The branch body can be either `->` followed by an expression, or a block of code.
+         let mut branch_body = Vec::new();
+         if let Some(..) = self.match_token(TokenKind::Then)? {
+            branch_body.push(self.parse_expression(0)?);
+         } else {
+            self.parse_indented_block(&mut branch_body, branch_token.indent_level, |p| {
+               p.parse_statement()
+            })?;
+         }
+         // Construct the branch.
+         let branch = self.ast.create_node(if is_elif {
+            NodeKind::IfBranch
+         } else {
+            NodeKind::ElseBranch
+         });
+         let body_span = self.span_all_nodes(&branch_body);
+         let span = if is_elif {
+            Span::join(self.ast.span(condition), &body_span)
+         } else {
+            body_span
+         };
+         self.ast.set_span(branch, span);
+         self.ast.set_first_handle(branch, condition);
+         self.ast.set_extra(branch, NodeData::NodeList(branch_body));
+         branches.push(branch);
+         // If the current branch is an `elif` branch, look ahead for the next one.
+         if is_elif {
+            if let Some(token) = self.match_token(TokenKind::Elif)? {
+               branch_token = token;
+            } else if let Some(token) = self.match_token(TokenKind::Else)? {
+               branch_token = token;
+               is_elif = false;
+            } else {
+               break
+            }
+         } else {
+            break
+         }
+      }
+      let node = self.ast.create_node(if is_statement {
+         NodeKind::IfStatement
+      } else {
+         NodeKind::IfExpression
+      });
+      self.ast.set_span(node, Span::join(&branch_token.span, &self.span_all_nodes(&branches)));
+      self.ast.set_extra(node, NodeData::NodeList(branches));
+
+      Ok(node)
    }
 
    /// Creates a node from the left-hand side and operator token of a unary postfix operator.
@@ -395,13 +502,24 @@ impl<'l, 's> Parser<'l, 's> {
       Ok(left)
    }
 
+   /// Parses a pass (`_`) statement.
+   fn parse_pass(&mut self) -> Result<NodeHandle, Error> {
+      let token = self.lexer.next()?;
+      let node = self.ast.create_node(NodeKind::Pass);
+      self.ast.set_span(node, token.span);
+      Ok(node)
+   }
+
    /// Parses a statement.
    fn parse_statement(&mut self) -> Result<NodeHandle, Error> {
       let token_kind = self.lexer.peek()?.kind.clone();
-      Ok(match token_kind {
+      let node = match token_kind {
+         TokenKind::Underscore => self.parse_pass()?,
          TokenKind::Do => self.parse_do_expression(None, true)?,
+         TokenKind::If => self.parse_if_expression(None, true)?,
          _ => self.parse_expression(0)?,
-      })
+      };
+      Ok(node)
    }
 
    /// Parses the entire source code of a module.

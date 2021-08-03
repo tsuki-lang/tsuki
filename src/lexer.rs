@@ -22,7 +22,7 @@ pub enum TokenKind {
    /// to lose precision.
    Integer(Range<usize>),
    Float(Range<usize>),
-   Atom(Range<usize>),
+   Atom(Range<usize>), // atom literal
    Character(u32),
    /// Strings store the range in which a string literal is stored within the `string_data` field
    /// inside of the lexer struct.
@@ -34,6 +34,7 @@ pub enum TokenKind {
    Identifier(Range<usize>),
    Underscore,
    And,
+   AtomK, // 'atom' keyword
    Catch,
    Derive,
    Do,
@@ -102,6 +103,7 @@ pub enum TokenKind {
    Colon,        // :
    Colons,       // ::
    Semicolon,    // ;
+   Then,         // ->
 
    // EOF
    Eof,
@@ -228,6 +230,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Identifier(_) => "<identifier>",
             TokenKind::Underscore => "_",
             TokenKind::And => "and",
+            TokenKind::AtomK => "atom",
             TokenKind::Catch => "catch",
             TokenKind::Derive => "derive",
             TokenKind::Do => "do",
@@ -292,6 +295,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Colon => ":",
             TokenKind::Colons => "::",
             TokenKind::Semicolon => ";",
+            TokenKind::Then => "->",
             TokenKind::Eof => "<end of file>",
          }
       )
@@ -302,6 +306,7 @@ impl fmt::Display for TokenKind {
 static KEYWORDS: phf::Map<&'static str, TokenKind> = phf::phf_map! {
    "_" => TokenKind::Underscore,
    "and" => TokenKind::And,
+   "atom" => TokenKind::AtomK,
    "catch" => TokenKind::Catch,
    "derive" => TokenKind::Derive,
    "do" => TokenKind::Do,
@@ -910,7 +915,18 @@ impl<'i> Lexer<'i> {
             TokenKind::UpToInclusive,
          )),
          b'+' => Ok(self.operator_opt2(b'=', TokenKind::Plus, TokenKind::PlusAssign)),
-         b'-' => Ok(self.operator_opt2(b'=', TokenKind::Minus, TokenKind::MinusAssign)),
+         b'-' => {
+            self.advance();
+            let kind = match self.get() {
+               b'>' => TokenKind::Then,
+               b'=' => TokenKind::MinusAssign,
+               _ => TokenKind::Minus,
+            };
+            if kind != TokenKind::Minus {
+               self.advance();
+            }
+            Ok(self.token(kind))
+         }
          b'*' => {
             self.advance(); // skip *
             let kind = match self.get() {
