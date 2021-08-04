@@ -13,21 +13,7 @@ fn unwrap_errors<T>(r: Result<T, common::Errors>) -> T {
 fn main() -> Result<(), common::Error> {
    let filename = "test.tsu";
    let source = r#"
-      print("test")
-      do
-        print("test2")
-        print("asdd")
-      if test
-        print("hi")
-      if single_expr -> "yes"
-      if a
-        _
-      elif b
-        _
-      elif c
-        _
-      else
-        _
+      1 + 2
    "#;
    let mut lexer = lexer::Lexer::new(filename, source);
    let (mut ast, root_node) = unwrap_errors(parser::parse(&mut lexer));

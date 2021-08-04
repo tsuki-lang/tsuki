@@ -1,6 +1,6 @@
 //! Semantic analyzer for types.
 
-use crate::ast::{Ast, NodeHandle};
+use crate::ast::{Ast, Mutation, NodeHandle};
 use crate::common::{Errors, ErrorKind, Span};
 use crate::sem::Sem;
 use crate::types::{Types, TypeId, BuiltinTypes};
@@ -8,6 +8,8 @@ use crate::types::{Types, TypeId, BuiltinTypes};
 pub struct SemTypes<'f, 't, 'bt> {
    filename: &'f str,
    errors: Errors,
+   mutations: Vec<Mutation>,
+
    types: &'t mut Types,
    builtin: &'bt BuiltinTypes,
 }
@@ -18,6 +20,7 @@ impl<'f, 't, 'bt> SemTypes<'f, 't, 'bt> {
       SemTypes {
          filename,
          errors: Errors::new(),
+         mutations: Vec::new(),
          types,
          builtin,
       }
@@ -34,11 +37,12 @@ impl<'f, 't, 'bt> Sem for SemTypes<'f, 't, 'bt> {
    type Result = TypeId;
 
    /// Performs type analysis for the given AST node. This annotates the node with a concrete type.
-   fn analyze(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeId {
-      let span = ast.span(node);
-      let typ = self.error(ErrorKind::Nyi("wip".into()), span.clone());
-      self.types.set_node_type(node, typ);
-      typ
+   fn analyze(&mut self, ast: &Ast, node: NodeHandle) -> TypeId {
+      // let span = ast.span(node);
+      // let typ = self.error(ErrorKind::Nyi("wip".into()), span.clone());
+      // self.types.set_node_type(node, typ);
+      // typ
+      self.builtin.t_unit
    }
 
    fn filename(&self) -> &str {
@@ -55,5 +59,9 @@ impl<'f, 't, 'bt> Sem for SemTypes<'f, 't, 'bt> {
 
    fn into_errors(self) -> Errors {
       self.errors
+   }
+
+   fn mutations(&self) -> &[Mutation] {
+      &self.mutations
    }
 }

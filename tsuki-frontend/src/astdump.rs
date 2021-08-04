@@ -29,6 +29,7 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
    print_indentation(depth);
 
    let kind = ast.kind(node);
+   let extra = ast.extra(node);
 
    // Optional prefix.
    if let Some(prefix) = prefix {
@@ -47,6 +48,10 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
          print_string_range(lexer, start, end);
       }
       NodeKind::Character => print!("{:?}", char::from_u32(ast.first(node) as u32)),
+      _ => (),
+   }
+   match extra {
+      NodeData::String(s) => print!("{:?}", &s),
       _ => (),
    }
    println!();
@@ -110,7 +115,6 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
       _ => (),
    }
 
-   let extra = ast.extra(node);
    match extra {
       NodeData::None => (),
       NodeData::NodeList(list) => {
@@ -118,6 +122,7 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
             dump_node(lexer, ast, node, depth + 1, None);
          }
       }
+      NodeData::String(..) => (),
    }
 }
 
