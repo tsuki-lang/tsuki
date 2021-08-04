@@ -424,41 +424,38 @@ impl<'i> Lexer<'i> {
       self.position < self.input.len()
    }
 
-   /// Returns the character at the current position.
-   #[inline(always)]
-   fn get(&self) -> u8 {
+   /// Returns the character at the given _absolute_ position.
+   fn get_at(&self, i: usize) -> u8 {
       // If all the logic for reading characters was only maybe handled in fn next(), this check
       // wouldn't be necessary. However, reading characters is done in many places, and we certainly
       // don't want to panic each time we reach the EOF and forget to put a bounds check for
       // reading from `self.input`. Since the bounds check would be required in each of these places
       // anyways, we may as well hoist it into this function without a significant performance
       // penalty.
-      if !self.has_more() {
+      if i >= self.input.len() {
          Self::EOF_CHAR
       } else {
-         self.input[self.position]
+         self.input[i]
       }
+   }
+
+   /// Returns the character at the current position.
+   fn get(&self) -> u8 {
+      self.get_at(self.position)
    }
 
    /// Returns the character `n` characters ahead of the current position.
-   #[inline(always)]
    fn get_ahead(&self, n: usize) -> u8 {
-      if self.position + n >= self.input.len() {
-         Self::EOF_CHAR
-      } else {
-         self.input[self.position + n]
-      }
+      self.get_at(self.position + n)
    }
 
    /// Advances the current position by `n` characters.
-   #[inline(always)]
    fn advance_by(&mut self, n: usize) {
       self.position += n;
       self.span.advance_column_by(n);
    }
 
    /// Advances the current position by one character.
-   #[inline(always)]
    fn advance(&mut self) {
       self.advance_by(1);
    }
@@ -640,6 +637,10 @@ impl<'i> Lexer<'i> {
       {
          is_float = true;
          self.read_float();
+      }
+
+      if self.get_at(self.position - 1) == b'_' && matches!(self.get(), b'a'..=b'z' | b'A'..=b'Z') {
+         self.read_identifier();
       }
 
       let end = self.position;

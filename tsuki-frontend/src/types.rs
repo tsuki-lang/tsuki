@@ -115,10 +115,15 @@ pub enum FloatSize {
 
 /// A struct containing all the built-in types.
 pub struct BuiltinTypes {
+   // Special
    pub t_error: TypeId,
    pub t_unit: TypeId,
    pub t_noreturn: TypeId,
+
+   // Boolean
    pub t_bool: TypeId,
+
+   // Integers
    pub t_uint8: TypeId,
    pub t_uint16: TypeId,
    pub t_uint32: TypeId,
@@ -127,13 +132,34 @@ pub struct BuiltinTypes {
    pub t_int16: TypeId,
    pub t_int32: TypeId,
    pub t_int64: TypeId,
+
+   // Floats
    pub t_float32: TypeId,
    pub t_float64: TypeId,
+
+   // Int/Float aliases
+   // NOTE: These will later be implemented in the standard library and will be configurable with
+   // compiler switches.
+   pub t_int: TypeId,
+   pub t_float: TypeId,
+   pub t_index: TypeId,
 }
 
 impl BuiltinTypes {
    /// Adds all the built-in types to the given `Types` and returns them.
    pub fn add_to(types: &mut Types) -> Self {
+      let int32 = types.create_type(TypeInfo {
+         name: "Int32",
+         kind: TypeKind::Integer(IntegerSize::S32),
+      });
+      let float32 = types.create_type(TypeInfo {
+         name: "Float32",
+         kind: TypeKind::Float(FloatSize::S32),
+      });
+      let uint64 = types.create_type(TypeInfo {
+         name: "Uint64",
+         kind: TypeKind::Integer(IntegerSize::U64),
+      });
       Self {
          t_error: types.create_type(TypeInfo {
             name: "Error",
@@ -163,10 +189,7 @@ impl BuiltinTypes {
             name: "Uint32",
             kind: TypeKind::Integer(IntegerSize::U32),
          }),
-         t_uint64: types.create_type(TypeInfo {
-            name: "Uint64",
-            kind: TypeKind::Integer(IntegerSize::U64),
-         }),
+         t_uint64: uint64,
          t_int8: types.create_type(TypeInfo {
             name: "Int8",
             kind: TypeKind::Integer(IntegerSize::S8),
@@ -175,22 +198,20 @@ impl BuiltinTypes {
             name: "Int16",
             kind: TypeKind::Integer(IntegerSize::S16),
          }),
-         t_int32: types.create_type(TypeInfo {
-            name: "Int32",
-            kind: TypeKind::Integer(IntegerSize::S32),
-         }),
+         t_int32: int32,
          t_int64: types.create_type(TypeInfo {
             name: "Int64",
             kind: TypeKind::Integer(IntegerSize::S64),
          }),
-         t_float32: types.create_type(TypeInfo {
-            name: "Float32",
-            kind: TypeKind::Float(FloatSize::S32),
-         }),
+         t_float32: float32,
          t_float64: types.create_type(TypeInfo {
             name: "Float64",
             kind: TypeKind::Float(FloatSize::S64),
          }),
+
+         t_int: int32,
+         t_float: float32,
+         t_index: uint64,
       }
    }
 }
