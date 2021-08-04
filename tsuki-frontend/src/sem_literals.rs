@@ -3,8 +3,8 @@
 //! `Float` to concrete types `Int8`, `Int16`, etc., including negation.
 //! Note that `SemTypes` may perform additional conversions later down the line.
 
-use crate::ast::{Ast, NodeHandle, NodeKind, Mutation};
-use crate::common::{Errors, ErrorKind, Span};
+use crate::ast::{Ast, Mutation, NodeHandle, NodeKind};
+use crate::common::{ErrorKind, Errors, Span};
 use crate::sem::Sem;
 
 /// State for the `SemLiterals` analysis phase.
@@ -24,13 +24,9 @@ impl<'f> SemLiterals<'f> {
       }
    }
 
-   fn canonicalize_integer(&mut self, ast: &Ast, node: NodeHandle) {
+   fn canonicalize_integer(&mut self, ast: &Ast, node: NodeHandle) {}
 
-   }
-
-   fn canonicalize_float(&mut self, ast: &Ast, node: NodeHandle) {
-
-   }
+   fn canonicalize_float(&mut self, ast: &Ast, node: NodeHandle) {}
 
    fn walk_branch(&mut self, ast: &Ast, node: NodeHandle) {
       ast.walk(node, |ast, child| {

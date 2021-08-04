@@ -178,11 +178,7 @@ impl Ast {
    }
 
    /// Walks through the given node's children.
-   pub fn walk(
-      &self,
-      node: NodeHandle,
-      mut then: impl FnMut(&Self, NodeHandle),
-   ) {
+   pub fn walk(&self, node: NodeHandle, mut then: impl FnMut(&Self, NodeHandle)) {
       let kind = self.kind(node);
       if !kind.is_leaf() {
          if self.first(node) != 0 {
@@ -196,7 +192,7 @@ impl Ast {
                for &h in list {
                   then(self, h);
                }
-            },
+            }
             _ => (),
          }
       }
@@ -208,7 +204,6 @@ pub enum NodeKind {
    /*
     * Pre-sem'check
     */
-
    /// The error node is used for returning a valid, unique node handle in case an error occurs
    /// during parsing.
    Error,
@@ -291,13 +286,12 @@ pub enum NodeKind {
    DoStatement,
    IfExpression,
    IfStatement,
-   IfBranch,    // if, elif
-   ElseBranch,  // else
+   IfBranch,   // if, elif
+   ElseBranch, // else
 
    /*
     * Post-sem'check
     */
-
    // Concrete literals
    Uint8,
    Uint16,

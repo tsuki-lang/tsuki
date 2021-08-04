@@ -1,9 +1,9 @@
 //! Semantic analyzer for types.
 
 use crate::ast::{Ast, Mutation, NodeHandle};
-use crate::common::{Errors, ErrorKind, Span};
+use crate::common::{ErrorKind, Errors, Span};
 use crate::sem::Sem;
-use crate::types::{Types, TypeId, BuiltinTypes};
+use crate::types::{BuiltinTypes, TypeId, Types};
 
 pub struct SemTypes<'f, 't, 'bt> {
    filename: &'f str,

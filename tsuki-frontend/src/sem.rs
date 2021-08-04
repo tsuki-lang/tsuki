@@ -1,11 +1,11 @@
 //! The root of semantic analysis.
 
 use crate::ast::{Ast, Mutation, NodeData, NodeHandle, NodeKind};
-use crate::common::{Error, Errors, ErrorKind, Span};
-use crate::types::{Types, BuiltinTypes};
+use crate::common::{Error, ErrorKind, Errors, Span};
+use crate::types::{BuiltinTypes, Types};
 
-use crate::sem_types::SemTypes;
 use crate::sem_literals::SemLiterals;
+use crate::sem_types::SemTypes;
 
 /// A semantic analyzer.
 pub(crate) trait Sem {
@@ -64,10 +64,7 @@ impl Analyzer {
 
 /// Analyzes and lowers the AST to a representation ready to be used by the backend.
 pub fn analyze(filename: &str, ast: Ast, root_node: NodeHandle) -> Result<Ast, Errors> {
-   let mut state = Analyzer {
-      ast,
-      root_node,
-   };
+   let mut state = Analyzer { ast, root_node };
 
    let mut types = Types::new();
    let builtin_types = BuiltinTypes::add_to(&mut types);

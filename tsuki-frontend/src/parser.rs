@@ -5,7 +5,7 @@ use std::ops::Range;
 use smallvec::{smallvec, SmallVec};
 
 use crate::ast::*;
-use crate::common::{Error, Errors, ErrorKind, Span};
+use crate::common::{Error, ErrorKind, Errors, Span};
 use crate::lexer::{Associativity, IndentLevel, Lexer, Token, TokenKind};
 
 /// The parser state.
@@ -348,10 +348,10 @@ impl<'l, 's> Parser<'l, 's> {
                branch_token = token;
                is_elif = false;
             } else {
-               break
+               break;
             }
          } else {
-            break
+            break;
          }
       }
       let node = self.ast.create_node(if is_statement {
@@ -359,7 +359,10 @@ impl<'l, 's> Parser<'l, 's> {
       } else {
          NodeKind::IfExpression
       });
-      self.ast.set_span(node, Span::join(&branch_token.span, &self.span_all_nodes(&branches)));
+      self.ast.set_span(
+         node,
+         Span::join(&branch_token.span, &self.span_all_nodes(&branches)),
+      );
       self.ast.set_extra(node, NodeData::NodeList(branches));
 
       Ok(node)
@@ -549,11 +552,13 @@ pub fn parse(lexer: &mut Lexer) -> Result<(Ast, NodeHandle), Errors> {
    let mut parser = Parser::new(lexer);
    let root_node = match parser.parse_module() {
       Ok(node) => node,
-      Err(error) => return Err({
-         let mut errors = Errors::new();
-         errors.push(error);
-         errors
-      }),
+      Err(error) => {
+         return Err({
+            let mut errors = Errors::new();
+            errors.push(error);
+            errors
+         })
+      }
    };
 
    if parser.errors.len() > 0 {

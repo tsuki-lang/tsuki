@@ -100,17 +100,23 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
       | NodeKind::Ref
       | NodeKind::IfBranch => {
          let left = ast.first_handle(node);
-         dump_node(lexer, ast, left, depth + 1, Some(match kind {
-            NodeKind::Check | NodeKind::Unwrap | NodeKind::Deref => Prefix::L,
-            | NodeKind::Not
-            | NodeKind::Neg
-            | NodeKind::BitNot
-            | NodeKind::Member
-            | NodeKind::Ref => Prefix::R,
-            NodeKind::Call => Prefix::Fun,
-            NodeKind::IfBranch => Prefix::Cond,
-            _ => unreachable!(),
-         }));
+         dump_node(
+            lexer,
+            ast,
+            left,
+            depth + 1,
+            Some(match kind {
+               NodeKind::Check | NodeKind::Unwrap | NodeKind::Deref => Prefix::L,
+               | NodeKind::Not
+               | NodeKind::Neg
+               | NodeKind::BitNot
+               | NodeKind::Member
+               | NodeKind::Ref => Prefix::R,
+               NodeKind::Call => Prefix::Fun,
+               NodeKind::IfBranch => Prefix::Cond,
+               _ => unreachable!(),
+            }),
+         );
       }
       _ => (),
    }
