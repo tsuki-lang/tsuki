@@ -6,6 +6,27 @@
 
 use crate::common::Span;
 
+use crate::types::TypeId;
+
+/// A handle to a single node in the AST. The actual AST is not stored next to the handle for
+/// efficiency and appeasing the borrow checker.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct NodeHandle(usize);
+
+impl NodeHandle {
+   /// Returns the null node handle. This handle always points to an error node and denotes the lack
+   /// of a usable node.
+   #[inline(always)]
+   pub fn null() -> NodeHandle {
+      NodeHandle(0)
+   }
+
+   /// Returns the raw ID stored in the node handle.
+   pub fn id(&self) -> usize {
+      self.0
+   }
+}
+
 /// The AST data.
 pub struct Ast {
    kinds: Vec<NodeKind>,
@@ -136,20 +157,6 @@ impl Ast {
          i: 1,
          len: self.kinds.len(),
       }
-   }
-}
-
-/// A handle to a single node in the AST. The actual AST is not stored next to the handle for
-/// efficiency and appeasing the borrow checker.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct NodeHandle(usize);
-
-impl NodeHandle {
-   /// Returns the null node handle. This handle always points to an error node and denotes the lack
-   /// of a usable node.
-   #[inline(always)]
-   pub fn null() -> NodeHandle {
-      NodeHandle(0)
    }
 }
 

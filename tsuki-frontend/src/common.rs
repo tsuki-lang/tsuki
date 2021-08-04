@@ -158,6 +158,12 @@ pub enum ErrorKind {
    MissingLineBreakAfterStatement,
    #[error("indented block of level greater than {0} expected")]
    IndentedBlockExpected(IndentLevel),
+
+   /*
+    * Sem'check errors
+    */
+   #[error("not yet implemented: {0}")]
+   Nyi(String),
 }
 
 /// An error that can occur during lexing, parsing, semantic analysis, or code generation.

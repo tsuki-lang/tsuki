@@ -1,28 +1,48 @@
 //! Semantic analyzer for types.
 
 use crate::ast::{Ast, NodeHandle};
-use crate::common::Errors;
+use crate::common::{Errors, ErrorKind, Span};
 use crate::sem::Sem;
-use crate::types::Types;
+use crate::types::{Types, TypeId, BuiltinTypes};
 
-pub struct SemTypes<'t> {
+pub struct SemTypes<'f, 't, 'bt> {
+   filename: &'f str,
    errors: Errors,
    types: &'t mut Types,
+   builtin: &'bt BuiltinTypes,
 }
 
-impl<'t> SemTypes<'t> {
-   pub fn new(types: &'t mut Types) -> Self {
+impl<'f, 't, 'bt> SemTypes<'f, 't, 'bt> {
+   /// Creates a new instance of the `SemTypes` analysis phase.
+   pub fn new(filename: &'f str, types: &'t mut Types, builtin: &'bt BuiltinTypes) -> Self {
       SemTypes {
+         filename,
          errors: Errors::new(),
          types,
+         builtin,
       }
+   }
+
+   /// Emits an error of the given kind, also returning the error type.
+   fn error(&mut self, kind: ErrorKind, span: Span) -> TypeId {
+      self.emit_error(kind, span);
+      self.builtin.t_error
    }
 }
 
-impl<'t> Sem for SemTypes<'t> {
-   /// Performs type analysis for the given AST node. This annotates the node with a concrete type.
-   fn analyze(&mut self, ast: &mut Ast, node: NodeHandle) {
+impl<'f, 't, 'bt> Sem for SemTypes<'f, 't, 'bt> {
+   type Result = TypeId;
 
+   /// Performs type analysis for the given AST node. This annotates the node with a concrete type.
+   fn analyze(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeId {
+      let span = ast.span(node);
+      let typ = self.error(ErrorKind::Nyi("wip".into()), span.clone());
+      self.types.set_node_type(node, typ);
+      typ
+   }
+
+   fn filename(&self) -> &str {
+      self.filename
    }
 
    fn errors(&self) -> &Errors {
