@@ -208,9 +208,6 @@ pub enum NodeKind {
    /// during parsing.
    Error,
 
-   // Grouping
-   StatementList,
-
    // Literals
    Nil,
    True,
@@ -232,6 +229,9 @@ pub enum NodeKind {
    /// Nodes of this kind must not be constructed. This kind is only used for distinguishing whether
    /// a node can be walked through.
    _LastLeaf,
+
+   // Grouping
+   StatementList,
 
    // Unary operators
    Not,
@@ -318,11 +318,24 @@ impl NodeKind {
 }
 
 /// Extra node data, for storing inside of the `extra` field.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum NodeData {
    None,
    NodeList(Vec<NodeHandle>),
-   String(String),
+   // Resolved Integer and Float literals are stored as NodeData, because `usize` doesn't
+   // necessarily have to be a `u64` internally. This also avoids some `std::mem::transmute`s for
+   // signed integers and floating-point numbers. Overall, I don't think integer literals are
+   // accessed often enough to cause a major performance drop from being stored in `NodeData`.
+   Uint8(u8),
+   Uint16(u16),
+   Uint32(u32),
+   Uint64(u64),
+   Int8(i8),
+   Int16(i16),
+   Int32(i32),
+   Int64(i64),
+   Float32(f32),
+   Float64(f64),
 }
 
 /// An iterator over node handles in an AST.

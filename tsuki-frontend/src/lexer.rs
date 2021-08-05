@@ -607,6 +607,8 @@ impl<'i> Lexer<'i> {
          self.advance(); // skip literal type specifier
       }
 
+      // FIXME: Number parsing allows for multiple consecutive underscores '_' inside of the
+      // literal. It's best to disallow this, as 1__000__000 looks pretty bad.
       match kind {
          LiteralKind::Binary => {
             while matches!(self.get(), b'0' | b'1' | b'_') {
@@ -639,8 +641,13 @@ impl<'i> Lexer<'i> {
          self.read_float();
       }
 
+      // If the last character parsed is an underscore, then this is a type-suffixed literal.
+      // Note how the lexer allows for any arbitrary identifier here; this might be used later
+      // to allow for custom literals, like 90_deg or -1.10_fixed.
+      // The negative sign is not part of the literal, but if the operator is placed next to a
+      // literal, it's recognized by SemLiterals, and edge cases like -128_i8 work correctly.
       if self.get_at(self.position - 1) == b'_' && matches!(self.get(), b'a'..=b'z' | b'A'..=b'Z') {
-         self.read_identifier();
+         let _ = self.read_identifier();
       }
 
       let end = self.position;

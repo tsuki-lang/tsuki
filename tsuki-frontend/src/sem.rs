@@ -2,7 +2,8 @@
 
 use crate::ast::{Ast, Mutation, NodeData, NodeHandle, NodeKind};
 use crate::common::{Error, ErrorKind, Errors, Span};
-use crate::types::{BuiltinTypes, Types};
+use crate::types::{BuiltinTypes, FloatSize, IntegerSize, Types};
+pub use crate::types::DefaultTypes;
 
 use crate::sem_literals::SemLiterals;
 use crate::sem_types::SemTypes;
@@ -62,20 +63,50 @@ impl Analyzer {
    }
 }
 
+/// Common information shared by the semantic pass.
+pub(crate) struct SemCommon {
+   pub filename: String,
+   pub source: String,
+   pub default_types: DefaultTypes,
+}
+
+impl SemCommon {
+   /// Returns the source code substring pointed to by the node's `first..second`.
+   pub fn get_source_range_from_node(&self, ast: &Ast, node: NodeHandle) -> &str {
+      let source_range = ast.first(node)..ast.second(node);
+      &self.source[source_range]
+   }
+}
+
+/// The options passed to `analyze`.
+pub struct AnalyzeOptions<'f, 's> {
+   pub filename: &'f str,
+   pub source: &'s str,
+   pub ast: Ast,
+   pub root_node: NodeHandle,
+   pub default_types: DefaultTypes,
+}
+
 /// Analyzes and lowers the AST to a representation ready to be used by the backend.
-pub fn analyze(filename: &str, ast: Ast, root_node: NodeHandle) -> Result<Ast, Errors> {
+pub fn analyze(options: AnalyzeOptions) -> Result<Ast, Errors> {
+   let AnalyzeOptions { filename, source, ast, root_node, default_types } = options;
    let mut state = Analyzer { ast, root_node };
 
+   let common = SemCommon {
+      filename: filename.into(),
+      source: source.into(),
+      default_types,
+   };
    let mut types = Types::new();
-   let builtin_types = BuiltinTypes::add_to(&mut types);
+   let builtin_types = BuiltinTypes::add_to(&mut types, &common.default_types);
 
    // NOTE: Maybe split errors into normal and fatal?
    // Normal errors would be accumulated into the existing error list, but would not halt the
    // analysis completely. Fatal errors would halt the analysis, and would occur if something really
    // goes wrong inside of a phase, yielding AST that might break the phase after it.
    // Also, warnings anyone?
-   state.perform(SemLiterals::new(filename))?;
-   state.perform(SemTypes::new(filename, &mut types, &builtin_types))?;
+   state.perform(SemLiterals::new(&common))?;
+   state.perform(SemTypes::new(&common, &mut types, &builtin_types))?;
 
    Ok(state.ast)
 }

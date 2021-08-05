@@ -2,11 +2,11 @@
 
 use crate::ast::{Ast, Mutation, NodeHandle};
 use crate::common::{ErrorKind, Errors, Span};
-use crate::sem::Sem;
+use crate::sem::{Sem, SemCommon};
 use crate::types::{BuiltinTypes, TypeId, Types};
 
-pub struct SemTypes<'f, 't, 'bt> {
-   filename: &'f str,
+pub(crate) struct SemTypes<'c, 't, 'bt> {
+   common: &'c SemCommon,
    errors: Errors,
    mutations: Vec<Mutation>,
 
@@ -14,11 +14,11 @@ pub struct SemTypes<'f, 't, 'bt> {
    builtin: &'bt BuiltinTypes,
 }
 
-impl<'f, 't, 'bt> SemTypes<'f, 't, 'bt> {
+impl<'c, 't, 'bt> SemTypes<'c, 't, 'bt> {
    /// Creates a new instance of the `SemTypes` analysis phase.
-   pub fn new(filename: &'f str, types: &'t mut Types, builtin: &'bt BuiltinTypes) -> Self {
+   pub fn new(common: &'c SemCommon, types: &'t mut Types, builtin: &'bt BuiltinTypes) -> Self {
       SemTypes {
-         filename,
+         common,
          errors: Errors::new(),
          mutations: Vec::new(),
          types,
@@ -33,7 +33,7 @@ impl<'f, 't, 'bt> SemTypes<'f, 't, 'bt> {
    }
 }
 
-impl<'f, 't, 'bt> Sem for SemTypes<'f, 't, 'bt> {
+impl Sem for SemTypes<'_, '_, '_> {
    type Result = TypeId;
 
    /// Performs type analysis for the given AST node. This annotates the node with a concrete type.
@@ -46,7 +46,7 @@ impl<'f, 't, 'bt> Sem for SemTypes<'f, 't, 'bt> {
    }
 
    fn filename(&self) -> &str {
-      self.filename
+      &self.common.filename
    }
 
    fn errors(&self) -> &Errors {

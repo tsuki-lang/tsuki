@@ -164,6 +164,16 @@ pub enum ErrorKind {
     */
    #[error("not yet implemented: {0}")]
    Nyi(String),
+   #[error("invalid number literal suffix: '{0}'")]
+   InvalidNumberLiteralSuffix(String),
+   #[error("integer {0} is too big to fit in 64 bits")]
+   IntegerTooBig(String),
+   #[error("integer {0} is too big to fit in {1}")]
+   UnsignedIntegerOverflowForType(u64, String),
+   #[error("integer {0} is too big (or too small) to fit in {1}")]
+   SignedIntegerOverflowForType(i64, String),
+   #[error("unsigned integers cannot be negative")]
+   UintCannotBeNegative,
 }
 
 /// An error that can occur during lexing, parsing, semantic analysis, or code generation.

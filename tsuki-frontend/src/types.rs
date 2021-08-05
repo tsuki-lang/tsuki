@@ -96,6 +96,7 @@ pub enum TypeKind {
 }
 
 /// The size of an integer. `S` sizes are signed, `U` sizes are unsigned.
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum IntegerSize {
    U8,
    U16,
@@ -108,9 +109,17 @@ pub enum IntegerSize {
 }
 
 /// The size of a float.
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum FloatSize {
    S32,
    S64,
+}
+
+/// Configuration for "sensible default" types: `Int`, `Float`, and `Index`.
+pub struct DefaultTypes {
+   pub int_size: IntegerSize,
+   pub float_size: FloatSize,
+   pub index_size: IntegerSize,
 }
 
 /// A struct containing all the built-in types.
@@ -147,18 +156,46 @@ pub struct BuiltinTypes {
 
 impl BuiltinTypes {
    /// Adds all the built-in types to the given `Types` and returns them.
-   pub fn add_to(types: &mut Types) -> Self {
-      let int32 = types.create_type(TypeInfo {
+   pub fn add_to(types: &mut Types, default_types: &DefaultTypes) -> Self {
+      let t_uint8 = types.create_type(TypeInfo {
+         name: "Uint8",
+         kind: TypeKind::Integer(IntegerSize::U8),
+      });
+      let t_uint16 = types.create_type(TypeInfo {
+         name: "Uint16",
+         kind: TypeKind::Integer(IntegerSize::U16),
+      });
+      let t_uint32 = types.create_type(TypeInfo {
+         name: "Uint32",
+         kind: TypeKind::Integer(IntegerSize::U32),
+      });
+      let t_uint64 = types.create_type(TypeInfo {
+         name: "Uint64",
+         kind: TypeKind::Integer(IntegerSize::U64),
+      });
+      let t_int8 = types.create_type(TypeInfo {
+         name: "Int8",
+         kind: TypeKind::Integer(IntegerSize::S8),
+      });
+      let t_int16 = types.create_type(TypeInfo {
+         name: "Int16",
+         kind: TypeKind::Integer(IntegerSize::S16),
+      });
+      let t_int32 = types.create_type(TypeInfo {
          name: "Int32",
          kind: TypeKind::Integer(IntegerSize::S32),
       });
-      let float32 = types.create_type(TypeInfo {
+      let t_int64 = types.create_type(TypeInfo {
+         name: "Int64",
+         kind: TypeKind::Integer(IntegerSize::S64),
+      });
+      let t_float32 = types.create_type(TypeInfo {
          name: "Float32",
          kind: TypeKind::Float(FloatSize::S32),
       });
-      let uint64 = types.create_type(TypeInfo {
-         name: "Uint64",
-         kind: TypeKind::Integer(IntegerSize::U64),
+      let t_float64 = types.create_type(TypeInfo {
+         name: "Float64",
+         kind: TypeKind::Float(FloatSize::S64),
       });
       Self {
          t_error: types.create_type(TypeInfo {
@@ -177,41 +214,35 @@ impl BuiltinTypes {
             name: "Bool",
             kind: TypeKind::Bool,
          }),
-         t_uint8: types.create_type(TypeInfo {
-            name: "Uint8",
-            kind: TypeKind::Integer(IntegerSize::U8),
-         }),
-         t_uint16: types.create_type(TypeInfo {
-            name: "Uint16",
-            kind: TypeKind::Integer(IntegerSize::U16),
-         }),
-         t_uint32: types.create_type(TypeInfo {
-            name: "Uint32",
-            kind: TypeKind::Integer(IntegerSize::U32),
-         }),
-         t_uint64: uint64,
-         t_int8: types.create_type(TypeInfo {
-            name: "Int8",
-            kind: TypeKind::Integer(IntegerSize::S8),
-         }),
-         t_int16: types.create_type(TypeInfo {
-            name: "Int16",
-            kind: TypeKind::Integer(IntegerSize::S16),
-         }),
-         t_int32: int32,
-         t_int64: types.create_type(TypeInfo {
-            name: "Int64",
-            kind: TypeKind::Integer(IntegerSize::S64),
-         }),
-         t_float32: float32,
-         t_float64: types.create_type(TypeInfo {
-            name: "Float64",
-            kind: TypeKind::Float(FloatSize::S64),
-         }),
+         t_uint8,
+         t_uint16,
+         t_uint32,
+         t_uint64,
+         t_int8,
+         t_int16,
+         t_int32,
+         t_int64,
+         t_float32,
+         t_float64,
 
-         t_int: int32,
-         t_float: float32,
-         t_index: uint64,
+         t_int: match default_types.int_size {
+            IntegerSize::S8 => t_int8,
+            IntegerSize::S16 => t_int16,
+            IntegerSize::S32 => t_int32,
+            IntegerSize::S64 => t_int64,
+            _ => panic!("int_size must be signed"),
+         },
+         t_float: match default_types.float_size {
+            FloatSize::S32 => t_float32,
+            FloatSize::S64 => t_float64,
+         },
+         t_index: match default_types.index_size {
+            IntegerSize::U8 => t_uint8,
+            IntegerSize::U16 => t_uint16,
+            IntegerSize::U32 => t_uint32,
+            IntegerSize::U64 => t_uint64,
+            _ => panic!("index_size must be unsigned"),
+         },
       }
    }
 }

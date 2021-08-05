@@ -1,4 +1,5 @@
 use tsuki_frontend::{astdump, common, lexer, parser, sem};
+use tsuki_frontend::types::{IntegerSize, FloatSize};
 
 fn unwrap_errors<T>(r: Result<T, common::Errors>) -> T {
    match r {
@@ -13,7 +14,7 @@ fn unwrap_errors<T>(r: Result<T, common::Errors>) -> T {
 fn main() -> Result<(), common::Error> {
    let filename = "test.tsu";
    let source = r#"
-      1 + 2
+      1 + -128_i8
    "#;
    let mut lexer = lexer::Lexer::new(filename, source);
    let (mut ast, root_node) = unwrap_errors(parser::parse(&mut lexer));
@@ -35,7 +36,17 @@ fn main() -> Result<(), common::Error> {
    println!("———");
 
    astdump::dump_ast(&lexer, &ast, root_node);
-   ast = unwrap_errors(sem::analyze(filename, ast, root_node));
+   ast = unwrap_errors(sem::analyze(sem::AnalyzeOptions {
+      filename,
+      source,
+      ast,
+      root_node,
+      default_types: sem::DefaultTypes {
+         int_size: IntegerSize::S32,
+         float_size: FloatSize::S32,
+         index_size: IntegerSize::U64,
+      },
+   }));
 
    println!("———");
    println!(":: AST (post-sem)");

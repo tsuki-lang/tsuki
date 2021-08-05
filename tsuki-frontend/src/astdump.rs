@@ -51,7 +51,17 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
       _ => (),
    }
    match extra {
-      NodeData::String(s) => print!("{:?}", &s),
+      number @
+      (NodeData::Uint8(..)
+      | NodeData::Uint16(..)
+      | NodeData::Uint32(..)
+      | NodeData::Uint64(..)
+      | NodeData::Int8(..)
+      | NodeData::Int16(..)
+      | NodeData::Int32(..)
+      | NodeData::Int64(..)
+      | NodeData::Float32(..)
+      | NodeData::Float64(..)) => print!("{:?}", number),
       _ => (),
    }
    println!();
@@ -128,7 +138,7 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
             dump_node(lexer, ast, node, depth + 1, None);
          }
       }
-      NodeData::String(..) => (),
+      _ => (),
    }
 }
 
