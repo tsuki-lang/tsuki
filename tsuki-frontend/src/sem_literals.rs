@@ -317,7 +317,7 @@ impl<'c> SemLiterals<'c> {
       // allows for. Thus, all the digits have to be first accumulated into a separate string
       // without these underscores.
       // We use a SmallVec for this purpose, so as to allocate memory on the stack for relatively
-      // small literals. I don't think there are many cases where people use more than 64 characters
+      // small literals. I don't think there are many cases where people use more than 32 characters
       // in a literal, but in these cases the SmallVec is simply going to move over to the heap.
       let mut digits = SmallVec::<[u8; 32]>::new();
       for b in string.bytes() {
