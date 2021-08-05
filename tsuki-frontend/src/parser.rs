@@ -2,7 +2,7 @@
 
 use std::ops::Range;
 
-use smallvec::{smallvec, SmallVec};
+use smallvec::SmallVec;
 
 use crate::ast::*;
 use crate::common::{Error, ErrorKind, Errors, Span};

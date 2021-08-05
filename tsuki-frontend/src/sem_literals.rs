@@ -4,7 +4,6 @@
 //! Note that `SemTypes` may perform additional conversions later down the line.
 
 use std::convert::{TryFrom, TryInto};
-use std::ops::Neg;
 
 use smallvec::SmallVec;
 
