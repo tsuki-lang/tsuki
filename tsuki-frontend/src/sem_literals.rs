@@ -6,6 +6,8 @@
 use std::convert::{TryFrom, TryInto};
 use std::ops::Neg;
 
+use smallvec::SmallVec;
+
 use crate::ast::{Ast, Mutation, NodeData, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors, Span};
 use crate::sem::{Sem, SemCommon};
@@ -198,6 +200,15 @@ impl<'c> SemLiterals<'c> {
       }
    }
 
+   /// Converts a `u64` to an `f64`, optionally flipping its sign around.
+   fn convert_to_float(&self, negative: bool, x: u64) -> f64 {
+      if negative {
+         -(x as f64)
+      } else {
+         x as f64
+      }
+   }
+
    /// Converts the abstract Integer `node` to a concretely typed node.
    fn convert_integer_node(
       &mut self,
@@ -262,21 +273,34 @@ impl<'c> SemLiterals<'c> {
             NodeData::Uint32(self.convert_unsigned(number, "Uint32", span)),
          ),
          LiteralSuffix::U64 => (NodeKind::Uint64, NodeData::Uint64(number)),
-         LiteralSuffix::F32 => todo!(),
-         LiteralSuffix::F64 => todo!(),
+         LiteralSuffix::F32 => (
+            NodeKind::Float32,
+            NodeData::Float32(self.convert_to_float(negative, number) as f32),
+         ),
+         LiteralSuffix::F64 => (
+            NodeKind::Float64,
+            NodeData::Float64(self.convert_to_float(negative, number)),
+         ),
       };
       self.mutations.push(Mutation::Convert(node, kind));
       self.mutations.push(Mutation::SetExtra(node, extra));
    }
 
-   /// Parses an integer literal to one of the type-strict kinds `Int8`, `Int16`, etc.
-   fn analyze_integer(&mut self, ast: &Ast, node: NodeHandle) {
+   /// Extracts the sign and number node from a potentially `Neg` node. The first value returned
+   /// specifies whether the number is negative, and the second value is the actual number.
+   fn extract_neg_node(ast: &Ast, node: NodeHandle) -> (bool, NodeHandle) {
       let negative = ast.kind(node) == NodeKind::Neg;
       let number_node = if negative {
          ast.first_handle(node)
       } else {
          node
       };
+      (negative, number_node)
+   }
+
+   /// Parses an integer literal to one of the type-strict kinds `Int8`, `Int16`, etc.
+   fn analyze_integer(&mut self, ast: &Ast, node: NodeHandle) {
+      let (negative, number_node) = Self::extract_neg_node(ast, node);
       let source = self.common.get_source_range_from_node(ast, number_node);
       assert!(!source.is_empty());
       let (digits, suffix) = self.split_number(source, ast.span(node));
@@ -286,11 +310,69 @@ impl<'c> SemLiterals<'c> {
       }
    }
 
+   /// Parses a floating point literal to an `f64`. If an error occurs, the function panics, as
+   /// floats are not susceptible to overflow; only precision loss on large scales.
+   fn parse_float(string: &str) -> f64 {
+      // Parsing floats is hard. That's why we're using the Rust standard library for this purpose.
+      // However, the standard library expects floats without underscores `_`, which tsuki
+      // allows for. Thus, all the digits have to be first accumulated into a separate string
+      // without these underscores.
+      // We use a SmallVec for this purpose, so as to allocate memory on the stack for relatively
+      // small literals. I don't think there are many cases where people use more than 64 characters
+      // in a literal, but in these cases the SmallVec is simply going to move over to the heap.
+      let mut digits = SmallVec::<[u8; 32]>::new();
+      for b in string.bytes() {
+         if b != b'_' {
+            digits.push(b);
+         }
+      }
+      // Safety: Using `from_utf8_unchecked` is safe, as floating point literals cannot have any
+      // UTF-8 characters in them.
+      let filtered = unsafe { std::str::from_utf8_unchecked(&digits) };
+      filtered.parse::<f64>().expect("the lexer must provide only valid digits")
+      // Idea: emit a warning when the literal suffers significant precision loss.
+   }
+
+   /// Converts the abstract `Float` node to a concrete node of kind `Float32` or `Float64`.
+   fn convert_float_node(
+      &mut self,
+      ast: &Ast,
+      node: NodeHandle,
+      negative: bool,
+      mut number: f64,
+      mut suffix: LiteralSuffix,
+   ) {
+      match suffix {
+         LiteralSuffix::None | LiteralSuffix::F => {
+            suffix = LiteralSuffix::from(self.common.default_types.float_size);
+         }
+         _ => (),
+      }
+      if negative {
+         number *= -1.0;
+      }
+      let (kind, extra) = match suffix {
+         LiteralSuffix::None | LiteralSuffix::F => unreachable!(),
+         LiteralSuffix::F32 => (NodeKind::Float32, NodeData::Float32(number as f32)),
+         LiteralSuffix::F64 => (NodeKind::Float64, NodeData::Float64(number)),
+         _ => {
+            self.emit_error(ErrorKind::InvalidFloatSuffix, ast.span(node).clone());
+            self.mutations.push(Mutation::Convert(node, NodeKind::Error));
+            return;
+         }
+      };
+      self.mutations.push(Mutation::Convert(node, kind));
+      self.mutations.push(Mutation::SetExtra(node, extra));
+   }
+
    /// Parses a float to a `Float32` or a `Float64`.
    fn analyze_float(&mut self, ast: &Ast, node: NodeHandle) {
-      let source = self.common.get_source_range_from_node(ast, node);
+      let (negative, number_node) = Self::extract_neg_node(ast, node);
+      let source = self.common.get_source_range_from_node(ast, number_node);
       assert!(!source.is_empty());
       let (digits, suffix) = self.split_number(source, ast.span(node));
+      let number = Self::parse_float(digits);
+      self.convert_float_node(ast, node, negative, number, suffix);
    }
 
    /// Walks through the sub-nodes of a branch node.

@@ -14,7 +14,7 @@ fn unwrap_errors<T>(r: Result<T, common::Errors>) -> T {
 fn main() -> Result<(), common::Error> {
    let filename = "test.tsu";
    let source = r#"
-      1 + -128_i8
+      1.0 + 2.0e-1_f64
    "#;
    let mut lexer = lexer::Lexer::new(filename, source);
    let (mut ast, root_node) = unwrap_errors(parser::parse(&mut lexer));

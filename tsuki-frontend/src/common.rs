@@ -174,6 +174,8 @@ pub enum ErrorKind {
    SignedIntegerOverflowForType(i64, String),
    #[error("unsigned integers cannot be negative")]
    UintCannotBeNegative,
+   #[error("integer suffixes cannot be used on float literals")]
+   InvalidFloatSuffix,
 }
 
 /// An error that can occur during lexing, parsing, semantic analysis, or code generation.
