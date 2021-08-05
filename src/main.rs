@@ -1,5 +1,5 @@
+use tsuki_frontend::types::{FloatSize, IntegerSize};
 use tsuki_frontend::{astdump, common, lexer, parser, sem};
-use tsuki_frontend::types::{IntegerSize, FloatSize};
 
 fn unwrap_errors<T>(r: Result<T, common::Errors>) -> T {
    match r {

@@ -51,7 +51,8 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
       _ => (),
    }
    match extra {
-      number @
+      number
+      @
       (NodeData::Uint8(..)
       | NodeData::Uint16(..)
       | NodeData::Uint32(..)

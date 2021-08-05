@@ -2,8 +2,8 @@
 
 use crate::ast::{Ast, Mutation, NodeData, NodeHandle, NodeKind};
 use crate::common::{Error, ErrorKind, Errors, Span};
-use crate::types::{BuiltinTypes, FloatSize, IntegerSize, Types};
 pub use crate::types::DefaultTypes;
+use crate::types::{BuiltinTypes, FloatSize, IntegerSize, Types};
 
 use crate::sem_literals::SemLiterals;
 use crate::sem_types::SemTypes;
@@ -89,7 +89,13 @@ pub struct AnalyzeOptions<'f, 's> {
 
 /// Analyzes and lowers the AST to a representation ready to be used by the backend.
 pub fn analyze(options: AnalyzeOptions) -> Result<Ast, Errors> {
-   let AnalyzeOptions { filename, source, ast, root_node, default_types } = options;
+   let AnalyzeOptions {
+      filename,
+      source,
+      ast,
+      root_node,
+      default_types,
+   } = options;
    let mut state = Analyzer { ast, root_node };
 
    let common = SemCommon {

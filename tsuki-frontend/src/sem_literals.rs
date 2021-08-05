@@ -99,7 +99,10 @@ impl<'c> SemLiterals<'c> {
             if let Some(&suffix) = SUFFIXES.get(suffix_string) {
                return (&source[..underscore], suffix);
             } else {
-               self.emit_error(ErrorKind::InvalidNumberLiteralSuffix(source.into()), span.clone());
+               self.emit_error(
+                  ErrorKind::InvalidNumberLiteralSuffix(source.into()),
+                  span.clone(),
+               );
             }
          }
       }
@@ -179,7 +182,7 @@ impl<'c> SemLiterals<'c> {
          Err(..) => {
             let kind = ErrorKind::UnsignedIntegerOverflowForType(x.into(), type_name.into());
             self.emit_error(kind, span.clone());
-            return R::default()
+            return R::default();
          }
       };
       if negative {
