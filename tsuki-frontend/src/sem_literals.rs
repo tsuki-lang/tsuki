@@ -147,10 +147,11 @@ impl<'c> SemLiterals<'c> {
       Ok(result)
    }
 
-   fn convert_unsigned<R, T>(&mut self, x: T, type_name: &str, span: &Span) -> R
+   /// Converts a `u64` to a smaller unsigned integer. `type_name` and `span` are used for
+   /// emitting errors in case of overflow.
+   fn convert_unsigned<R>(&mut self, x: u64, type_name: &str, span: &Span) -> R
    where
-      T: Copy + TryInto<R> + Into<u64>,
-      R: Default,
+      R: Default + TryFrom<u64>,
    {
       match x.try_into() {
          Ok(ok) => ok,
@@ -162,11 +163,17 @@ impl<'c> SemLiterals<'c> {
       }
    }
 
-   fn convert_signed<R, T>(&mut self, negative: bool, x: T, type_name: &str, span: &Span) -> R
+   /// Converts a `u64` to a signed integer. Emits an error using the given `type_name` and `span`,
+   /// and returns `R::default()` in case of an overflow error.
+   fn convert_signed<R>(&mut self, negative: bool, x: u64, type_name: &str, span: &Span) -> R
    where
-      T: Copy + TryInto<i64> + Into<u64>,
       R: Default + TryFrom<i64>,
    {
+      // i64 is the largest possible signed integer in tsuki, so we use that as the source for our
+      // conversion. Note that if we converted straight from u64 to R, the minimum negative number
+      // edge case -128_i8 would not work. The 128 would get converted into an i8, causing an
+      // overflow, so instead we first need to convert to an i64, then apply the sign, and
+      // afterwards convert the i64 to R.
       let mut signed: i64 = match x.try_into() {
          Ok(ok) => ok,
          Err(..) => {
