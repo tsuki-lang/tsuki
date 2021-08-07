@@ -54,6 +54,11 @@ impl Types {
       TypeId(id)
    }
 
+   /// Returns the name of the type.
+   pub fn name(&self, typ: TypeId) -> &str {
+      &self.name_data[self.names[typ.0]]
+   }
+
    /// Returns the type for the given node, or `TypeId::null()` if the node has no type.
    pub fn node_type(&self, node: NodeHandle) -> TypeId {
       self.node_types.get(node.id()).cloned().unwrap_or(TypeId::null())
@@ -93,6 +98,7 @@ pub enum TypeKind {
    Bool,
    Integer(IntegerSize),
    Float(FloatSize),
+   Char,
 }
 
 /// The size of an integer. `S` sizes are signed, `U` sizes are unsigned.
@@ -152,6 +158,9 @@ pub struct BuiltinTypes {
    pub t_int: TypeId,
    pub t_float: TypeId,
    pub t_index: TypeId,
+
+   // Characters
+   pub t_char: TypeId,
 }
 
 impl BuiltinTypes {
@@ -243,6 +252,10 @@ impl BuiltinTypes {
             IntegerSize::U64 => t_uint64,
             _ => panic!("index_size must be unsigned"),
          },
+         t_char: types.create_type(TypeInfo {
+            name: "Char",
+            kind: TypeKind::Char,
+         }),
       }
    }
 }

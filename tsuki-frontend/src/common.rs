@@ -176,6 +176,18 @@ pub enum ErrorKind {
    UintCannotBeNegative,
    #[error("integer suffixes cannot be used on float literals")]
    InvalidFloatSuffix,
+
+   #[error("this binary operator is not yet supported")]
+   BinaryOperatorNotYetSupported,
+
+   /*
+    * Internal errors
+    * ---
+    * Every internal error must be prefixed by "<component> internal error:" to tell the user that
+    * something went terribly wrong in the compiler, and that the error should be reported.
+    */
+   #[error("SemTypes internal error: invalid AST node passed to analyze()")]
+   SemTypesInvalidAstNode,
 }
 
 /// An error that can occur during lexing, parsing, semantic analysis, or code generation.
