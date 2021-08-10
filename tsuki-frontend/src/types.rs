@@ -3,7 +3,7 @@
 // Note: Because `type` is a keyword in Rust, sometimes a truncated form `typ` is used to prevent
 // conflicts.
 
-use std::ops::Range;
+use std::{cmp::Ordering, ops::Range};
 
 use crate::ast::NodeHandle;
 
@@ -59,6 +59,11 @@ impl Types {
       &self.name_data[self.names[typ.0].clone()]
    }
 
+   /// Returns the kind of the given type.
+   pub fn kind(&self, typ: TypeId) -> &TypeKind {
+      &self.kinds[typ.0]
+   }
+
    /// Returns the type for the given node, or `TypeId::null()` if the node has no type.
    pub fn node_type(&self, node: NodeHandle) -> TypeId {
       self.node_types.get(node.id()).cloned().unwrap_or(TypeId::null())
@@ -101,8 +106,26 @@ pub enum TypeKind {
    Char,
 }
 
+impl TypeKind {
+   /// Returns whether the type kind represents an integer type.
+   pub fn is_integer(&self) -> bool {
+      matches!(self, TypeKind::Integer(..))
+   }
+
+   /// Returns whether the type kind represents a float type.
+   pub fn is_float(&self) -> bool {
+      matches!(self, TypeKind::Float(..))
+   }
+
+   /// Returns whether the type kind represents a numeric (integer or float) type.
+   pub fn is_numeric(&self) -> bool {
+      self.is_integer() || self.is_float()
+   }
+}
+
 /// The size of an integer. `S` sizes are signed, `U` sizes are unsigned.
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum IntegerSize {
    U8,
    U16,
@@ -114,8 +137,33 @@ pub enum IntegerSize {
    S64,
 }
 
+impl IntegerSize {
+   /// Returns whether the size represents an unsigned integer.
+   pub fn is_unsigned(self) -> bool {
+      // Can't use Self here?
+      use IntegerSize::*;
+      matches!(self, U8 | U16 | U32 | U64)
+   }
+
+   /// Returns whether the size represents a signed integer.
+   pub fn is_signed(self) -> bool {
+      !self.is_unsigned()
+   }
+}
+
+impl PartialOrd for IntegerSize {
+   /// Compares two integer sizes.
+   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+      if self.is_signed() && other.is_unsigned() {
+         None
+      } else {
+         (*self as u8).partial_cmp(&(*other as u8))
+      }
+   }
+}
+
 /// The size of a float.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FloatSize {
    S32,
    S64,
@@ -264,5 +312,43 @@ impl BuiltinTypes {
             kind: TypeKind::Char,
          }),
       }
+   }
+}
+
+/// A unique ID identifying an entry in the type log.
+#[derive(Clone, Copy, Debug)]
+pub struct TypeLogEntry(usize);
+
+/// A log storing the AST nodes from which different instances of types came from.
+pub struct TypeLog {
+   types: Vec<TypeId>,
+   nodes: Vec<NodeHandle>,
+}
+
+impl TypeLog {
+   /// Constructs a new type log.
+   pub fn new() -> Self {
+      Self {
+         types: Vec::new(),
+         nodes: Vec::new(),
+      }
+   }
+
+   /// Inserts a new type into the log and returns its handle.
+   pub fn push(&mut self, typ: TypeId, node: NodeHandle) -> TypeLogEntry {
+      let id = self.types.len();
+      self.types.push(typ);
+      self.nodes.push(node);
+      TypeLogEntry(id)
+   }
+
+   /// Returns the type stored in the log entry.
+   pub fn typ(&self, entry: TypeLogEntry) -> TypeId {
+      self.types[entry.0]
+   }
+
+   /// Returns the source node stored in the log entry.
+   pub fn node(&self, entry: TypeLogEntry) -> NodeHandle {
+      self.nodes[entry.0]
    }
 }
