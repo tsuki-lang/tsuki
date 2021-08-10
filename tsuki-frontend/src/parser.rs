@@ -278,10 +278,7 @@ impl<'l, 's> Parser<'l, 's> {
    }
 
    /// Parses a prefix `do` expression (or statement).
-   fn parse_do_expression(
-      &mut self,
-      token: Option<Token>,
-   ) -> Result<NodeHandle, Error> {
+   fn parse_do_expression(&mut self, token: Option<Token>) -> Result<NodeHandle, Error> {
       let token = self.some_or_next(token)?;
       let node = self.ast.create_node(NodeKind::Do);
       let mut statements = Vec::new();
@@ -295,10 +292,7 @@ impl<'l, 's> Parser<'l, 's> {
       Ok(node)
    }
 
-   fn parse_if_expression(
-      &mut self,
-      token: Option<Token>,
-   ) -> Result<NodeHandle, Error> {
+   fn parse_if_expression(&mut self, token: Option<Token>) -> Result<NodeHandle, Error> {
       let mut branch_token = self.some_or_next(token)?;
       let mut branches = Vec::new();
       let mut is_elif = true;

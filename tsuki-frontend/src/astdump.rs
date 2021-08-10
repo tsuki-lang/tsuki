@@ -156,9 +156,5 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
 
 /// Prints the AST to stdout, starting from the given root node.
 pub fn dump_ast(lexer: &Lexer, ast: &Ast, types: Option<&Types>, root_node: NodeHandle) {
-   dump_node(&State {
-      lexer,
-      ast,
-      types,
-   }, root_node, 0, None);
+   dump_node(&State { lexer, ast, types }, root_node, 0, None);
 }

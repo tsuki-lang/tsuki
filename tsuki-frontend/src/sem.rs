@@ -113,7 +113,12 @@ pub fn analyze(options: AnalyzeOptions) -> Result<(Ast, Types), Errors> {
    // goes wrong inside of a phase, yielding AST that might break the phase after it.
    // Also, warnings anyone?
    state.perform(SemLiterals::new(&common))?;
-   state.perform(SemTypes::new(&common, &mut types, &mut type_log, &builtin_types))?;
+   state.perform(SemTypes::new(
+      &common,
+      &mut types,
+      &mut type_log,
+      &builtin_types,
+   ))?;
 
    Ok((state.ast, types))
 }

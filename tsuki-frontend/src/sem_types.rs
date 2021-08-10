@@ -21,7 +21,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
       common: &'c SemCommon,
       types: &'t mut Types,
       log: &'tl mut TypeLog,
-      builtin: &'bt BuiltinTypes
+      builtin: &'bt BuiltinTypes,
    ) -> Self {
       SemTypes {
          common,
@@ -76,7 +76,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
          _ => {
             let right_name = self.types.name(right);
             let kind = ErrorKind::InvalidUnaryOperator(right_name.into());
-            return self.error(ast, node, kind)
+            return self.error(ast, node, kind);
          }
       };
       self.annotate(node, typ)
@@ -92,7 +92,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
    ) -> Option<TypeLogEntry> {
       // If the two types are equal, there's need for conversion.
       if from == to {
-         return Some(self.log.push(to, node))
+         return Some(self.log.push(to, node));
       }
       // Otherwise, compare their kinds for various traits.
       let from_kind = self.types.kind(from);
@@ -105,7 +105,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
          let from_size = from_kind.unwrap_integer();
          let to_size = to_kind.unwrap_integer();
          if to_size >= from_size {
-            return Some(self.log.push(to, node))
+            return Some(self.log.push(to, node));
          }
       }
 
@@ -116,7 +116,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
          let from_size = from_kind.unwrap_float();
          let to_size = to_kind.unwrap_float();
          if to_size >= from_size {
-            return Some(self.log.push(to, node))
+            return Some(self.log.push(to, node));
          }
       }
 
@@ -133,12 +133,15 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
       let conversion = self.perform_implicit_conversion(right, right_type, left_type);
       let typ = match ast.kind(node) {
          NodeKind::Plus | NodeKind::Minus | NodeKind::Mul | NodeKind::Div
-         if conversion.is_some() => left_type,
+            if conversion.is_some() =>
+         {
+            left_type
+         }
          _ => {
             let left_name = self.types.name(left_type);
             let right_name = self.types.name(right_type);
             let kind = ErrorKind::TypeMismatch(left_name.into(), right_name.into());
-            return self.error(ast, node, kind)
+            return self.error(ast, node, kind);
          }
       };
       self.annotate(node, typ)
@@ -188,18 +191,17 @@ impl Sem for SemTypes<'_, '_, '_, '_> {
          // NodeKind::Member - magic for field access in self
          // NodeKind::Ref - magic for creating pointers
          // NodeKind::Deref - magic for dereferencing
-         | NodeKind::Not
-         | NodeKind::Neg
-         | NodeKind::BitNot => self.annotate_unary_operator(ast, node),
+         NodeKind::Not | NodeKind::Neg | NodeKind::BitNot => {
+            self.annotate_unary_operator(ast, node)
+         }
 
          // Binary operators
          // ---
          // The following kinds were omitted from the generic rule:
          // NodeKind::Dot - magic for field access
-         | NodeKind::Plus
-         | NodeKind::Minus
-         | NodeKind::Mul
-         | NodeKind::Div => self.annotate_binary_operator(ast, node),
+         NodeKind::Plus | NodeKind::Minus | NodeKind::Mul | NodeKind::Div => {
+            self.annotate_binary_operator(ast, node)
+         }
          // Other operators are to be implemented later.
 
          // Control flow

@@ -162,7 +162,6 @@ pub enum ErrorKind {
    /*
     * Sem'check errors
     */
-
    // SemLiterals
    #[error("invalid number literal suffix: '{0}'")]
    InvalidNumberLiteralSuffix(String),
