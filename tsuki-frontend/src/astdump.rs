@@ -2,6 +2,7 @@
 
 use crate::ast::*;
 use crate::lexer::Lexer;
+use crate::types::Types;
 
 #[derive(Debug)]
 enum Prefix {
@@ -25,7 +26,14 @@ fn print_string_range(lexer: &Lexer, start: usize, end: usize) {
    print!("{}", &lexer.string_data()[start..end]);
 }
 
-fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: Option<Prefix>) {
+struct State<'l, 'll, 'a, 't> {
+   lexer: &'l Lexer<'ll>,
+   ast: &'a Ast,
+   types: Option<&'t Types>,
+}
+
+fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) {
+   let State { lexer, ast, types } = s;
    print_indentation(depth);
 
    let kind = ast.kind(node);
@@ -65,6 +73,10 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
       | NodeData::Float64(..)) => print!("{:?}", number),
       _ => (),
    }
+   if let Some(types) = types {
+      let typ = types.node_type(node);
+      print!(" : {}", types.name(typ));
+   }
    println!();
 
    match kind {
@@ -97,8 +109,8 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
       | NodeKind::Index
       | NodeKind::IndexAlt => {
          let (left, right) = (ast.first_handle(node), ast.second_handle(node));
-         dump_node(lexer, ast, left, depth + 1, Some(Prefix::L));
-         dump_node(lexer, ast, right, depth + 1, Some(Prefix::R));
+         dump_node(s, left, depth + 1, Some(Prefix::L));
+         dump_node(s, right, depth + 1, Some(Prefix::R));
       }
       | NodeKind::Check
       | NodeKind::Unwrap
@@ -112,8 +124,7 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
       | NodeKind::IfBranch => {
          let left = ast.first_handle(node);
          dump_node(
-            lexer,
-            ast,
+            s,
             left,
             depth + 1,
             Some(match kind {
@@ -136,7 +147,7 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
       NodeData::None => (),
       NodeData::NodeList(list) => {
          for &node in list {
-            dump_node(lexer, ast, node, depth + 1, None);
+            dump_node(s, node, depth + 1, None);
          }
       }
       _ => (),
@@ -144,6 +155,10 @@ fn dump_node(lexer: &Lexer, ast: &Ast, node: NodeHandle, depth: usize, prefix: O
 }
 
 /// Prints the AST to stdout, starting from the given root node.
-pub fn dump_ast(lexer: &Lexer, ast: &Ast, root_node: NodeHandle) {
-   dump_node(lexer, ast, root_node, 0, None);
+pub fn dump_ast(lexer: &Lexer, ast: &Ast, types: Option<&Types>, root_node: NodeHandle) {
+   dump_node(&State {
+      lexer,
+      ast,
+      types,
+   }, root_node, 0, None);
 }

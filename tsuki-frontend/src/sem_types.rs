@@ -3,33 +3,61 @@
 use crate::ast::{Ast, Mutation, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors, Span};
 use crate::sem::{Sem, SemCommon};
-use crate::types::{BuiltinTypes, TypeId, TypeKind, Types};
+use crate::types::{BuiltinTypes, TypeId, TypeKind, TypeLog, Types};
 
-pub(crate) struct SemTypes<'c, 't, 'bt> {
+pub(crate) struct SemTypes<'c, 't, 'tl, 'bt> {
    common: &'c SemCommon,
    errors: Errors,
    mutations: Vec<Mutation>,
 
    types: &'t mut Types,
+   log: &'tl mut TypeLog,
    builtin: &'bt BuiltinTypes,
 }
 
-impl<'c, 't, 'bt> SemTypes<'c, 't, 'bt> {
+impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
    /// Creates a new instance of the `SemTypes` analysis phase.
-   pub fn new(common: &'c SemCommon, types: &'t mut Types, builtin: &'bt BuiltinTypes) -> Self {
+   pub fn new(
+      common: &'c SemCommon,
+      types: &'t mut Types,
+      log: &'tl mut TypeLog,
+      builtin: &'bt BuiltinTypes
+   ) -> Self {
       SemTypes {
          common,
          errors: Errors::new(),
          mutations: Vec::new(),
          types,
+         log,
          builtin,
       }
    }
 
    /// Annotates the given AST with the given type, and returns the type.
-   fn annotate(&mut self, ast: &Ast, node: NodeHandle, typ: TypeId) -> TypeId {
+   fn annotate(&mut self, node: NodeHandle, typ: TypeId) -> TypeId {
       self.types.set_node_type(node, typ);
       typ
+   }
+
+   /// Annotates a literal with a concrete type.
+   fn annotate_literal(&mut self, ast: &Ast, node: NodeHandle) -> TypeId {
+      let typ = match ast.kind(node) {
+         NodeKind::True => self.builtin.t_bool,
+         NodeKind::False => self.builtin.t_bool,
+         NodeKind::Uint8 => self.builtin.t_uint8,
+         NodeKind::Uint16 => self.builtin.t_uint16,
+         NodeKind::Uint32 => self.builtin.t_uint32,
+         NodeKind::Uint64 => self.builtin.t_uint64,
+         NodeKind::Int8 => self.builtin.t_int8,
+         NodeKind::Int16 => self.builtin.t_int16,
+         NodeKind::Int32 => self.builtin.t_int32,
+         NodeKind::Int64 => self.builtin.t_int64,
+         NodeKind::Float32 => self.builtin.t_float32,
+         NodeKind::Float64 => self.builtin.t_float64,
+         NodeKind::Character => self.builtin.t_char,
+         _ => unreachable!(),
+      };
+      self.annotate(node, typ)
    }
 
    // Currently, this does some rather simplistic analysis just to Make it Work™, but in the
@@ -50,7 +78,7 @@ impl<'c, 't, 'bt> SemTypes<'c, 't, 'bt> {
             self.error(kind, ast.span(node).clone())
          }
       };
-      self.annotate(ast, node, typ)
+      self.annotate(node, typ)
    }
 
    /// Attempts to convert the type `from` to type `tp`. If an implicit conversion is not possible,
@@ -63,6 +91,8 @@ impl<'c, 't, 'bt> SemTypes<'c, 't, 'bt> {
       // Otherwise, compare their kinds for various traits.
       let from_kind = self.types.kind(from);
       let to_kind = self.types.kind(to);
+
+      // Widening integer conversions
       if from_kind.is_integer() && to_kind.is_integer() {
          // Integers are only implicitly convertible to wider types of the same signedness,
          // eg. Int8 -> Int16, Int32 -> Int64, but not Int64 -> Int32, or Uint32 -> Int32.
@@ -72,6 +102,18 @@ impl<'c, 't, 'bt> SemTypes<'c, 't, 'bt> {
             return Some(to)
          }
       }
+
+      // Widening float conversions
+      if from_kind.is_float() && to_kind.is_float() {
+         // Floats are only implicitly convertible if the destination type is wider than the
+         // source type (Float32 -> Float64).
+         let from_size = from_kind.unwrap_float();
+         let to_size = to_kind.unwrap_float();
+         if to_size >= from_size {
+            return Some(to)
+         }
+      }
+
       None
    }
 
@@ -90,7 +132,7 @@ impl<'c, 't, 'bt> SemTypes<'c, 't, 'bt> {
             self.error(kind, ast.span(node).clone())
          }
       };
-      self.annotate(ast, node, typ)
+      self.annotate(node, typ)
    }
 
    /// Annotates statements in a list of statements.
@@ -100,7 +142,7 @@ impl<'c, 't, 'bt> SemTypes<'c, 't, 'bt> {
          // Right now this isn't done for testing purposes.
          let _ = self.analyze(ast, node);
       });
-      self.builtin.t_statement
+      self.annotate(node, self.builtin.t_statement)
    }
 
    /// Emits an error of the given kind, also returning the error type.
@@ -110,26 +152,26 @@ impl<'c, 't, 'bt> SemTypes<'c, 't, 'bt> {
    }
 }
 
-impl Sem for SemTypes<'_, '_, '_> {
+impl Sem for SemTypes<'_, '_, '_, '_> {
    type Result = TypeId;
 
    /// Performs type analysis for the given AST node. This annotates the node with a concrete type.
    fn analyze(&mut self, ast: &Ast, node: NodeHandle) -> TypeId {
       match ast.kind(node) {
          // Literals
-         NodeKind::True => self.builtin.t_bool,
-         NodeKind::False => self.builtin.t_bool,
-         NodeKind::Uint8 => self.builtin.t_uint8,
-         NodeKind::Uint16 => self.builtin.t_uint16,
-         NodeKind::Uint32 => self.builtin.t_uint32,
-         NodeKind::Uint64 => self.builtin.t_uint64,
-         NodeKind::Int8 => self.builtin.t_int8,
-         NodeKind::Int16 => self.builtin.t_int16,
-         NodeKind::Int32 => self.builtin.t_int32,
-         NodeKind::Int64 => self.builtin.t_int64,
-         NodeKind::Float32 => self.builtin.t_float32,
-         NodeKind::Float64 => self.builtin.t_float64,
-         NodeKind::Character => self.builtin.t_char,
+         | NodeKind::True
+         | NodeKind::False
+         | NodeKind::Uint8
+         | NodeKind::Uint16
+         | NodeKind::Uint32
+         | NodeKind::Uint64
+         | NodeKind::Int8
+         | NodeKind::Int16
+         | NodeKind::Int32
+         | NodeKind::Int64
+         | NodeKind::Float32
+         | NodeKind::Float64
+         | NodeKind::Character => self.annotate_literal(ast, node),
 
          // Unary operators
          // ---

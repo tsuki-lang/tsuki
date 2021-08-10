@@ -1197,6 +1197,31 @@ type Strings = Table[String, String]
 
 Type aliases defined inside of implementations are called _associated types_, and are described in [Implementations](#implementations-impl).
 
+## Implicit conversion
+
+Certain types can be automatically converted to other types. This process is called _implicit conversion_.
+
+The following implicit conversions are permitted:
+- The identity conversion, ie. a type `T` can be implicitly converted to itself.
+- Widening conversions for integers that do not change signedness.
+  - For example, `Int8` can be converted to `Int16`, but not the other way around.
+  - Conversions between integers of different signedness are not permitted, eg. converting from `Uint8` to `Int8` is illegal. This is the case even when the conversion is known to be safe, but this restriction will be relaxed in the future.
+- Widening conversions between floating point types.
+  - Converting from `Float32` to `Float64` is allowed, but not the other way around.
+- Conversions dropping pointer mutability.
+  - Converting from `^var T` to `^T` is allowed, but not the other way around.
+- Conversions dropping slice mutability.
+  - Converting from `[var T]` to `[T]` is allowed, but not the other way around.
+
+Implicit conversions are performed in the following places:
+
+- The right-hand side of arithmetic and relational operators is converted to the left-hand side whenever possible.
+  - **Note:** This type of conversion will be removed once operator overloading is implemented.
+- The right-hand side of assignment is converted to the type of the assignment target whenever possible.
+- Function arguments are converted to the expected type whenever possible.
+
+If an implicit conversion fails, a type mismatch error is reported during compilation.
+
 ## Implementations (`impl`)
 
 `impl` blocks allow for specifying types and functions associated with types, or instances of types. They also allow for implementing traits.

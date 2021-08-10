@@ -37,15 +37,22 @@ pub struct TypeInfo<'n> {
 impl Types {
    /// Creates a new, empty type registry.
    pub fn new() -> Self {
-      Self {
+      let mut types = Self {
          names: Vec::new(),
          kinds: Vec::new(),
          name_data: String::new(),
          node_types: Vec::new(),
-      }
+      };
+      // Ensure the null slot is populated by the missing type.
+      let _ = types.create_type(TypeInfo {
+         name: "missingtype",
+         kind: TypeKind::Missing,
+      });
+      types
    }
 
    /// Creates a new type with the given type info.
+   #[must_use]
    pub fn create_type(&mut self, info: TypeInfo<'_>) -> TypeId {
       let id = self.names.len();
       let name_range = self.add_name(info.name);
@@ -88,6 +95,8 @@ impl Types {
 
 /// The kind of a type.
 pub enum TypeKind {
+   /// The missing type is assigned to all nodes that don't get a type assigned explicitly.
+   Missing,
    /// The error type is returned when type analysis fails for an AST node.
    Error,
    /// The statement type is assigned to AST nodes that do not return a value, such as loops.
@@ -231,6 +240,15 @@ pub struct BuiltinTypes {
 impl BuiltinTypes {
    /// Adds all the built-in types to the given `Types` and returns them.
    pub fn add_to(types: &mut Types, default_types: &DefaultTypes) -> Self {
+      let t_error = types.create_type(TypeInfo {
+         // NOTE: Maybe look for better names than this?
+         // Just like `statement`, the name is lowercase, but users may think that the occurrence
+         // of errortype is an error in the compiler. Of course, it's not.
+         // Maybe we should "unwrap" error types somehow, so that we never report errors
+         // containing them?
+         name: "errortype",
+         kind: TypeKind::Error,
+      });
       let t_uint8 = types.create_type(TypeInfo {
          name: "Uint8",
          kind: TypeKind::Integer(IntegerSize::U8),
@@ -272,10 +290,7 @@ impl BuiltinTypes {
          kind: TypeKind::Float(FloatSize::S64),
       });
       Self {
-         t_error: types.create_type(TypeInfo {
-            name: "Error",
-            kind: TypeKind::Error,
-         }),
+         t_error,
          t_unit: types.create_type(TypeInfo {
             name: "()",
             kind: TypeKind::Unit,

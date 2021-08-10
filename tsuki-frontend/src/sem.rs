@@ -3,7 +3,7 @@
 use crate::ast::{Ast, Mutation, NodeHandle};
 use crate::common::{Error, ErrorKind, Errors, Span};
 pub use crate::types::DefaultTypes;
-use crate::types::{BuiltinTypes, Types};
+use crate::types::{BuiltinTypes, TypeLog, Types};
 
 use crate::sem_literals::SemLiterals;
 use crate::sem_types::SemTypes;
@@ -88,7 +88,7 @@ pub struct AnalyzeOptions<'f, 's> {
 }
 
 /// Analyzes and lowers the AST to a representation ready to be used by the backend.
-pub fn analyze(options: AnalyzeOptions) -> Result<Ast, Errors> {
+pub fn analyze(options: AnalyzeOptions) -> Result<(Ast, Types), Errors> {
    let AnalyzeOptions {
       filename,
       source,
@@ -104,6 +104,7 @@ pub fn analyze(options: AnalyzeOptions) -> Result<Ast, Errors> {
       default_types,
    };
    let mut types = Types::new();
+   let mut type_log = TypeLog::new();
    let builtin_types = BuiltinTypes::add_to(&mut types, &common.default_types);
 
    // NOTE: Maybe split errors into normal and fatal?
@@ -112,7 +113,7 @@ pub fn analyze(options: AnalyzeOptions) -> Result<Ast, Errors> {
    // goes wrong inside of a phase, yielding AST that might break the phase after it.
    // Also, warnings anyone?
    state.perform(SemLiterals::new(&common))?;
-   state.perform(SemTypes::new(&common, &mut types, &builtin_types))?;
+   state.perform(SemTypes::new(&common, &mut types, &mut type_log, &builtin_types))?;
 
-   Ok(state.ast)
+   Ok((state.ast, types))
 }
