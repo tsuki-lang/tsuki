@@ -3,7 +3,7 @@
 use crate::ast::{Ast, Mutation, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors, Span};
 use crate::sem::{Sem, SemCommon};
-use crate::types::{BuiltinTypes, TypeId, TypeKind, TypeLog, Types};
+use crate::types::{BuiltinTypes, TypeId, TypeKind, TypeLog, TypeLogEntry, Types};
 
 pub(crate) struct SemTypes<'c, 't, 'tl, 'bt> {
    common: &'c SemCommon,
@@ -34,13 +34,13 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
    }
 
    /// Annotates the given AST with the given type, and returns the type.
-   fn annotate(&mut self, node: NodeHandle, typ: TypeId) -> TypeId {
+   fn annotate(&mut self, node: NodeHandle, typ: TypeId) -> TypeLogEntry {
       self.types.set_node_type(node, typ);
-      typ
+      self.log.push(typ, node)
    }
 
    /// Annotates a literal with a concrete type.
-   fn annotate_literal(&mut self, ast: &Ast, node: NodeHandle) -> TypeId {
+   fn annotate_literal(&mut self, ast: &Ast, node: NodeHandle) -> TypeLogEntry {
       let typ = match ast.kind(node) {
          NodeKind::True => self.builtin.t_bool,
          NodeKind::False => self.builtin.t_bool,
@@ -65,8 +65,9 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
    // replaced by much simpler logic and compiler intrinsics inside the stdlib.
 
    /// Annotates a unary operator with types.
-   fn annotate_unary_operator(&mut self, ast: &Ast, node: NodeHandle) -> TypeId {
-      let right = self.analyze(ast, ast.first_handle(node));
+   fn annotate_unary_operator(&mut self, ast: &Ast, node: NodeHandle) -> TypeLogEntry {
+      let log_entry = self.analyze(ast, ast.first_handle(node));
+      let right = self.log.typ(log_entry);
       let right_kind = self.types.kind(right);
       let typ = match ast.kind(node) {
          NodeKind::Not if right == self.builtin.t_bool => right,
@@ -75,7 +76,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
          _ => {
             let right_name = self.types.name(right);
             let kind = ErrorKind::InvalidUnaryOperator(right_name.into());
-            self.error(kind, ast.span(node).clone())
+            return self.error(ast, node, kind)
          }
       };
       self.annotate(node, typ)
@@ -83,10 +84,15 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
 
    /// Attempts to convert the type `from` to type `tp`. If an implicit conversion is not possible,
    /// returns `None`. Otherwise returns the converted type ID.
-   fn perform_implicit_conversion(&mut self, from: TypeId, to: TypeId) -> Option<TypeId> {
+   fn perform_implicit_conversion(
+      &mut self,
+      node: NodeHandle,
+      from: TypeId,
+      to: TypeId,
+   ) -> Option<TypeLogEntry> {
       // If the two types are equal, there's need for conversion.
       if from == to {
-         return Some(to)
+         return Some(self.log.push(to, node))
       }
       // Otherwise, compare their kinds for various traits.
       let from_kind = self.types.kind(from);
@@ -99,7 +105,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
          let from_size = from_kind.unwrap_integer();
          let to_size = to_kind.unwrap_integer();
          if to_size >= from_size {
-            return Some(to)
+            return Some(self.log.push(to, node))
          }
       }
 
@@ -110,7 +116,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
          let from_size = from_kind.unwrap_float();
          let to_size = to_kind.unwrap_float();
          if to_size >= from_size {
-            return Some(to)
+            return Some(self.log.push(to, node))
          }
       }
 
@@ -118,25 +124,28 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
    }
 
    /// Annotates a binary operator with types.
-   fn annotate_binary_operator(&mut self, ast: &Ast, node: NodeHandle) -> TypeId {
-      let left = self.analyze(ast, ast.first_handle(node));
-      let right = self.analyze(ast, ast.second_handle(node));
-      let converted_right = self.perform_implicit_conversion(right, left);
+   fn annotate_binary_operator(&mut self, ast: &Ast, node: NodeHandle) -> TypeLogEntry {
+      let (left, right) = (ast.first_handle(node), ast.second_handle(node));
+      let left_entry = self.analyze(ast, left);
+      let right_entry = self.analyze(ast, right);
+      let left_type = self.log.typ(left_entry);
+      let right_type = self.log.typ(right_entry);
+      let conversion = self.perform_implicit_conversion(right, right_type, left_type);
       let typ = match ast.kind(node) {
          NodeKind::Plus | NodeKind::Minus | NodeKind::Mul | NodeKind::Div
-         if converted_right.is_some() => left,
+         if conversion.is_some() => left_type,
          _ => {
-            let left_name = self.types.name(left);
-            let right_name = self.types.name(right);
+            let left_name = self.types.name(left_type);
+            let right_name = self.types.name(right_type);
             let kind = ErrorKind::TypeMismatch(left_name.into(), right_name.into());
-            self.error(kind, ast.span(node).clone())
+            return self.error(ast, node, kind)
          }
       };
       self.annotate(node, typ)
    }
 
    /// Annotates statements in a list of statements.
-   fn annotate_statement_list(&mut self, ast: &Ast, node: NodeHandle) -> TypeId {
+   fn annotate_statement_list(&mut self, ast: &Ast, node: NodeHandle) -> TypeLogEntry {
       ast.walk(node, |ast, node| {
          // TODO: Don't ignore the type. Instead, enforce it to be ().
          // Right now this isn't done for testing purposes.
@@ -146,17 +155,17 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
    }
 
    /// Emits an error of the given kind, also returning the error type.
-   fn error(&mut self, kind: ErrorKind, span: Span) -> TypeId {
-      self.emit_error(kind, span);
-      self.builtin.t_error
+   fn error(&mut self, ast: &Ast, node: NodeHandle, kind: ErrorKind) -> TypeLogEntry {
+      self.emit_error(kind, ast.span(node).clone());
+      self.log.push(self.builtin.t_error, node)
    }
 }
 
 impl Sem for SemTypes<'_, '_, '_, '_> {
-   type Result = TypeId;
+   type Result = TypeLogEntry;
 
    /// Performs type analysis for the given AST node. This annotates the node with a concrete type.
-   fn analyze(&mut self, ast: &Ast, node: NodeHandle) -> TypeId {
+   fn analyze(&mut self, ast: &Ast, node: NodeHandle) -> TypeLogEntry {
       match ast.kind(node) {
          // Literals
          | NodeKind::True
@@ -197,7 +206,7 @@ impl Sem for SemTypes<'_, '_, '_, '_> {
          NodeKind::StatementList => self.annotate_statement_list(ast, node),
 
          // Other nodes are invalid.
-         _ => self.error(ErrorKind::SemTypesInvalidAstNode, ast.span(node).clone()),
+         _ => self.error(ast, node, ErrorKind::SemTypesInvalidAstNode),
       }
    }
 
