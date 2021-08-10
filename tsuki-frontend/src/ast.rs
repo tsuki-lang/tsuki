@@ -282,10 +282,8 @@ pub enum NodeKind {
    // be an expression statement. The parser tries to assume the kind from context, but might fail.
    // The kind can be corrected during sem'checking.
    Pass,
-   DoExpression,
-   DoStatement,
-   IfExpression,
-   IfStatement,
+   Do,
+   If,
    IfBranch,   // if, elif
    ElseBranch, // else
 

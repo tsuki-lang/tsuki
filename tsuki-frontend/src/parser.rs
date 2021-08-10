@@ -270,8 +270,8 @@ impl<'l, 's> Parser<'l, 's> {
          TokenKind::Dot => self.unary_prefix(token, NodeKind::Member)?,
          TokenKind::Pointer => self.unary_prefix(token, NodeKind::Ref)?,
          // Control flow structures
-         TokenKind::Do => self.parse_do_expression(Some(token), false)?,
-         TokenKind::If => self.parse_if_expression(Some(token), false)?,
+         TokenKind::Do => self.parse_do_expression(Some(token))?,
+         TokenKind::If => self.parse_if_expression(Some(token))?,
          // Unknown tokens
          _ => self.error(ErrorKind::UnexpectedPrefixToken(token.kind), span),
       })
@@ -281,14 +281,9 @@ impl<'l, 's> Parser<'l, 's> {
    fn parse_do_expression(
       &mut self,
       token: Option<Token>,
-      is_statement: bool,
    ) -> Result<NodeHandle, Error> {
       let token = self.some_or_next(token)?;
-      let node = self.ast.create_node(if is_statement {
-         NodeKind::DoStatement
-      } else {
-         NodeKind::DoExpression
-      });
+      let node = self.ast.create_node(NodeKind::Do);
       let mut statements = Vec::new();
       let indent_level = token.indent_level;
       self.parse_indented_block(&mut statements, indent_level, |p| p.parse_statement())?;
@@ -303,7 +298,6 @@ impl<'l, 's> Parser<'l, 's> {
    fn parse_if_expression(
       &mut self,
       token: Option<Token>,
-      is_statement: bool,
    ) -> Result<NodeHandle, Error> {
       let mut branch_token = self.some_or_next(token)?;
       let mut branches = Vec::new();
@@ -354,11 +348,7 @@ impl<'l, 's> Parser<'l, 's> {
             break;
          }
       }
-      let node = self.ast.create_node(if is_statement {
-         NodeKind::IfStatement
-      } else {
-         NodeKind::IfExpression
-      });
+      let node = self.ast.create_node(NodeKind::If);
       self.ast.set_span(
          node,
          Span::join(&branch_token.span, &self.span_all_nodes(&branches)),
@@ -516,8 +506,8 @@ impl<'l, 's> Parser<'l, 's> {
       let token_kind = self.lexer.peek()?.kind.clone();
       let node = match token_kind {
          TokenKind::Underscore => self.parse_pass()?,
-         TokenKind::Do => self.parse_do_expression(None, true)?,
-         TokenKind::If => self.parse_if_expression(None, true)?,
+         TokenKind::Do => self.parse_do_expression(None)?,
+         TokenKind::If => self.parse_if_expression(None)?,
          _ => self.parse_expression(0)?,
       };
       Ok(node)

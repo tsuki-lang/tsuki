@@ -56,7 +56,7 @@ impl Types {
 
    /// Returns the name of the type.
    pub fn name(&self, typ: TypeId) -> &str {
-      &self.name_data[self.names[typ.0]]
+      &self.name_data[self.names[typ.0].clone()]
    }
 
    /// Returns the type for the given node, or `TypeId::null()` if the node has no type.
@@ -134,6 +134,7 @@ pub struct BuiltinTypes {
    pub t_error: TypeId,
    pub t_unit: TypeId,
    pub t_noreturn: TypeId,
+   pub t_statement: TypeId,
 
    // Boolean
    pub t_bool: TypeId,
@@ -218,6 +219,12 @@ impl BuiltinTypes {
          t_noreturn: types.create_type(TypeInfo {
             name: "NoReturn",
             kind: TypeKind::NoReturn,
+         }),
+         // Unlike all other types, the `statement` type is lowercase. This should let users know
+         // that the "expression" in question isn't an expression after all.
+         t_statement: types.create_type(TypeInfo {
+            name: "statement",
+            kind: TypeKind::Statement,
          }),
          t_bool: types.create_type(TypeInfo {
             name: "Bool",

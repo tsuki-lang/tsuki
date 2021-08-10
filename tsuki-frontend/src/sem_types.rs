@@ -26,18 +26,43 @@ impl<'c, 't, 'bt> SemTypes<'c, 't, 'bt> {
       }
    }
 
+   /// Annotates the given AST with the given type, and returns the type.
+   fn annotate(&mut self, ast: &Ast, node: NodeHandle, typ: TypeId) -> TypeId {
+      self.types.set_node_type(node, typ);
+      typ
+   }
+
+   // Currently, this does some rather simplistic analysis just to Make it Work™, but in the
+   // future when operators will be lowered to trait instance function calls, this will be
+   // replaced by much simpler logic and compiler intrinsics inside the stdlib.
+
+   /// Annotates a unary operator with types.
+   fn annotate_unary_operator(&mut self, ast: &Ast, node: NodeHandle) -> TypeId {
+      let right = self.analyze(ast, ast.first_handle(node));
+      let typ = match ast.kind(node) {
+         _ => self.error(ErrorKind::BinaryOperatorNotYetSupported, ast.span(node).clone()),
+      };
+      self.annotate(ast, node, typ)
+   }
+
    /// Annotates a binary operator with types.
    fn annotate_binary_operator(&mut self, ast: &Ast, node: NodeHandle) -> TypeId {
-      // Currently, this does some rather simplistic analysis just to Make it Work™, but in the
-      // future when operators will be lowered to trait instance function calls, this will be
-      // replaced by much simpler logic and compiler intrinsics inside the stdlib.
       let left = self.analyze(ast, ast.first_handle(node));
       let right = self.analyze(ast, ast.second_handle(node));
       let typ = match ast.kind(node) {
          _ => self.error(ErrorKind::BinaryOperatorNotYetSupported, ast.span(node).clone())
       };
-      self.types.set_node_type(node, typ);
-      typ
+      self.annotate(ast, node, typ)
+   }
+
+   /// Annotates statements in a list of statements.
+   fn annotate_statement_list(&mut self, ast: &Ast, node: NodeHandle) -> TypeId {
+      ast.walk(node, |ast, node| {
+         // TODO: Don't ignore the type. Instead, enforce it to be ().
+         // Right now this isn't done for testing purposes.
+         let _ = self.analyze(ast, node);
+      });
+      self.builtin.t_statement
    }
 
    /// Emits an error of the given kind, also returning the error type.
@@ -67,6 +92,29 @@ impl Sem for SemTypes<'_, '_, '_> {
          NodeKind::Float32 => self.builtin.t_float32,
          NodeKind::Float64 => self.builtin.t_float64,
          NodeKind::Character => self.builtin.t_char,
+
+         // Unary operators
+         // ---
+         // The following operators were omitted from the generic rule:
+         // NodeKind::Member - magic for field access in self
+         // NodeKind::Ref - magic for creating pointers
+         // NodeKind::Deref - magic for dereferencing
+         | NodeKind::Not
+         | NodeKind::Neg
+         | NodeKind::BitNot => self.annotate_unary_operator(ast, node),
+
+         // Binary operators
+         // ---
+         // The following kinds were omitted from the generic rule:
+         // NodeKind::Dot - magic for field access
+         | NodeKind::Plus
+         | NodeKind::Minus
+         | NodeKind::Mul
+         | NodeKind::Div => self.annotate_binary_operator(ast, node),
+         // Other operators are to be implemented later.
+
+         // Control flow
+         NodeKind::StatementList => self.annotate_statement_list(ast, node),
 
          // Other nodes are invalid.
          _ => self.error(ErrorKind::SemTypesInvalidAstNode, ast.span(node).clone()),
