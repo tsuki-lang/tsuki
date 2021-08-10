@@ -2,7 +2,7 @@
 
 use crate::ast::{Ast, Mutation, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors, Span};
-use crate::sem::{Sem, SemCommon};
+use crate::sem::{SemPass, SemCommon};
 use crate::types::{BuiltinTypes, TypeId, TypeKind, TypeLog, TypeLogEntry, Types};
 
 pub(crate) struct SemTypes<'c, 't, 'tl, 'bt> {
@@ -164,7 +164,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
    }
 }
 
-impl Sem for SemTypes<'_, '_, '_, '_> {
+impl SemPass for SemTypes<'_, '_, '_, '_> {
    type Result = TypeLogEntry;
 
    /// Performs type analysis for the given AST node. This annotates the node with a concrete type.

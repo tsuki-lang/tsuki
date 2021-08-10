@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 
 use crate::ast::{Ast, Mutation, NodeData, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors, Span};
-use crate::sem::{Sem, SemCommon};
+use crate::sem::{SemPass, SemCommon};
 use crate::types::{FloatSize, IntegerSize};
 
 /// State for the `SemLiterals` analysis phase.
@@ -395,7 +395,7 @@ impl<'c> SemLiterals<'c> {
    }
 }
 
-impl Sem for SemLiterals<'_> {
+impl SemPass for SemLiterals<'_> {
    type Result = ();
 
    /// Performs literal resolution for the given AST node.

@@ -9,7 +9,7 @@ use crate::sem_literals::SemLiterals;
 use crate::sem_types::SemTypes;
 
 /// A semantic analyzer.
-pub(crate) trait Sem {
+pub(crate) trait SemPass {
    type Result;
 
    /// Analyzes the node with the given handle.
@@ -46,7 +46,7 @@ struct Analyzer {
 
 impl Analyzer {
    /// Performs the given semantic pass, and returns the errors, if any.
-   fn perform(&mut self, mut sem: impl Sem) -> Result<(), Errors> {
+   fn perform(&mut self, mut sem: impl SemPass) -> Result<(), Errors> {
       sem.analyze(&mut self.ast, self.root_node);
 
       // All mutations are committed before we check for errors. This should reduce the risk of
