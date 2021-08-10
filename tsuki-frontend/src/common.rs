@@ -162,8 +162,8 @@ pub enum ErrorKind {
    /*
     * Sem'check errors
     */
-   #[error("not yet implemented: {0}")]
-   Nyi(String),
+
+   // SemLiterals
    #[error("invalid number literal suffix: '{0}'")]
    InvalidNumberLiteralSuffix(String),
    #[error("integer {0} is too big to fit in 64 bits")]
@@ -177,8 +177,11 @@ pub enum ErrorKind {
    #[error("integer suffixes cannot be used on float literals")]
    InvalidFloatSuffix,
 
-   #[error("this binary operator is not yet supported")]
-   BinaryOperatorNotYetSupported,
+   // SemTypes
+   #[error("invalid unary operator for {0}")]
+   InvalidUnaryOperator(String),
+   #[error("type mismatch: expected {0}, but got {1}")]
+   TypeMismatch(String, String),
 
    /*
     * Internal errors

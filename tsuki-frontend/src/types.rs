@@ -121,6 +121,22 @@ impl TypeKind {
    pub fn is_numeric(&self) -> bool {
       self.is_integer() || self.is_float()
    }
+
+   /// Unwraps the integer size stored in the type kind, panics if the kind is not an integer.
+   pub fn unwrap_integer(&self) -> IntegerSize {
+      match self {
+         TypeKind::Integer(size) => *size,
+         _ => panic!("unwrap_integer called on a type kind that is not an integer"),
+      }
+   }
+
+   /// Unwraps the float size stored in the type kind, panics if the kind is not an float.
+   pub fn unwrap_float(&self) -> FloatSize {
+      match self {
+         TypeKind::Float(size) => *size,
+         _ => panic!("unwrap_float called on a type kind that is not a float"),
+      }
+   }
 }
 
 /// The size of an integer. `S` sizes are signed, `U` sizes are unsigned.

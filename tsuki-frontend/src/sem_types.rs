@@ -3,7 +3,7 @@
 use crate::ast::{Ast, Mutation, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors, Span};
 use crate::sem::{Sem, SemCommon};
-use crate::types::{BuiltinTypes, TypeId, Types};
+use crate::types::{BuiltinTypes, TypeId, TypeKind, Types};
 
 pub(crate) struct SemTypes<'c, 't, 'bt> {
    common: &'c SemCommon,
@@ -39,18 +39,56 @@ impl<'c, 't, 'bt> SemTypes<'c, 't, 'bt> {
    /// Annotates a unary operator with types.
    fn annotate_unary_operator(&mut self, ast: &Ast, node: NodeHandle) -> TypeId {
       let right = self.analyze(ast, ast.first_handle(node));
+      let right_kind = self.types.kind(right);
       let typ = match ast.kind(node) {
-         _ => self.error(ErrorKind::BinaryOperatorNotYetSupported, ast.span(node).clone()),
+         NodeKind::Not if right == self.builtin.t_bool => right,
+         NodeKind::BitNot if right_kind.is_integer() => right,
+         NodeKind::Neg if right_kind.is_numeric() => right,
+         _ => {
+            let right_name = self.types.name(right);
+            let kind = ErrorKind::InvalidUnaryOperator(right_name.into());
+            self.error(kind, ast.span(node).clone())
+         }
       };
       self.annotate(ast, node, typ)
+   }
+
+   /// Attempts to convert the type `from` to type `tp`. If an implicit conversion is not possible,
+   /// returns `None`. Otherwise returns the converted type ID.
+   fn perform_implicit_conversion(&mut self, from: TypeId, to: TypeId) -> Option<TypeId> {
+      // If the two types are equal, there's need for conversion.
+      if from == to {
+         return Some(to)
+      }
+      // Otherwise, compare their kinds for various traits.
+      let from_kind = self.types.kind(from);
+      let to_kind = self.types.kind(to);
+      if from_kind.is_integer() && to_kind.is_integer() {
+         // Integers are only implicitly convertible to wider types of the same signedness,
+         // eg. Int8 -> Int16, Int32 -> Int64, but not Int64 -> Int32, or Uint32 -> Int32.
+         let from_size = from_kind.unwrap_integer();
+         let to_size = to_kind.unwrap_integer();
+         if to_size >= from_size {
+            return Some(to)
+         }
+      }
+      None
    }
 
    /// Annotates a binary operator with types.
    fn annotate_binary_operator(&mut self, ast: &Ast, node: NodeHandle) -> TypeId {
       let left = self.analyze(ast, ast.first_handle(node));
       let right = self.analyze(ast, ast.second_handle(node));
+      let converted_right = self.perform_implicit_conversion(right, left);
       let typ = match ast.kind(node) {
-         _ => self.error(ErrorKind::BinaryOperatorNotYetSupported, ast.span(node).clone())
+         NodeKind::Plus | NodeKind::Minus | NodeKind::Mul | NodeKind::Div
+         if converted_right.is_some() => left,
+         _ => {
+            let left_name = self.types.name(left);
+            let right_name = self.types.name(right);
+            let kind = ErrorKind::TypeMismatch(left_name.into(), right_name.into());
+            self.error(kind, ast.span(node).clone())
+         }
       };
       self.annotate(ast, node, typ)
    }
