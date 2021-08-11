@@ -1,0 +1,10 @@
+[package]
+name = "tsuki-backend-llvm"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+
+tsuki-frontend = { path = "../tsuki-frontend" }
+
+inkwell = { git = "https://github.com/TheDan64/inkwell", rev = "41857f9", features = ["llvm12-0"] }

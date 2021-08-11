@@ -7,7 +7,9 @@ edition = "2018"
 [workspace]
 members = [
   "tsuki-frontend",
+  "tsuki-backend-llvm",
 ]
 
 [dependencies]
 tsuki-frontend = { path = "tsuki-frontend" }
+tsuki-backend-llvm = { path = "tsuki-backend-llvm" }

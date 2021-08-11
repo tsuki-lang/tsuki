@@ -1,9 +1,9 @@
 //! Semantic analyzer for types.
 
 use crate::ast::{Ast, Mutation, NodeHandle, NodeKind};
-use crate::common::{ErrorKind, Errors, Span};
+use crate::common::{ErrorKind, Errors};
 use crate::sem::{SemPass, SemCommon};
-use crate::types::{BuiltinTypes, TypeId, TypeKind, TypeLog, TypeLogEntry, Types};
+use crate::types::{BuiltinTypes, TypeId, TypeLog, TypeLogEntry, Types};
 
 pub(crate) struct SemTypes<'c, 't, 'tl, 'bt> {
    common: &'c SemCommon,

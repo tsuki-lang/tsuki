@@ -1,1 +1,7 @@
+* text=lf
+
+*.rs text
+*.toml text
+.editorconfig text
+
 .lite_project.lua -linguist-detectable
