@@ -6,7 +6,13 @@ use smallvec::SmallVec;
 
 use crate::lexer::{IndentLevel, Token, TokenKind};
 
-/// A structure representing a span of text in a source file.
+/// Represents a source file.
+pub struct SourceFile {
+   pub filename: String,
+   pub source: String,
+}
+
+/// Represents a span of text in a source file.
 #[derive(Clone, Debug)]
 pub struct Span {
    pub line_start: usize,
@@ -190,6 +196,8 @@ pub enum ErrorKind {
     */
    #[error("SemTypes internal error: invalid AST node passed to analyze()")]
    SemTypesInvalidAstNode,
+   #[error("code generation error: {0}")]
+   CodeGen(String),
 }
 
 /// An error that can occur during lexing, parsing, semantic analysis, or code generation.
