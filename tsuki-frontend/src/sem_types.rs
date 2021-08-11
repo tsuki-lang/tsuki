@@ -2,7 +2,7 @@
 
 use crate::ast::{Ast, Mutation, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors};
-use crate::sem::{SemPass, SemCommon};
+use crate::sem::{SemCommon, SemPass};
 use crate::types::{BuiltinTypes, TypeId, TypeLog, TypeLogEntry, Types};
 
 pub(crate) struct SemTypes<'c, 't, 'tl, 'bt> {

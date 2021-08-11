@@ -1,6 +1,6 @@
 use tsuki_backend_llvm::LlvmBackend;
-use tsuki_frontend::common::{Errors, SourceFile};
 use tsuki_frontend::backend::{Backend, Executable};
+use tsuki_frontend::common::{Errors, SourceFile};
 
 fn unwrap_errors<T>(r: Result<T, Errors>) -> T {
    match r {
@@ -17,7 +17,8 @@ fn main() {
       filename: "test.tsu".into(),
       source: r#"
          2 + 2
-      "#.into(),
+      "#
+      .into(),
    }));
    executable.run(&[]);
 }

@@ -13,7 +13,7 @@ use ast::{Ast, NodeHandle};
 use common::{Errors, SourceFile};
 use lexer::Lexer;
 use sem::AnalyzeOptions;
-use types::{DefaultTypes, IntegerSize, FloatSize};
+use types::{DefaultTypes, FloatSize, IntegerSize};
 
 /// Parses and analyzes a source file. Returns the checked AST and a handle to the root node.
 pub fn analyze(file: &SourceFile) -> Result<(Ast, NodeHandle), Errors> {

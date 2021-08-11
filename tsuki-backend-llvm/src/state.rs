@@ -1,10 +1,10 @@
 //! Common code generation state.
 
-use inkwell::module::Module;
-use inkwell::context::Context;
 use inkwell::builder::Builder;
-use tsuki_frontend::common::{Error, ErrorKind, Errors, SourceFile};
+use inkwell::context::Context;
+use inkwell::module::Module;
 use tsuki_frontend::ast::{Ast, NodeHandle, NodeKind};
+use tsuki_frontend::common::{Error, ErrorKind, Errors, SourceFile};
 
 /// Code generation state shared across functions.
 pub struct CodeGen<'s, 'c> {
@@ -37,7 +37,9 @@ impl<'s, 'c> CodeGen<'s, 'c> {
    /// Generates code for an arbitrary node.
    pub fn generate(&mut self, ast: &Ast, node: NodeHandle) -> Result<(), Error> {
       match ast.kind(node) {
-         other => return Err(self.error(ast, node, format!("node kind not supported: {:?}", other))),
+         other => {
+            return Err(self.error(ast, node, format!("node kind not supported: {:?}", other)))
+         }
       }
       Ok(())
    }

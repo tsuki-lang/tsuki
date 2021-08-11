@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 
 use crate::ast::{Ast, Mutation, NodeData, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors, Span};
-use crate::sem::{SemPass, SemCommon};
+use crate::sem::{SemCommon, SemPass};
 use crate::types::{FloatSize, IntegerSize};
 
 /// State for the `SemLiterals` analysis phase.
