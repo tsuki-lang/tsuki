@@ -9,14 +9,14 @@ mod sem_literals;
 mod sem_types;
 pub mod types;
 
-use ast::Ast;
+use ast::{Ast, NodeHandle};
 use common::{Errors, SourceFile};
 use lexer::Lexer;
 use sem::AnalyzeOptions;
 use types::{DefaultTypes, IntegerSize, FloatSize};
 
-/// Parses and analyzes a source file.
-pub fn analyze(file: &SourceFile) -> Result<Ast, Errors> {
+/// Parses and analyzes a source file. Returns the checked AST and a handle to the root node.
+pub fn analyze(file: &SourceFile) -> Result<(Ast, NodeHandle), Errors> {
    let SourceFile { filename, source } = file;
    let mut lexer = Lexer::new(filename, source);
    let (ast, root_node) = parser::parse(&mut lexer)?;
@@ -55,5 +55,5 @@ pub fn analyze(file: &SourceFile) -> Result<Ast, Errors> {
    println!("———");
    astdump::dump_ast(&lexer, &ast, Some(&types), root_node);
 
-   Ok(ast)
+   Ok((ast, root_node))
 }
