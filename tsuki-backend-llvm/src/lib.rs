@@ -10,7 +10,8 @@ use inkwell::passes::PassManager;
 use inkwell::targets::{
    CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
 };
-use inkwell::{AddressSpace, OptimizationLevel};
+use inkwell::OptimizationLevel;
+use thiserror::Error;
 use tsuki_frontend::backend;
 use tsuki_frontend::common::{self, Error, ErrorKind, Errors, SourceFile, Span};
 
@@ -26,7 +27,7 @@ pub struct LlvmBackend {
 /// Options for creating an LLVM backend instance.
 pub struct LlvmBackendConfig<'c, 'e, 't> {
    pub cache_dir: &'c Path,
-   pub executable_name: &'e str,
+   pub package_name: &'e str,
    pub target_triple: Option<&'t str>,
 }
 
@@ -35,7 +36,7 @@ impl LlvmBackend {
    pub fn new(config: LlvmBackendConfig) -> Self {
       Self {
          cache_dir: config.cache_dir.to_owned(),
-         executable_name: config.executable_name.to_owned(),
+         executable_name: config.package_name.to_owned(),
          target_triple: match config.target_triple {
             Some(triple) => TargetTriple::create(triple),
             None => TargetMachine::get_default_triple(),
@@ -58,31 +59,33 @@ impl LlvmBackend {
 }
 
 impl backend::Backend for LlvmBackend {
-   type Executable = LlvmExecutable;
+   type Target = ObjectFile;
 
    /// Compiles the given source file to an executable.
-   fn compile(&self, root: SourceFile) -> Result<Self::Executable, Errors> {
+   fn compile(&self, root: SourceFile) -> Result<Self::Target, Errors> {
       let (ast, root_node) = tsuki_frontend::analyze(&root)?;
       let context = Context::create();
       let mut state = CodeGen::new(root, &context);
 
-      // TODO: Make this more generic by putting this in the code generator.
-      // Right now this is here for testing purposes.
-      let i32_type = context.i32_type();
-      let string_type =
-         context.i8_type().ptr_type(AddressSpace::Generic).ptr_type(AddressSpace::Generic);
-      let main_type = i32_type.fn_type(&[i32_type.into(), string_type.into()], false);
+      // Construct all the types.
+      let i32_type = state.context.i32_type();
+      let main_fn_type = i32_type.fn_type(&[], false);
 
-      let main_fn = state.module.add_function("main", main_type, None);
-      let main_builder = context.create_builder();
-      let main_block = context.append_basic_block(main_fn, "entry");
-      main_builder.position_at_end(main_block);
+      // Create the function, and an entry block.
+      let main_fn = state.module.add_function("main", main_fn_type, None);
+      let builder = context.create_builder();
+      let entry = context.append_basic_block(main_fn, "entry");
+      builder.position_at_end(entry);
 
-      state
-         .generate_statement(&ast, root_node, &main_builder)
-         .map_err(|e| common::single_error(e))?;
+      // Compile the modules' code.
+      state.generate_statement(&ast, root_node, &builder).map_err(|e| common::single_error(e))?;
 
-      main_builder.build_return(Some(&i32_type.const_zero()));
+      // Compile the terminating exit() tail call.
+      // let exit = state.module.get_function("_exit").expect("libc must be loaded");
+      // let _exit_call = builder.build_call(exit, &[i32_type.const_zero().into()], "");
+      // // exit_call.set_tail_call(true);
+      // builder.build_unreachable();
+      builder.build_return(Some(&i32_type.const_zero()));
 
       let pass_manager = PassManager::create(&state.module);
       pass_manager.initialize();
@@ -95,8 +98,8 @@ impl backend::Backend for LlvmBackend {
       // Cross-compilation support, anyone?
       // Right now we initialize the native target only.
       Self::to_errors(Target::initialize_native(&InitializationConfig {
-         // I'm not sure we need _all_ the features, so let's initialize the base and machine_code
-         // generation only.
+         // Honestly, I'm not sure we need _all_ the features.
+         // TODO: Check which ones can be disabled.
          asm_parser: true,
          asm_printer: true,
          base: true,
@@ -137,31 +140,63 @@ impl backend::Backend for LlvmBackend {
       // If we lack sufficient permissions, then LLVM will point that out anyways.
       let _ = std::fs::remove_file(&object_path);
 
-      // Fire away!
+      // Compile the object file.
       Self::to_errors(machine.write_to_file(&state.module, FileType::Object, &object_path))?;
 
-      let executable_path = self.cache_dir.join(&self.executable_name);
-      Ok(LlvmExecutable {
-         path: executable_path,
-      })
+      Ok(ObjectFile { path: object_path })
    }
 }
 
-/// Struct representing a complete executable built using LLVM.
-pub struct LlvmExecutable {
+/// Struct representing an object file built using LLVM.
+pub struct ObjectFile {
    path: PathBuf,
 }
 
-impl backend::Executable for LlvmExecutable {
-   /// Runs the executable.
-   fn run(&self, args: &[&str]) -> Result<i32, String> {
-      Ok(Command::new(&self.path)
-         .args(args.iter())
-         .spawn()
-         .map_err(|e| e.to_string())?
-         .wait()
-         .map_err(|e| e.to_string())?
-         .code()
-         .unwrap_or(0))
+/// Struct representing an executable file built from linked object files.
+pub struct ExecutableFile {
+   path: PathBuf,
+}
+
+#[derive(Debug, Error)]
+pub enum LinkError {
+   #[error("no linker found; check the $TSUKI_LD and $LD environment variables.")]
+   NoLinker,
+   #[error("the linker exited with an error (code {0}):\n{1}")]
+   Failure(i32, String),
+   #[error("I/O error: {0}")]
+   Io(#[from] std::io::Error),
+}
+
+impl ExecutableFile {
+   /// Links the provided object files into an executable.
+   ///
+   /// This launches the standard compiler pointed to by the `$TSUKI_CC` or `$CC` environment
+   /// variables (in that order), or the `cc` executable found in `$PATH`.
+   pub fn link(backend: LlvmBackend, objects: &[ObjectFile]) -> Result<Self, LinkError> {
+      use std::env;
+
+      let linker = env::var_os("TSUKI_CC")
+         .or_else(|| env::var_os("CC"))
+         .or_else(|| Some("cc".into()))
+         .ok_or(LinkError::NoLinker)?;
+      let output_path = backend.cache_dir.join(&backend.executable_name);
+
+      let mut cmd = Command::new(linker);
+      // Pass the output path to the linker.
+      cmd.arg("-o");
+      cmd.arg(&output_path);
+      for object in objects {
+         cmd.arg(&object.path);
+      }
+      println!("{:?}", cmd);
+
+      let output = cmd.output()?;
+      if let Some(exit_code) = output.status.code() {
+         if exit_code != 0 {
+            let errors = std::str::from_utf8(&output.stderr).ok().unwrap_or("<invalid UTF-8>");
+            return Err(LinkError::Failure(exit_code, errors.into()));
+         }
+      }
+      Ok(Self { path: output_path })
    }
 }

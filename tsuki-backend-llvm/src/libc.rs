@@ -4,11 +4,14 @@ use crate::codegen::CodeGen;
 
 impl<'c> CodeGen<'c> {
    pub(crate) fn load_libc(&mut self) {
+      // int printf(char *fmt, ...);
       let string_type = self.context.i8_type().ptr_type(AddressSpace::Generic);
       let i32_type = self.context.i32_type();
       let printf_fn_type = i32_type.fn_type(&[string_type.into()], true);
       self.module.add_function("printf", printf_fn_type, None);
 
+      // printf format string "%i\n", used for __intrin_print_int32.
+      // const char printf_int_format[] = "%i\n";
       let int_format = self.context.const_string(b"%i\n", true);
       let int_format_type = int_format.get_type();
       let printf_int_format = self.module.add_global(

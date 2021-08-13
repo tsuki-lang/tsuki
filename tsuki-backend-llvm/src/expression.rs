@@ -59,10 +59,7 @@ impl<'c> CodeGen<'c> {
       let arguments = ast.extra(node).unwrap_node_list();
       match ast.kind(node) {
          NodeKind::IntrinPrintInt32 => {
-            let printf = self
-               .module
-               .get_function("printf")
-               .expect("libc must be loaded to use __intrin_print_int32");
+            let printf = self.module.get_function("printf").expect("libc must be loaded");
             let zero = self.context.i32_type().const_zero();
             let format = self.module.get_global("printf_int_format").unwrap();
             let format_ptr = unsafe {
