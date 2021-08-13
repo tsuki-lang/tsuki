@@ -1,6 +1,6 @@
 mod expression;
 mod libc;
-mod state;
+mod codegen;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -10,7 +10,7 @@ use inkwell::targets::{InitializationConfig, Target, TargetMachine, TargetTriple
 use tsuki_frontend::common::{self, Error, ErrorKind, Errors, SourceFile, Span};
 use tsuki_frontend::backend;
 
-use state::CodeGen;
+use codegen::CodeGen;
 
 /// Struct representing the LLVM compilation backend and options passed to it.
 pub struct LlvmBackend {
@@ -60,6 +60,10 @@ impl backend::Backend for LlvmBackend {
       let mut state = CodeGen::new(root, &context);
 
       state.generate(&ast, root_node).map_err(|e| common::single_error(e))?;
+      println!("———");
+      println!(":: LLVM IR");
+      println!("———");
+      println!("{:?}", state);
 
       // Cross-compilation support, anyone?
       // Right now we initialize the native target only.

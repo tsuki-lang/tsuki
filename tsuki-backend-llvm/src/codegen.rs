@@ -1,27 +1,21 @@
 //! Common code generation state.
 
-use inkwell::OptimizationLevel;
+use std::fmt;
+
 use inkwell::builder::Builder;
 use inkwell::context::Context;
-use inkwell::execution_engine::{ExecutionEngine, JitFunction};
 use inkwell::module::Module;
 use inkwell::support::LLVMString;
 use tsuki_frontend::ast::{Ast, NodeHandle, NodeKind};
-use tsuki_frontend::common::{Error, ErrorKind, Errors, SourceFile};
-
-use crate::libc;
+use tsuki_frontend::common::{Error, ErrorKind, SourceFile};
 
 /// Code generation state shared across functions.
 pub struct CodeGen<'c> {
-   source: SourceFile,
-   context: &'c Context,
-   module: Module<'c>,
-   builder: Builder<'c>,
+   pub(crate) source: SourceFile,
+   pub(crate) context: &'c Context,
+   pub(crate) module: Module<'c>,
+   pub(crate) builder: Builder<'c>,
 }
-
-/// Temporary: A JIT-compiled `main` function.
-/// This will be removed once compiling to objects is implemented.
-pub type JittedMain = unsafe extern "C" fn () -> f64;
 
 impl<'c> CodeGen<'c> {
    pub fn new(source: SourceFile, context: &'c Context) -> Self {
@@ -75,5 +69,11 @@ impl<'c> CodeGen<'c> {
          return Err(self.error(ast, node, "no statements to execute".into()))
       }
       Ok(())
+   }
+}
+
+impl fmt::Debug for CodeGen<'_> {
+   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+      write!(f, "{}", &self.module.print_to_string().to_str().unwrap())
    }
 }

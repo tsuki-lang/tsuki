@@ -2,7 +2,7 @@
 
 use tsuki_frontend::ast::{Ast, NodeHandle, NodeKind};
 
-use crate::state::CodeGen;
+use crate::codegen::CodeGen;
 
 impl<'c> CodeGen<'c> {
    /// Generates code for any expression node.
