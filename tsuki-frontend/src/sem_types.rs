@@ -147,11 +147,35 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
       self.annotate(node, typ)
    }
 
+   /// Annotates a function call.
+   fn annotate_call(&mut self, ast: &Ast, node: NodeHandle) -> TypeLogEntry {
+      // Because function calls aren't really supported yet, the function call syntax is reused
+      // for backend intrinsics. This will someday be replaced by a `compiler_intrinsic` pragma.
+      let callee = ast.first_handle(node);
+      if ast.kind(callee) != NodeKind::Identifier {
+         return self.error(ast, node, ErrorKind::NonIntrinCall)
+      }
+      let name = self.common.get_source_range_from_node(ast, callee);
+      match name {
+         "__intrin_print_int32" => {
+            self.mutations.push(Mutation::ConvertPreserve(node, NodeKind::IntrinPrintInt32))
+         }
+         _ => return self.error(ast, node, ErrorKind::NonIntrinCall),
+      }
+      for &arg in ast.extra(node).unwrap_node_list() {
+         // TODO: Argument type checking.
+         let _ = self.analyze(ast, arg);
+      }
+      self.annotate(node, self.builtin.t_unit)
+   }
+
    /// Annotates statements in a list of statements.
    fn annotate_statement_list(&mut self, ast: &Ast, node: NodeHandle) -> TypeLogEntry {
       ast.walk(node, |ast, node| {
          // TODO: Don't ignore the type. Instead, enforce it to be ().
          // Right now this isn't done for testing purposes.
+         // Also, there are no `val` statements yet so there isn't a way of ignoring the return
+         // type in case it's not ().
          let _ = self.analyze(ast, node);
       });
       self.annotate(node, self.builtin.t_statement)
@@ -202,6 +226,7 @@ impl SemPass for SemTypes<'_, '_, '_, '_> {
          NodeKind::Plus | NodeKind::Minus | NodeKind::Mul | NodeKind::Div => {
             self.annotate_binary_operator(ast, node)
          }
+         NodeKind::Call => self.annotate_call(ast, node),
          // Other operators are to be implemented later.
 
          // Control flow

@@ -348,6 +348,7 @@ impl BuiltinTypes {
 
 /// A unique ID identifying an entry in the type log.
 #[derive(Clone, Copy, Debug)]
+#[must_use]
 pub struct TypeLogEntry(usize);
 
 /// A log storing the AST nodes from which different instances of types came from.

@@ -156,12 +156,17 @@ impl Ast {
       new
    }
 
+   /// Converts the given node to a new node of the given kind, preserving its metadata.
+   pub fn convert_preserve(&mut self, node: NodeHandle, kind: NodeKind) {
+      self.ancestors[node.0] = self.duplicate(node);
+      self.kinds[node.0] = kind;
+   }
+
    /// Converts the given node to a new node of the given kind.
    /// Field values are not preserved, and instead moved to a new node, which is set to be the
    /// ancestor of the existing node.
    pub fn convert(&mut self, node: NodeHandle, kind: NodeKind) {
-      self.ancestors[node.0] = self.duplicate(node);
-      self.kinds[node.0] = kind;
+      self.convert_preserve(node, kind);
       self.set_span(node, Span::default());
       self.set_first(node, 0);
       self.set_second(node, 0);
@@ -301,6 +306,9 @@ pub enum NodeKind {
    Int64,
    Float32,
    Float64,
+
+   // Intrinsics
+   IntrinPrintInt32,
 }
 
 impl NodeKind {
@@ -336,6 +344,17 @@ pub enum NodeData {
    Float64(f64),
 }
 
+impl NodeData {
+   /// Unwraps a node list, or panics if the data aren't a node list.
+   pub fn unwrap_node_list(&self) -> &[NodeHandle] {
+      if let Self::NodeList(list) = self {
+         &list
+      } else {
+         panic!("unwrap_node_list called on node data that aren't a node list");
+      }
+   }
+}
+
 /// An iterator over node handles in an AST.
 pub struct NodeHandles {
    i: usize,
@@ -363,6 +382,8 @@ pub enum Mutation {
    /// This duplicates the old node, and sets the new node's ancestor to the duplicated old node.
    /// The new node's `first`, `second`, and `extra`, are reset in the new node.
    Convert(NodeHandle, NodeKind),
+   /// Like `Convert`, but preserves the `first`, `second`, end `extra`.
+   ConvertPreserve(NodeHandle, NodeKind),
    /// Sets the `first` of the node to the given handle.
    SetFirstHandle(NodeHandle, NodeHandle),
    /// Sets the `second` of the node to the given handle.
@@ -376,6 +397,7 @@ impl Mutation {
    pub fn commit(&self, ast: &mut Ast) {
       match self {
          &Self::Convert(node, kind) => ast.convert(node, kind),
+         &Self::ConvertPreserve(node, kind) => ast.convert_preserve(node, kind),
          &Self::SetFirstHandle(node, handle) => ast.set_first_handle(node, handle),
          &Self::SetSecondHandle(node, handle) => ast.set_second_handle(node, handle),
          // FIXME: Again, unnecessary copying of `extra` slowing things down.

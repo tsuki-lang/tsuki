@@ -6,7 +6,9 @@ use crate::common::{Errors, SourceFile};
 /// Common functionality for executables.
 pub trait Executable {
    /// Runs the executable with the provided arguments.
-   fn run(&self, args: &[&str]);
+   ///
+   /// Upon failure, this should return a string with an error message describing the failure.
+   fn run(&self, args: &[&str]) -> Result<i32, String>;
 }
 
 /// Trait implemented by all backends that can compile and run tsuki source code.
@@ -20,5 +22,5 @@ pub trait Backend {
    /// `Err` should return an error of kind `CodeGen`, together with a diagnostic message.
    /// These errors should only be thrown in dire cases where something went wrong in earlier stages
    /// of compilation, and the backend can't make sense of what the frontend produced.
-   fn compile(root: SourceFile) -> Result<Self::Executable, Errors>;
+   fn compile(&self, root: SourceFile) -> Result<Self::Executable, Errors>;
 }

@@ -187,6 +187,9 @@ pub enum ErrorKind {
    InvalidUnaryOperator(String),
    #[error("type mismatch: expected {0}, but got {1}")]
    TypeMismatch(String, String),
+   #[error("only intrinsic \"function\" calls are supported right now")]
+   NonIntrinCall,
+
 
    /*
     * Internal errors
@@ -196,8 +199,11 @@ pub enum ErrorKind {
     */
    #[error("SemTypes internal error: invalid AST node passed to analyze()")]
    SemTypesInvalidAstNode,
-   #[error("code generation error: {0}")]
+
+   #[error("backend internal error: code generation error: {0}")]
    CodeGen(String),
+   #[error("backend internal error: execution error: {0}")]
+   ExecutableError(String),
 }
 
 /// An error that can occur during lexing, parsing, semantic analysis, or code generation.
@@ -224,3 +230,10 @@ impl fmt::Display for Error {
 }
 
 pub type Errors = SmallVec<[Error; 8]>;
+
+/// Creates an `Errors` from a single error.
+pub fn single_error(error: Error) -> Errors {
+   let mut errs = Errors::new();
+   errs.push(error);
+   errs
+}
