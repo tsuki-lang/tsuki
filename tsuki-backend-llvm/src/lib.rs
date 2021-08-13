@@ -1,14 +1,14 @@
+mod codegen;
 mod expression;
 mod libc;
-mod codegen;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use inkwell::context::Context;
 use inkwell::targets::{InitializationConfig, Target, TargetMachine, TargetTriple};
-use tsuki_frontend::common::{self, Error, ErrorKind, Errors, SourceFile, Span};
 use tsuki_frontend::backend;
+use tsuki_frontend::common::{self, Error, ErrorKind, Errors, SourceFile, Span};
 
 use codegen::CodeGen;
 
@@ -40,13 +40,16 @@ impl LlvmBackend {
    }
 
    fn to_errors<T, E>(r: Result<T, E>) -> Result<T, Errors>
-      where E: ToString,
+   where
+      E: ToString,
    {
-      r.map_err(|e| common::single_error(Error {
-         filename: "internal error".into(),
-         span: Span::default(),
-         kind: ErrorKind::CodeGen(e.to_string()),
-      }))
+      r.map_err(|e| {
+         common::single_error(Error {
+            filename: "internal error".into(),
+            span: Span::default(),
+            kind: ErrorKind::CodeGen(e.to_string()),
+         })
+      })
    }
 }
 
@@ -79,7 +82,9 @@ impl backend::Backend for LlvmBackend {
       }))?;
 
       let executable_path = self.cache_dir.join(&self.executable_name);
-      Ok(LlvmExecutable { path: executable_path })
+      Ok(LlvmExecutable {
+         path: executable_path,
+      })
    }
 }
 

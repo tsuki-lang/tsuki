@@ -190,7 +190,6 @@ pub enum ErrorKind {
    #[error("only intrinsic \"function\" calls are supported right now")]
    NonIntrinCall,
 
-
    /*
     * Internal errors
     * ---

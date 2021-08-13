@@ -1,6 +1,6 @@
-use inkwell::AddressSpace;
 use inkwell::context::Context;
 use inkwell::values::FunctionValue;
+use inkwell::AddressSpace;
 
 use crate::codegen::CodeGen;
 

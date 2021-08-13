@@ -153,7 +153,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
       // for backend intrinsics. This will someday be replaced by a `compiler_intrinsic` pragma.
       let callee = ast.first_handle(node);
       if ast.kind(callee) != NodeKind::Identifier {
-         return self.error(ast, node, ErrorKind::NonIntrinCall)
+         return self.error(ast, node, ErrorKind::NonIntrinCall);
       }
       let name = self.common.get_source_range_from_node(ast, callee);
       match name {

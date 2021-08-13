@@ -41,7 +41,12 @@ impl<'c> CodeGen<'c> {
    }
 
    /// Maps an LLVM error string to an Error.
-   fn map_llvm_error<T>(&self, ast: &Ast, node: NodeHandle, r: Result<T, LLVMString>) -> Result<T, Error> {
+   fn map_llvm_error<T>(
+      &self,
+      ast: &Ast,
+      node: NodeHandle,
+      r: Result<T, LLVMString>,
+   ) -> Result<T, Error> {
       r.map_err(|e| self.error(ast, node, format!("LLVM error: {}", e)))
    }
 
@@ -61,12 +66,9 @@ impl<'c> CodeGen<'c> {
       // passed to printf.
       let statements = ast.extra(node).unwrap_node_list();
       if statements.len() > 0 {
-         for i in 0..statements.len() - 1 {
-
-         }
-
+         for i in 0..statements.len() - 1 {}
       } else {
-         return Err(self.error(ast, node, "no statements to execute".into()))
+         return Err(self.error(ast, node, "no statements to execute".into()));
       }
       Ok(())
    }
