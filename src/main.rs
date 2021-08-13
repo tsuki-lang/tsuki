@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       .compile(SourceFile {
          filename: "test.tsu".into(),
          source: r#"
-            __intrin_print_int32(2 + 2)
+            __intrin_print_int32(42)
          "#
          .into(),
       }),

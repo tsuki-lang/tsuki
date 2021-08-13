@@ -353,6 +353,21 @@ impl NodeData {
          panic!("unwrap_node_list called on node data that aren't a node list");
       }
    }
+
+   /// Unwraps `Uint` or `Int` data to the largest possible unsigned integer.
+   pub fn unwrap_uint(&self) -> u64 {
+      match self {
+         &Self::Uint8(x) => x as u64,
+         &Self::Uint16(x) => x as u64,
+         &Self::Uint32(x) => x as u64,
+         &Self::Uint64(x) => x,
+         &Self::Int8(x) => x as u64,
+         &Self::Int16(x) => x as u64,
+         &Self::Int32(x) => x as u64,
+         &Self::Int64(x) => x as u64,
+         _ => panic!("unwrap_uint called on node data that isn't a u?int"),
+      }
+   }
 }
 
 /// An iterator over node handles in an AST.

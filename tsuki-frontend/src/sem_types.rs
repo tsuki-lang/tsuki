@@ -156,15 +156,22 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
          return self.error(ast, node, ErrorKind::NonIntrinCall);
       }
       let name = self.common.get_source_range_from_node(ast, callee);
+      let expected_argument_count;
       match name {
          "__intrin_print_int32" => {
+            expected_argument_count = 1;
             self.mutations.push(Mutation::ConvertPreserve(node, NodeKind::IntrinPrintInt32))
          }
          _ => return self.error(ast, node, ErrorKind::NonIntrinCall),
       }
-      for &arg in ast.extra(node).unwrap_node_list() {
+      let arguments = ast.extra(node).unwrap_node_list();
+      if arguments.len() != expected_argument_count {
+         let kind = ErrorKind::NArgumentsExpected(expected_argument_count, arguments.len());
+         return self.error(ast, node, kind);
+      }
+      for &argument in arguments {
          // TODO: Argument type checking.
-         let _ = self.analyze(ast, arg);
+         let _ = self.analyze(ast, argument);
       }
       self.annotate(node, self.builtin.t_unit)
    }

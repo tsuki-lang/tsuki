@@ -189,6 +189,8 @@ pub enum ErrorKind {
    TypeMismatch(String, String),
    #[error("only intrinsic \"function\" calls are supported right now")]
    NonIntrinCall,
+   #[error("{0} arguments expected, got {1}")]
+   NArgumentsExpected(usize, usize),
 
    /*
     * Internal errors

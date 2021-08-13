@@ -6,6 +6,7 @@ use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::support::LLVMString;
+use inkwell::types::StructType;
 use tsuki_frontend::ast::{Ast, NodeHandle, NodeKind};
 use tsuki_frontend::common::{Error, ErrorKind, SourceFile};
 
@@ -14,7 +15,8 @@ pub struct CodeGen<'c> {
    pub(crate) source: SourceFile,
    pub(crate) context: &'c Context,
    pub(crate) module: Module<'c>,
-   pub(crate) builder: Builder<'c>,
+
+   pub(crate) unit_type: StructType<'c>,
 }
 
 impl<'c> CodeGen<'c> {
@@ -24,7 +26,7 @@ impl<'c> CodeGen<'c> {
          context,
          // TODO: import, module resolution and names.
          module: context.create_module("main"),
-         builder: context.create_builder(),
+         unit_type: context.struct_type(&[], false),
       };
       // Temporary: set up some libc functions.
       state.load_libc();
@@ -51,9 +53,17 @@ impl<'c> CodeGen<'c> {
    }
 
    /// Generates code for an arbitrary node.
-   pub fn generate(&mut self, ast: &Ast, node: NodeHandle) -> Result<(), Error> {
+   pub fn generate_statement(
+      &mut self,
+      ast: &Ast,
+      node: NodeHandle,
+      builder: &Builder,
+   ) -> Result<(), Error> {
       match ast.kind(node) {
-         NodeKind::StatementList => self.generate_statement_list(ast, node)?,
+         NodeKind::StatementList => self.generate_statement_list(ast, node, builder)?,
+         NodeKind::IntrinPrintInt32 => {
+            let _ = self.generate_expression(ast, node, builder);
+         }
          other => {
             return Err(self.error(ast, node, format!("node kind not supported: {:?}", other)))
          }
@@ -61,14 +71,15 @@ impl<'c> CodeGen<'c> {
       Ok(())
    }
 
-   fn generate_statement_list(&mut self, ast: &Ast, node: NodeHandle) -> Result<(), Error> {
-      // For debugging purposes, the last statement in the list is interpreted as a Float32 to be
-      // passed to printf.
-      let statements = ast.extra(node).unwrap_node_list();
-      if statements.len() > 0 {
-         for i in 0..statements.len() - 1 {}
-      } else {
-         return Err(self.error(ast, node, "no statements to execute".into()));
+   /// Generates code for a list of statements.
+   fn generate_statement_list(
+      &mut self,
+      ast: &Ast,
+      node: NodeHandle,
+      builder: &Builder,
+   ) -> Result<(), Error> {
+      for &statement in ast.extra(node).unwrap_node_list() {
+         self.generate_statement(ast, statement, builder)?;
       }
       Ok(())
    }

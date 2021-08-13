@@ -6,7 +6,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use inkwell::context::Context;
-use inkwell::targets::{InitializationConfig, Target, TargetMachine, TargetTriple};
+use inkwell::passes::PassManager;
+use inkwell::targets::{
+   CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
+};
+use inkwell::{AddressSpace, OptimizationLevel};
 use tsuki_frontend::backend;
 use tsuki_frontend::common::{self, Error, ErrorKind, Errors, SourceFile, Span};
 
@@ -62,7 +66,27 @@ impl backend::Backend for LlvmBackend {
       let context = Context::create();
       let mut state = CodeGen::new(root, &context);
 
-      state.generate(&ast, root_node).map_err(|e| common::single_error(e))?;
+      // TODO: Make this more generic by putting this in the code generator.
+      // Right now this is here for testing purposes.
+      let i32_type = context.i32_type();
+      let string_type =
+         context.i8_type().ptr_type(AddressSpace::Generic).ptr_type(AddressSpace::Generic);
+      let main_type = i32_type.fn_type(&[i32_type.into(), string_type.into()], false);
+
+      let main_fn = state.module.add_function("main", main_type, None);
+      let main_builder = context.create_builder();
+      let main_block = context.append_basic_block(main_fn, "entry");
+      main_builder.position_at_end(main_block);
+
+      state
+         .generate_statement(&ast, root_node, &main_builder)
+         .map_err(|e| common::single_error(e))?;
+
+      main_builder.build_return(Some(&i32_type.const_zero()));
+
+      let pass_manager = PassManager::create(&state.module);
+      pass_manager.initialize();
+
       println!("———");
       println!(":: LLVM IR");
       println!("———");
@@ -73,13 +97,48 @@ impl backend::Backend for LlvmBackend {
       Self::to_errors(Target::initialize_native(&InitializationConfig {
          // I'm not sure we need _all_ the features, so let's initialize the base and machine_code
          // generation only.
-         asm_parser: false,
-         asm_printer: false,
+         asm_parser: true,
+         asm_printer: true,
          base: true,
-         disassembler: false,
-         info: false,
+         disassembler: true,
+         info: true,
          machine_code: true,
       }))?;
+
+      Self::to_errors(state.module.verify())?;
+
+      // Set up the target machine. We won't be enabling any special features here for now.
+      let target = Self::to_errors(Target::from_triple(&self.target_triple))?;
+      let machine = Self::to_errors(
+         target
+            .create_target_machine(
+               &self.target_triple,
+               "generic",
+               "",
+               OptimizationLevel::Default,
+               RelocMode::Default,
+               CodeModel::Default,
+            )
+            .ok_or("target triple is not supported"),
+      )?;
+      state.module.set_data_layout(&machine.get_target_data().get_data_layout());
+      state.module.set_triple(&self.target_triple);
+
+      // Create all the needed directories.
+      let object_dir = self.cache_dir.join("object");
+      Self::to_errors(std::fs::create_dir_all(&self.cache_dir))?;
+      Self::to_errors(std::fs::create_dir_all(&object_dir))?;
+
+      // Do some path manipulation to figure out where the object file should be placed.
+      let object_name = format!("{}.o", &self.executable_name);
+      let object_path = object_dir.join(&object_name);
+      // Delete the old object file so that LLVM isn't going to complain when writing the new one.
+      // The result is ignored because we don't care if the file exists or not.
+      // If we lack sufficient permissions, then LLVM will point that out anyways.
+      let _ = std::fs::remove_file(&object_path);
+
+      // Fire away!
+      Self::to_errors(machine.write_to_file(&state.module, FileType::Object, &object_path))?;
 
       let executable_path = self.cache_dir.join(&self.executable_name);
       Ok(LlvmExecutable {

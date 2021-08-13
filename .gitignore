@@ -1,5 +1,6 @@
 .lite_workspace.lua
 *.md.backup
+bin
 
 
 # Added by cargo
