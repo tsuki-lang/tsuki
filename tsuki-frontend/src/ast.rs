@@ -169,6 +169,7 @@ impl Ast {
       // FIXME: This is maybe a bit on the expensive side.
       // Maybe move the extra data out of here instead, like `Option::take`?
       self.set_extra(new, self.extra(node).clone());
+      self.set_type_id(new, self.type_id(node));
       new
    }
 
@@ -206,26 +207,62 @@ impl Ast {
          len: self.kinds.len(),
       }
    }
+}
+
+// As much as I don't like Rust's macro_rules!, I don't like duplicate code either, so the two
+// functions `walk_node_list` and `walk` are "duplicated" using a couple of macros.
+
+macro_rules! walk_node_list_impl {
+   ($ast:expr, $node:expr, $then:expr) => {
+      if matches!($ast.extra($node), NodeData::NodeList(..)) {
+         let n = $ast.extra($node).unwrap_node_list().len();
+         for i in 0..n {
+            $then($ast, $ast.extra($node).unwrap_node_list()[i]);
+         }
+      }
+   };
+}
+
+macro_rules! walk_impl {
+   ($ast:expr, $node:expr, $then:expr, $walk_node_list:tt) => {
+      if !$ast.kind($node).is_leaf() {
+         if $ast.first($node) != 0 {
+            $then($ast, $ast.first_handle($node));
+            if $ast.second($node) != 0 {
+               $then($ast, $ast.second_handle($node));
+            }
+         }
+         $ast.$walk_node_list($node, |ast, child| {
+            $then(ast, child);
+         })
+      }
+   };
+}
+
+impl Ast {
+   /// Walks through the node data of a node whose `NodeData` is a node list.
+   /// If the `NodeData` isn't a node list, this is a noop.
+   pub fn walk_node_list(&self, node: NodeHandle, mut then: impl FnMut(&Self, NodeHandle)) {
+      walk_node_list_impl!(self, node, then);
+   }
+
+   /// Same as `walk_node_list`, but `self` is mutable.
+   pub fn walk_node_list_mut(
+      &mut self,
+      node: NodeHandle,
+      mut then: impl FnMut(&mut Self, NodeHandle),
+   ) {
+      walk_node_list_impl!(self, node, then);
+   }
 
    /// Walks through the given node's children.
    pub fn walk(&self, node: NodeHandle, mut then: impl FnMut(&Self, NodeHandle)) {
-      let kind = self.kind(node);
-      if !kind.is_leaf() {
-         if self.first(node) != 0 {
-            then(self, self.first_handle(node));
-            if self.second(node) != 0 {
-               then(self, self.second_handle(node));
-            }
-         }
-         match self.extra(node) {
-            NodeData::NodeList(list) => {
-               for &h in list {
-                  then(self, h);
-               }
-            }
-            _ => (),
-         }
-      }
+      walk_impl!(self, node, then, walk_node_list);
+   }
+
+   /// Walks through the given node's children, but the first argument of `then` is mutable.
+   pub fn walk_mut(&mut self, node: NodeHandle, mut then: impl FnMut(&mut Self, NodeHandle)) {
+      walk_impl!(self, node, then, walk_node_list_mut);
    }
 }
 

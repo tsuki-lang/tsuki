@@ -12,8 +12,8 @@ use crate::sem_types::SemTypes;
 pub(crate) trait SemPass {
    type Result;
 
-   /// Analyzes the node with the given handle.
-   fn analyze(&mut self, ast: &Ast, node: NodeHandle) -> Self::Result;
+   /// Analyzes the AST from the given root node, and returns the modified version of the AST.
+   fn analyze(&mut self, ast: Ast, root_node: NodeHandle) -> Ast;
 
    /// Returns the filename string.
    fn filename(&self) -> &str;
@@ -23,9 +23,6 @@ pub(crate) trait SemPass {
    fn errors_mut(&mut self) -> &mut Errors;
    /// Consumes `self` to return the list of errors.
    fn into_errors(self) -> Errors;
-
-   /// Returns the mutations queued up by the analyzer.
-   fn mutations(&self) -> &[Mutation];
 
    /// Emits an error of the given kind, at the given span.
    fn emit_error(&mut self, kind: ErrorKind, span: Span) {
@@ -46,19 +43,13 @@ struct Analyzer {
 
 impl Analyzer {
    /// Performs the given semantic pass, and returns the errors, if any.
-   fn perform(&mut self, mut sem: impl SemPass) -> Result<(), Errors> {
-      sem.analyze(&mut self.ast, self.root_node);
-
-      // All mutations are committed before we check for errors. This should reduce the risk of
-      // phases in the future getting invalid AST.
-      for mutation in sem.mutations() {
-         mutation.commit(&mut self.ast);
-      }
+   fn perform(mut self, mut sem: impl SemPass) -> Result<Self, Errors> {
+      self.ast = sem.analyze(self.ast, self.root_node);
 
       if sem.errors().len() > 0 {
          Err(sem.into_errors())
       } else {
-         Ok(())
+         Ok(self)
       }
    }
 }
@@ -112,8 +103,8 @@ pub fn analyze(options: AnalyzeOptions) -> Result<(Ast, Types), Errors> {
    // analysis completely. Fatal errors would halt the analysis, and would occur if something really
    // goes wrong inside of a phase, yielding AST that might break the phase after it.
    // Also, warnings anyone?
-   state.perform(SemLiterals::new(&common))?;
-   state.perform(SemTypes::new(
+   state = state.perform(SemLiterals::new(&common))?;
+   state = state.perform(SemTypes::new(
       &common,
       &mut types,
       &mut type_log,

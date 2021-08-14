@@ -8,7 +8,6 @@ use crate::types::{BuiltinTypes, IntegerSize, TypeId, TypeLog, TypeLogEntry, Typ
 pub(crate) struct SemTypes<'c, 't, 'tl, 'bt> {
    common: &'c SemCommon,
    errors: Errors,
-   mutations: Vec<Mutation>,
 
    types: &'t mut Types,
    log: &'tl mut TypeLog,
@@ -26,7 +25,6 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
       SemTypes {
          common,
          errors: Errors::new(),
-         mutations: Vec::new(),
          types,
          log,
          builtin,
@@ -34,13 +32,13 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
    }
 
    /// Annotates the given AST with the given type, and returns the type.
-   fn annotate(&mut self, node: NodeHandle, typ: TypeId) -> TypeLogEntry {
-      self.types.set_node_type(node, typ);
+   fn annotate(&mut self, ast: &mut Ast, node: NodeHandle, typ: TypeId) -> TypeLogEntry {
+      ast.set_type_id(node, typ);
       self.log.push(typ, node)
    }
 
    /// Annotates a literal with a concrete type.
-   fn annotate_literal(&mut self, ast: &Ast, node: NodeHandle) -> TypeLogEntry {
+   fn annotate_literal(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
       let typ = match ast.kind(node) {
          NodeKind::True => self.builtin.t_bool,
          NodeKind::False => self.builtin.t_bool,
@@ -57,7 +55,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
          NodeKind::Character => self.builtin.t_char,
          _ => unreachable!(),
       };
-      self.annotate(node, typ)
+      self.annotate(ast, node, typ)
    }
 
    // Currently, this does some rather simplistic analysis just to Make it Work™, but in the
@@ -65,8 +63,8 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
    // replaced by much simpler logic and compiler intrinsics inside the stdlib.
 
    /// Annotates a unary operator with types.
-   fn annotate_unary_operator(&mut self, ast: &Ast, node: NodeHandle) -> TypeLogEntry {
-      let log_entry = self.analyze(ast, ast.first_handle(node));
+   fn annotate_unary_operator(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
+      let log_entry = self.annotate_node(ast, ast.first_handle(node));
       let right = self.log.typ(log_entry);
       let right_kind = self.types.kind(right);
       let typ = match ast.kind(node) {
@@ -79,18 +77,23 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
             return self.error(ast, node, kind);
          }
       };
-      self.annotate(node, typ)
+      self.annotate(ast, node, typ)
    }
 
    /// Widens the given integer node to the provided size.
    ///
    /// For literal nodes, this converts the literal directly. For other nodes, this wraps the node
-   /// in a `IntrinUintWiden` or `IntrinIntWiden` with a `NodeData` representing the new size.
-   fn widen_integer(&mut self, ast: &Ast, node: NodeHandle, new_size: IntegerSize) {
+   /// in a `WidenUint` or `WidenInt` with the type set to represent the new size.
+   fn widen_integer(
+      &mut self,
+      ast: &mut Ast,
+      node: NodeHandle,
+      new_size: IntegerSize,
+   ) -> TypeLogEntry {
       if ast.kind(node).is_integer() {
          // Shortcut path for literals.
          let as_uint = ast.extra(node).unwrap_uint();
-         self.mutations.push(Mutation::Convert(
+         ast.convert(
             node,
             match new_size {
                IntegerSize::U8 => NodeKind::Uint8,
@@ -102,8 +105,8 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
                IntegerSize::S32 => NodeKind::Int32,
                IntegerSize::S64 => NodeKind::Int64,
             },
-         ));
-         self.mutations.push(Mutation::SetExtra(
+         );
+         ast.set_extra(
             node,
             match new_size {
                IntegerSize::U8 => NodeData::Uint8(as_uint as u8),
@@ -115,16 +118,17 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
                IntegerSize::S32 => NodeData::Int32(as_uint as i32),
                IntegerSize::S64 => NodeData::Int64(as_uint as i64),
             },
-         ))
+         );
       } else {
          // Backend path for other nodes.
          if ast.kind(node).is_unsigned_integer() {
-            self.mutations.push(Mutation::Wrap(node, NodeKind::WidenInt));
+            ast.wrap(node, NodeKind::WidenUint);
          } else {
-            self.mutations.push(Mutation::Wrap(node, NodeKind::WidenInt));
+            ast.wrap(node, NodeKind::WidenInt);
          }
       }
-      self.types.set_node_type(
+      self.annotate(
+         ast,
          node,
          match new_size {
             IntegerSize::U8 => self.builtin.t_uint8,
@@ -141,11 +145,9 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
 
    /// Attempts to convert the type `from` to type `tp`. If an implicit conversion is not possible,
    /// returns `None`. Otherwise returns the converted type ID.
-   ///
-   /// This function also emits a Convert mutation if the conversion is successful.
    fn perform_implicit_conversion(
       &mut self,
-      ast: &Ast,
+      ast: &mut Ast,
       node: NodeHandle,
       from: TypeId,
       to: TypeId,
@@ -165,8 +167,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
          let from_size = from_kind.unwrap_integer();
          let to_size = to_kind.unwrap_integer();
          if to_size >= from_size {
-            self.widen_integer(ast, node, to_size);
-            return Some(self.log.push(to, node));
+            return Some(self.widen_integer(ast, node, to_size));
          }
       }
 
@@ -185,10 +186,10 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
    }
 
    /// Annotates a binary operator with types.
-   fn annotate_binary_operator(&mut self, ast: &Ast, node: NodeHandle) -> TypeLogEntry {
+   fn annotate_binary_operator(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
       let (left, right) = (ast.first_handle(node), ast.second_handle(node));
-      let left_entry = self.analyze(ast, left);
-      let right_entry = self.analyze(ast, right);
+      let left_entry = self.annotate_node(ast, left);
+      let right_entry = self.annotate_node(ast, right);
       let left_type = self.log.typ(left_entry);
       let right_type = self.log.typ(right_entry);
       let conversion = self.perform_implicit_conversion(ast, right, right_type, left_type);
@@ -205,11 +206,11 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
             return self.error(ast, node, kind);
          }
       };
-      self.annotate(node, typ)
+      self.annotate(ast, node, typ)
    }
 
    /// Annotates a function call.
-   fn annotate_call(&mut self, ast: &Ast, node: NodeHandle) -> TypeLogEntry {
+   fn annotate_call(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
       // Because function calls aren't really supported yet, the function call syntax is reused
       // for backend intrinsics. This will someday be replaced by a `compiler_intrinsic` pragma.
       let callee = ast.first_handle(node);
@@ -221,7 +222,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
       match name {
          "__intrin_print_int32" => {
             expected_argument_count = 1;
-            self.mutations.push(Mutation::ConvertPreserve(node, NodeKind::PrintInt32))
+            ast.convert_preserve(node, NodeKind::PrintInt32);
          }
          _ => return self.error(ast, node, ErrorKind::NonIntrinCall),
       }
@@ -230,23 +231,25 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
          let kind = ErrorKind::NArgumentsExpected(expected_argument_count, arguments.len());
          return self.error(ast, node, kind);
       }
-      for &argument in arguments {
+      // I don't like that I have to use normal indices. Give me back my inline iterators :(
+      for i in 0..arguments.len() {
          // TODO: Argument type checking.
-         let _ = self.analyze(ast, argument);
+         let argument = ast.extra(node).unwrap_node_list()[i];
+         let _ = self.annotate_node(ast, argument);
       }
-      self.annotate(node, self.builtin.t_unit)
+      self.annotate(ast, node, self.builtin.t_unit)
    }
 
    /// Annotates statements in a list of statements.
-   fn annotate_statement_list(&mut self, ast: &Ast, node: NodeHandle) -> TypeLogEntry {
-      ast.walk(node, |ast, node| {
+   fn annotate_statement_list(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
+      ast.walk_mut(node, |ast, node| {
          // TODO: Don't ignore the type. Instead, enforce it to be ().
          // Right now this isn't done for testing purposes.
          // Also, there are no `val` statements yet so there isn't a way of ignoring the return
          // type in case it's not ().
-         let _ = self.analyze(ast, node);
+         let _ = self.annotate_node(ast, node);
       });
-      self.annotate(node, self.builtin.t_statement)
+      self.annotate(ast, node, self.builtin.t_statement)
    }
 
    /// Emits an error of the given kind, also returning the error type.
@@ -254,13 +257,8 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
       self.emit_error(kind, ast.span(node).clone());
       self.log.push(self.builtin.t_error, node)
    }
-}
 
-impl SemPass for SemTypes<'_, '_, '_, '_> {
-   type Result = TypeLogEntry;
-
-   /// Performs type analysis for the given AST node. This annotates the node with a concrete type.
-   fn analyze(&mut self, ast: &Ast, node: NodeHandle) -> TypeLogEntry {
+   fn annotate_node(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
       match ast.kind(node) {
          // Literals
          | NodeKind::True
@@ -301,8 +299,21 @@ impl SemPass for SemTypes<'_, '_, '_, '_> {
          NodeKind::StatementList => self.annotate_statement_list(ast, node),
 
          // Other nodes are invalid.
-         _ => self.error(ast, node, ErrorKind::SemTypesInvalidAstNode),
+         _ => {
+            println!("{:?}", ast.kind(node));
+            self.error(ast, node, ErrorKind::SemTypesInvalidAstNode)
+         }
       }
+   }
+}
+
+impl SemPass for SemTypes<'_, '_, '_, '_> {
+   type Result = TypeLogEntry;
+
+   /// Performs type analysis for the given AST node. This annotates the node with a concrete type.
+   fn analyze(&mut self, mut ast: Ast, root_node: NodeHandle) -> Ast {
+      let _ = self.annotate_node(&mut ast, root_node);
+      ast
    }
 
    fn filename(&self) -> &str {
@@ -319,9 +330,5 @@ impl SemPass for SemTypes<'_, '_, '_, '_> {
 
    fn into_errors(self) -> Errors {
       self.errors
-   }
-
-   fn mutations(&self) -> &[Mutation] {
-      &self.mutations
    }
 }
