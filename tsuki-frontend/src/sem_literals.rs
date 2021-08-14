@@ -7,7 +7,7 @@ use std::convert::{TryFrom, TryInto};
 
 use smallvec::SmallVec;
 
-use crate::ast::{Ast, Mutation, NodeData, NodeHandle, NodeKind};
+use crate::ast::{Ast, NodeData, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors, Span};
 use crate::sem::{SemCommon, SemPass};
 use crate::types::{FloatSize, IntegerSize};

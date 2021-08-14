@@ -1,6 +1,6 @@
 //! Semantic analyzer for types.
 
-use crate::ast::{Ast, Mutation, NodeData, NodeHandle, NodeKind};
+use crate::ast::{Ast, NodeData, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors};
 use crate::sem::{SemCommon, SemPass};
 use crate::types::{BuiltinTypes, IntegerSize, TypeId, TypeLog, TypeLogEntry, Types};

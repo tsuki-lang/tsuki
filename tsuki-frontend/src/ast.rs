@@ -239,6 +239,11 @@ macro_rules! walk_impl {
    };
 }
 
+// These "iterators" are implemented as functions taking closures as arguments rather than proper
+// Rusty iterators, because Rusty iterators quickly turn into a maintenance mess with more complex
+// logic like shown here. Also, borrows, ownership, all that good stuff. This style plays better
+// with the rules in this case.
+
 impl Ast {
    /// Walks through the node data of a node whose `NodeData` is a node list.
    /// If the `NodeData` isn't a node list, this is a noop.
@@ -471,40 +476,3 @@ impl Iterator for NodeHandles {
       }
    }
 }
-
-/// An AST mutation.
-pub enum Mutation {
-   /// Converts the node at the given handle to the given kind.
-   ///
-   /// This duplicates the old node, and sets the new node's ancestor to the duplicated old node.
-   /// The new node's `first`, `second`, and `extra`, are reset in the new node.
-   Convert(NodeHandle, NodeKind),
-   /// Like `Convert`, but preserves the `first`, `second`, end `extra`.
-   ConvertPreserve(NodeHandle, NodeKind),
-   /// Sets the `first` of the node to the given handle.
-   SetFirstHandle(NodeHandle, NodeHandle),
-   /// Sets the `second` of the node to the given handle.
-   SetSecondHandle(NodeHandle, NodeHandle),
-   /// Sets the `extra` of the node to the given node data.
-   SetExtra(NodeHandle, NodeData),
-   /// Wraps the node in a new node of the given kind. The inner node is stored in `first`.
-   Wrap(NodeHandle, NodeKind),
-}
-
-impl Mutation {
-   /// Commits the mutation to the AST, consuming the mutation in the process.
-   pub fn commit(&self, ast: &mut Ast) {
-      match self {
-         &Self::Convert(node, kind) => ast.convert(node, kind),
-         &Self::ConvertPreserve(node, kind) => ast.convert_preserve(node, kind),
-         &Self::SetFirstHandle(node, handle) => ast.set_first_handle(node, handle),
-         &Self::SetSecondHandle(node, handle) => ast.set_second_handle(node, handle),
-         // FIXME: Again, unnecessary copying of `extra` slowing things down.
-         // Implementing something like `NodeData::take` should help with this.
-         Self::SetExtra(node, extra) => ast.set_extra(*node, extra.clone()),
-         &Self::Wrap(node, kind) => ast.wrap(node, kind),
-      }
-   }
-}
-
-pub type Mutations = Vec<Mutation>;

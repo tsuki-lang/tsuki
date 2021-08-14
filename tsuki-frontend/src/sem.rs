@@ -1,6 +1,6 @@
 //! The root of semantic analysis.
 
-use crate::ast::{Ast, Mutation, NodeHandle};
+use crate::ast::{Ast, NodeHandle};
 use crate::common::{Error, ErrorKind, Errors, Span};
 pub use crate::types::DefaultTypes;
 use crate::types::{BuiltinTypes, TypeLog, Types};
