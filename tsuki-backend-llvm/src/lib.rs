@@ -1,9 +1,12 @@
+//! The root of the LLVM backend. This implements high-level functionality - compiling code into
+//! object files, and linking those object files into executables.
+
 mod codegen;
 mod expression;
 mod libc;
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output};
 
 use inkwell::context::Context;
 use inkwell::passes::PassManager;
@@ -63,7 +66,7 @@ impl backend::Backend for LlvmBackend {
 
    /// Compiles the given source file to an executable.
    fn compile(&self, root: SourceFile) -> Result<Self::Target, Errors> {
-      let (ast, root_node) = tsuki_frontend::analyze(&root)?;
+      let ir = tsuki_frontend::analyze(&root)?;
       let context = Context::create();
       let mut state = CodeGen::new(root, &context);
 
@@ -78,7 +81,7 @@ impl backend::Backend for LlvmBackend {
       builder.position_at_end(entry);
 
       // Compile the modules' code.
-      state.generate_statement(&ast, root_node, &builder).map_err(|e| common::single_error(e))?;
+      state.generate_statement(&ir, ir.root_node, &builder).map_err(|e| common::single_error(e))?;
 
       // Compile the terminating exit() tail call.
       // let exit = state.module.get_function("_exit").expect("libc must be loaded");
@@ -188,7 +191,6 @@ impl ExecutableFile {
       for object in objects {
          cmd.arg(&object.path);
       }
-      println!("{:?}", cmd);
 
       let output = cmd.output()?;
       if let Some(exit_code) = output.status.code() {
@@ -198,5 +200,11 @@ impl ExecutableFile {
          }
       }
       Ok(Self { path: output_path })
+   }
+
+   /// Runs the executable, passing the given arguments to it. The output contains captured
+   /// stdout and stderr, as well as the exit code.
+   pub fn run(&self, args: &[&str]) -> Result<Output, std::io::Error> {
+      Command::new(&self.path).args(args).output()
    }
 }

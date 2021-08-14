@@ -9,6 +9,7 @@ use inkwell::support::LLVMString;
 use inkwell::types::StructType;
 use tsuki_frontend::ast::{Ast, NodeHandle, NodeKind};
 use tsuki_frontend::common::{Error, ErrorKind, SourceFile};
+use tsuki_frontend::Ir;
 
 /// Code generation state shared across functions.
 pub struct CodeGen<'c> {
@@ -55,17 +56,21 @@ impl<'c> CodeGen<'c> {
    /// Generates code for an arbitrary node.
    pub fn generate_statement(
       &mut self,
-      ast: &Ast,
+      ir: &Ir,
       node: NodeHandle,
       builder: &Builder,
    ) -> Result<(), Error> {
-      match ast.kind(node) {
-         NodeKind::StatementList => self.generate_statement_list(ast, node, builder)?,
+      match ir.ast.kind(node) {
+         NodeKind::StatementList => self.generate_statement_list(ir, node, builder)?,
          NodeKind::IntrinPrintInt32 => {
-            let _ = self.generate_expression(ast, node, builder);
+            let _ = self.generate_expression(ir, node, builder);
          }
          other => {
-            return Err(self.error(ast, node, format!("node kind not supported: {:?}", other)))
+            return Err(self.error(
+               &ir.ast,
+               node,
+               format!("node kind not supported: {:?}", other),
+            ))
          }
       }
       Ok(())
@@ -74,12 +79,12 @@ impl<'c> CodeGen<'c> {
    /// Generates code for a list of statements.
    fn generate_statement_list(
       &mut self,
-      ast: &Ast,
+      ir: &Ir,
       node: NodeHandle,
       builder: &Builder,
    ) -> Result<(), Error> {
-      for &statement in ast.extra(node).unwrap_node_list() {
-         self.generate_statement(ast, statement, builder)?;
+      for &statement in ir.ast.extra(node).unwrap_node_list() {
+         self.generate_statement(ir, statement, builder)?;
       }
       Ok(())
    }

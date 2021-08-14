@@ -24,13 +24,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       backend.compile(SourceFile {
          filename: "test.tsu".into(),
          source: r#"
-            __intrin_print_int32(42)
+            __intrin_print_int32(42 + 3)
          "#
          .into(),
       }),
    );
 
-   ExecutableFile::link(backend, &[object])?;
+   let executable = ExecutableFile::link(backend, &[object])?;
+   executable.run(&[])?;
 
    Ok(())
 }

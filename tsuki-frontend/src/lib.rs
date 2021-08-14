@@ -13,18 +13,24 @@ use ast::{Ast, NodeHandle};
 use common::{Errors, SourceFile};
 use lexer::Lexer;
 use sem::AnalyzeOptions;
-use types::{DefaultTypes, FloatSize, IntegerSize};
+use types::{DefaultTypes, FloatSize, IntegerSize, Types};
 
-/// Parses and analyzes a source file. Returns the checked AST and a handle to the root node.
-pub fn analyze(file: &SourceFile) -> Result<(Ast, NodeHandle), Errors> {
+/// The intermediate representation output by the analyzer. This contains the AST and typeinformation.
+pub struct Ir {
+   pub ast: Ast,
+   pub root_node: NodeHandle,
+   pub types: Types,
+}
+
+/// Parses and analyzes a source file. Returns the fully analyzed, typed IR.
+pub fn analyze(file: &SourceFile) -> Result<Ir, Errors> {
    let SourceFile { filename, source } = file;
    let mut lexer = Lexer::new(filename, source);
    let (ast, root_node) = parser::parse(&mut lexer)?;
 
-   println!("———");
    println!(":: Source code");
-   println!("———");
    println!("{}", source);
+   println!();
 
    for handle in ast.node_handles() {
       if ast.span(handle).is_invalid() {
@@ -33,11 +39,10 @@ pub fn analyze(file: &SourceFile) -> Result<(Ast, NodeHandle), Errors> {
       }
    }
 
-   println!("———");
    println!(":: AST (pre-sem)");
-   println!("———");
-
    astdump::dump_ast(&lexer, &ast, None, root_node);
+   println!();
+
    let (ast, types) = sem::analyze(AnalyzeOptions {
       filename,
       source,
@@ -50,10 +55,13 @@ pub fn analyze(file: &SourceFile) -> Result<(Ast, NodeHandle), Errors> {
       },
    })?;
 
-   println!("———");
    println!(":: AST (post-sem)");
-   println!("———");
    astdump::dump_ast(&lexer, &ast, Some(&types), root_node);
+   println!();
 
-   Ok((ast, root_node))
+   Ok(Ir {
+      ast,
+      root_node,
+      types,
+   })
 }

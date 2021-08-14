@@ -7,6 +7,7 @@ use inkwell::values::{
    VectorValue,
 };
 use tsuki_frontend::ast::{Ast, NodeHandle, NodeKind};
+use tsuki_frontend::Ir;
 
 use crate::codegen::CodeGen;
 
@@ -36,11 +37,12 @@ impl<'c> CodeGen<'c> {
    /// Generates code for any expression node.
    pub(crate) fn generate_expression(
       &self,
-      ast: &Ast,
+      ir: &Ir,
       node: NodeHandle,
       builder: &Builder,
    ) -> BasicValueEnum {
-      match ast.kind(node) {
+      match ir.ast.kind(node) {
+         // Literals
          | NodeKind::Uint8
          | NodeKind::Uint16
          | NodeKind::Uint32
@@ -48,16 +50,20 @@ impl<'c> CodeGen<'c> {
          | NodeKind::Int8
          | NodeKind::Int16
          | NodeKind::Int32
-         | NodeKind::Int64 => self.generate_int_literal(ast, node).into(),
-         NodeKind::IntrinPrintInt32 => self.generate_intrinsic(ast, node, builder),
+         | NodeKind::Int64 => self.generate_int_literal(&ir.ast, node).into(),
+
+         // Operators
+
+         // Intrinsics
+         NodeKind::IntrinPrintInt32 => self.generate_intrinsic(ir, node, builder),
          _ => unreachable!(),
       }
    }
 
    /// Generates code for an intrinsic function call node.
-   fn generate_intrinsic(&self, ast: &Ast, node: NodeHandle, builder: &Builder) -> BasicValueEnum {
-      let arguments = ast.extra(node).unwrap_node_list();
-      match ast.kind(node) {
+   fn generate_intrinsic(&self, ir: &Ir, node: NodeHandle, builder: &Builder) -> BasicValueEnum {
+      let arguments = ir.ast.extra(node).unwrap_node_list();
+      match ir.ast.kind(node) {
          NodeKind::IntrinPrintInt32 => {
             let printf = self.module.get_function("printf").expect("libc must be loaded");
             let zero = self.context.i32_type().const_zero();
@@ -65,11 +71,11 @@ impl<'c> CodeGen<'c> {
             let format_ptr = unsafe {
                builder.build_in_bounds_gep(format.as_pointer_value(), &[zero, zero], "fmt")
             };
-            let argument = self.generate_expression(ast, arguments[0], builder);
+            let argument = self.generate_expression(ir, arguments[0], builder);
             builder.build_call(printf, &[format_ptr.into(), argument.into()], "");
          }
          _ => unreachable!(),
       }
-      self.generate_unit_literal(ast, node).into()
+      self.generate_unit_literal(&ir.ast, node).into()
    }
 }
