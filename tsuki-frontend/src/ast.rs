@@ -5,6 +5,7 @@
 //! This also works much better with the borrow checker.
 
 use crate::common::Span;
+use crate::types::TypeId;
 
 /// A handle to a single node in the AST. The actual AST is not stored next to the handle for
 /// efficiency and appeasing the borrow checker.
@@ -40,6 +41,9 @@ pub struct Ast {
    /// Converted nodes duplicate their old nodes and store them in this table.
    /// Nodes that don't have a valid ancestor have this set to the null node.
    ancestors: Vec<NodeHandle>,
+   /// The type information is stored inside of the AST so that duplications also copy type info
+   /// around.
+   types: Vec<TypeId>,
 }
 
 impl Ast {
@@ -52,6 +56,7 @@ impl Ast {
          second: Vec::new(),
          extra: Vec::new(),
          ancestors: Vec::new(),
+         types: Vec::new(),
       };
       // Create a Nil node at ID 0 so that if some invalid AST node reference is dumped, it'll
       // instead go to this Error node.
@@ -69,6 +74,7 @@ impl Ast {
       self.second.push(0);
       self.extra.push(NodeData::None);
       self.ancestors.push(NodeHandle::null());
+      self.types.push(TypeId::null());
       NodeHandle(id)
    }
 
@@ -144,6 +150,16 @@ impl Ast {
       self.ancestors[handle.0]
    }
 
+   /// Returns the type ID of the given node.
+   pub fn type_id(&self, handle: NodeHandle) -> TypeId {
+      self.types[handle.0]
+   }
+
+   /// Sets the type ID of the given node.
+   pub fn set_type_id(&mut self, handle: NodeHandle, typ: TypeId) {
+      self.types[handle.0] = typ;
+   }
+
    /// Duplicates the given node, and returns a handle to the new node.
    fn duplicate(&mut self, node: NodeHandle) -> NodeHandle {
       let new = self.create_node(self.kind(node));
@@ -171,6 +187,15 @@ impl Ast {
       self.set_first(node, 0);
       self.set_second(node, 0);
       self.set_extra(node, NodeData::None);
+   }
+
+   /// Wraps the old node in a new node of the given kind.
+   ///
+   /// That is, converts the given node to the given kind, and sets the `first` to the
+   /// ancestor node.
+   pub fn wrap(&mut self, node: NodeHandle, kind: NodeKind) {
+      self.convert(node, kind);
+      self.set_first_handle(node, self.ancestors[node.0]);
    }
 
    /// Returns an iterator over all node handles in the AST.
@@ -308,7 +333,9 @@ pub enum NodeKind {
    Float64,
 
    // Intrinsics
-   IntrinPrintInt32,
+   WidenUint,
+   WidenInt,
+   PrintInt32,
 }
 
 impl NodeKind {
@@ -320,6 +347,24 @@ impl NodeKind {
    /// Returns whether the node kind is for a branch node.
    pub fn is_branch(self) -> bool {
       self > NodeKind::_LastLeaf
+   }
+
+   /// Returns whether the node kind is for a typed unsigned integer node.
+   pub fn is_unsigned_integer(self) -> bool {
+      matches!(
+         self,
+         Self::Uint8 | Self::Uint16 | Self::Uint32 | Self::Uint64
+      )
+   }
+
+   /// Returns whether the node kind is for a typed signed integer node.
+   pub fn is_signed_integer(self) -> bool {
+      matches!(self, Self::Int8 | Self::Int16 | Self::Int32 | Self::Int64)
+   }
+
+   /// Returns whether the node kind is for a typed integer node, be it signed, or unsigned.
+   pub fn is_integer(self) -> bool {
+      self.is_unsigned_integer() || self.is_signed_integer()
    }
 }
 
@@ -405,6 +450,8 @@ pub enum Mutation {
    SetSecondHandle(NodeHandle, NodeHandle),
    /// Sets the `extra` of the node to the given node data.
    SetExtra(NodeHandle, NodeData),
+   /// Wraps the node in a new node of the given kind. The inner node is stored in `first`.
+   Wrap(NodeHandle, NodeKind),
 }
 
 impl Mutation {
@@ -418,6 +465,7 @@ impl Mutation {
          // FIXME: Again, unnecessary copying of `extra` slowing things down.
          // Implementing something like `NodeData::take` should help with this.
          Self::SetExtra(node, extra) => ast.set_extra(*node, extra.clone()),
+         &Self::Wrap(node, kind) => ast.wrap(node, kind),
       }
    }
 }

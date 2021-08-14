@@ -13,8 +13,6 @@ pub struct Types {
    kinds: Vec<TypeKind>,
 
    name_data: String,
-
-   node_types: Vec<TypeId>,
 }
 
 /// A unique ID representing a type.
@@ -41,7 +39,6 @@ impl Types {
          names: Vec::new(),
          kinds: Vec::new(),
          name_data: String::new(),
-         node_types: Vec::new(),
       };
       // Ensure the null slot is populated by the missing type.
       let _ = types.create_type(TypeInfo {
@@ -69,19 +66,6 @@ impl Types {
    /// Returns the kind of the given type.
    pub fn kind(&self, typ: TypeId) -> &TypeKind {
       &self.kinds[typ.0]
-   }
-
-   /// Returns the type for the given node, or `TypeId::null()` if the node has no type.
-   pub fn node_type(&self, node: NodeHandle) -> TypeId {
-      self.node_types.get(node.id()).cloned().unwrap_or(TypeId::null())
-   }
-
-   /// Sets the type for the given node.
-   pub fn set_node_type(&mut self, node: NodeHandle, typ: TypeId) {
-      if self.node_types.len() <= node.id() {
-         self.node_types.resize(node.id() + 1, TypeId::null());
-      }
-      self.node_types[node.id()] = typ;
    }
 
    /// Adds a name into the local `name_data` storage.

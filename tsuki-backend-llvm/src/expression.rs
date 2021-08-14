@@ -34,6 +34,10 @@ impl<'c> CodeGen<'c> {
       self.unit_type.const_zero()
    }
 
+   fn generate_add(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
+      todo!()
+   }
+
    /// Generates code for any expression node.
    pub(crate) fn generate_expression(
       &self,
@@ -53,9 +57,10 @@ impl<'c> CodeGen<'c> {
          | NodeKind::Int64 => self.generate_int_literal(&ir.ast, node).into(),
 
          // Operators
+         NodeKind::Plus => self.generate_add(ir, node),
 
          // Intrinsics
-         NodeKind::IntrinPrintInt32 => self.generate_intrinsic(ir, node, builder),
+         NodeKind::PrintInt32 => self.generate_intrinsic(ir, node, builder),
          _ => unreachable!(),
       }
    }
@@ -64,7 +69,7 @@ impl<'c> CodeGen<'c> {
    fn generate_intrinsic(&self, ir: &Ir, node: NodeHandle, builder: &Builder) -> BasicValueEnum {
       let arguments = ir.ast.extra(node).unwrap_node_list();
       match ir.ast.kind(node) {
-         NodeKind::IntrinPrintInt32 => {
+         NodeKind::PrintInt32 => {
             let printf = self.module.get_function("printf").expect("libc must be loaded");
             let zero = self.context.i32_type().const_zero();
             let format = self.module.get_global("printf_int_format").unwrap();

@@ -83,20 +83,15 @@ impl backend::Backend for LlvmBackend {
       // Compile the modules' code.
       state.generate_statement(&ir, ir.root_node, &builder).map_err(|e| common::single_error(e))?;
 
-      // Compile the terminating exit() tail call.
-      // let exit = state.module.get_function("_exit").expect("libc must be loaded");
-      // let _exit_call = builder.build_call(exit, &[i32_type.const_zero().into()], "");
-      // // exit_call.set_tail_call(true);
-      // builder.build_unreachable();
+      // Return the zero exit code.
       builder.build_return(Some(&i32_type.const_zero()));
 
       let pass_manager = PassManager::create(&state.module);
       pass_manager.initialize();
 
-      println!("———");
       println!(":: LLVM IR");
-      println!("———");
       println!("{:?}", state);
+      println!();
 
       // Cross-compilation support, anyone?
       // Right now we initialize the native target only.

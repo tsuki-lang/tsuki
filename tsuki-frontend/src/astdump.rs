@@ -10,6 +10,7 @@ enum Prefix {
    R,
    Fun,
    Cond,
+   X,
 }
 
 fn print_indentation(depth: usize) {
@@ -74,7 +75,7 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
       _ => (),
    }
    if let Some(types) = types {
-      let typ = types.node_type(node);
+      let typ = ast.type_id(node);
       print!(" : {}", types.name(typ));
    }
    println!();
@@ -121,7 +122,9 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
       | NodeKind::BitNot
       | NodeKind::Member
       | NodeKind::Ref
-      | NodeKind::IfBranch => {
+      | NodeKind::IfBranch
+      | NodeKind::WidenInt
+      | NodeKind::WidenUint => {
          let left = ast.first_handle(node);
          dump_node(
             s,
@@ -136,6 +139,7 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
                | NodeKind::Ref => Prefix::R,
                NodeKind::Call => Prefix::Fun,
                NodeKind::IfBranch => Prefix::Cond,
+               NodeKind::WidenInt | NodeKind::WidenUint => Prefix::X,
                _ => unreachable!(),
             }),
          );

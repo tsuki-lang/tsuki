@@ -62,7 +62,7 @@ impl<'c> CodeGen<'c> {
    ) -> Result<(), Error> {
       match ir.ast.kind(node) {
          NodeKind::StatementList => self.generate_statement_list(ir, node, builder)?,
-         NodeKind::IntrinPrintInt32 => {
+         NodeKind::PrintInt32 => {
             let _ = self.generate_expression(ir, node, builder);
          }
          other => {

@@ -230,6 +230,16 @@ impl<'l, 's> Parser<'l, 's> {
       Ok(())
    }
 
+   /// Parses expressions in parentheses.
+   fn parentheses(&mut self, _left: Token) -> Result<NodeHandle, Error> {
+      // TODO: tuples and unit literal
+      let inner = self.parse_expression(0)?;
+      let _ = self.expect_token(TokenKind::RightParen, |t| {
+         ErrorKind::MissingClosingToken(TokenKind::RightParen, t)
+      })?;
+      Ok(inner)
+   }
+
    /// Creates a node for a nullary operator.
    fn nullary_operator(&mut self, operator: Token, node_kind: NodeKind) -> NodeHandle {
       let node = self.create_node_with(node_kind, 0, 0);
@@ -261,6 +271,8 @@ impl<'l, 's> Parser<'l, 's> {
          | TokenKind::Character(..)
          | TokenKind::String(..) => self.parse_literal(token),
          TokenKind::Identifier(..) => self.create_identifier(token),
+         // Parentheses
+         TokenKind::LeftParen => self.parentheses(token)?,
          // Nullary operators
          TokenKind::UpTo => self.nullary_operator(token, NodeKind::FullRange),
          // Unary prefix operators

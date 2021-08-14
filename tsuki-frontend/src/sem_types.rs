@@ -1,9 +1,9 @@
 //! Semantic analyzer for types.
 
-use crate::ast::{Ast, Mutation, NodeHandle, NodeKind};
+use crate::ast::{Ast, Mutation, NodeData, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors};
 use crate::sem::{SemCommon, SemPass};
-use crate::types::{BuiltinTypes, TypeId, TypeLog, TypeLogEntry, Types};
+use crate::types::{BuiltinTypes, IntegerSize, TypeId, TypeLog, TypeLogEntry, Types};
 
 pub(crate) struct SemTypes<'c, 't, 'tl, 'bt> {
    common: &'c SemCommon,
@@ -82,10 +82,70 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
       self.annotate(node, typ)
    }
 
+   /// Widens the given integer node to the provided size.
+   ///
+   /// For literal nodes, this converts the literal directly. For other nodes, this wraps the node
+   /// in a `IntrinUintWiden` or `IntrinIntWiden` with a `NodeData` representing the new size.
+   fn widen_integer(&mut self, ast: &Ast, node: NodeHandle, new_size: IntegerSize) {
+      if ast.kind(node).is_integer() {
+         // Shortcut path for literals.
+         let as_uint = ast.extra(node).unwrap_uint();
+         self.mutations.push(Mutation::Convert(
+            node,
+            match new_size {
+               IntegerSize::U8 => NodeKind::Uint8,
+               IntegerSize::U16 => NodeKind::Uint16,
+               IntegerSize::U32 => NodeKind::Uint32,
+               IntegerSize::U64 => NodeKind::Uint64,
+               IntegerSize::S8 => NodeKind::Int8,
+               IntegerSize::S16 => NodeKind::Int16,
+               IntegerSize::S32 => NodeKind::Int32,
+               IntegerSize::S64 => NodeKind::Int64,
+            },
+         ));
+         self.mutations.push(Mutation::SetExtra(
+            node,
+            match new_size {
+               IntegerSize::U8 => NodeData::Uint8(as_uint as u8),
+               IntegerSize::U16 => NodeData::Uint16(as_uint as u16),
+               IntegerSize::U32 => NodeData::Uint32(as_uint as u32),
+               IntegerSize::U64 => NodeData::Uint64(as_uint as u64),
+               IntegerSize::S8 => NodeData::Int8(as_uint as i8),
+               IntegerSize::S16 => NodeData::Int16(as_uint as i16),
+               IntegerSize::S32 => NodeData::Int32(as_uint as i32),
+               IntegerSize::S64 => NodeData::Int64(as_uint as i64),
+            },
+         ))
+      } else {
+         // Backend path for other nodes.
+         if ast.kind(node).is_unsigned_integer() {
+            self.mutations.push(Mutation::Wrap(node, NodeKind::WidenInt));
+         } else {
+            self.mutations.push(Mutation::Wrap(node, NodeKind::WidenInt));
+         }
+      }
+      self.types.set_node_type(
+         node,
+         match new_size {
+            IntegerSize::U8 => self.builtin.t_uint8,
+            IntegerSize::U16 => self.builtin.t_uint16,
+            IntegerSize::U32 => self.builtin.t_uint32,
+            IntegerSize::U64 => self.builtin.t_uint64,
+            IntegerSize::S8 => self.builtin.t_int8,
+            IntegerSize::S16 => self.builtin.t_int16,
+            IntegerSize::S32 => self.builtin.t_int32,
+            IntegerSize::S64 => self.builtin.t_int64,
+         },
+      )
+   }
+
    /// Attempts to convert the type `from` to type `tp`. If an implicit conversion is not possible,
    /// returns `None`. Otherwise returns the converted type ID.
+   ///
+   /// This function also emits a Convert mutation if the conversion is successful.
    fn perform_implicit_conversion(
       &mut self,
+      ast: &Ast,
       node: NodeHandle,
       from: TypeId,
       to: TypeId,
@@ -105,6 +165,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
          let from_size = from_kind.unwrap_integer();
          let to_size = to_kind.unwrap_integer();
          if to_size >= from_size {
+            self.widen_integer(ast, node, to_size);
             return Some(self.log.push(to, node));
          }
       }
@@ -130,7 +191,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
       let right_entry = self.analyze(ast, right);
       let left_type = self.log.typ(left_entry);
       let right_type = self.log.typ(right_entry);
-      let conversion = self.perform_implicit_conversion(right, right_type, left_type);
+      let conversion = self.perform_implicit_conversion(ast, right, right_type, left_type);
       let typ = match ast.kind(node) {
          NodeKind::Plus | NodeKind::Minus | NodeKind::Mul | NodeKind::Div
             if conversion.is_some() =>
@@ -160,7 +221,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
       match name {
          "__intrin_print_int32" => {
             expected_argument_count = 1;
-            self.mutations.push(Mutation::ConvertPreserve(node, NodeKind::IntrinPrintInt32))
+            self.mutations.push(Mutation::ConvertPreserve(node, NodeKind::PrintInt32))
          }
          _ => return self.error(ast, node, ErrorKind::NonIntrinCall),
       }
