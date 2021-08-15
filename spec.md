@@ -1749,7 +1749,7 @@ tsuki exposes a set of integer types that correspond to platform-specific C type
 
 ## `Ptr[T]`, `PtrVar[T]`, `PtrArray[T]`, and `PtrVarArray[T]`
 
-The `Ptr` type is used for creating and manipulating unmanaged pointers to data. Though it looks like a normal type, it's actually a magic type implemented in the compiler itself. `Ptr[T]` acts similar to `^T`, and `PtrVar[T]` acts similar to `^var T`, but their lifetime is not managed by the compiler. They can be created freely by using their `to` functions, and they can be dereferenced just like regular pointers:
+The `Ptr` type is used for creating and manipulating unmanaged pointers to data. Though it looks like a normal type, it's actually a magic type implemented in the compiler itself. `Ptr[T]` acts similarly to `^T`, and `PtrVar[T]` acts similar to `^var T`, but their lifetime is not managed by the compiler. They can be created freely by using their `to` functions, and they can be dereferenced just like regular pointers:
 
 ```
 var x = 1
@@ -1774,6 +1774,7 @@ var s = [1, 2, 3]
 var a = PtrArray.to(s[..], 0)
 print(a[1])  # 2
 ```
+`PtrArray`s do not store the length alongside the pointer like slices do, so using them allows for unbounded access, which is undefined behavior.
 
 `CString` is available as an alias to `PtrArray[CChar]`.
 
