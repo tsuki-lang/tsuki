@@ -1,14 +1,20 @@
 //! Code generation for expressions.
 
-use inkwell::types::IntType;
-use inkwell::values::{BasicValue, BasicValueEnum, IntValue, StructValue};
+use inkwell::types::{FloatType, IntType};
+use inkwell::values::{BasicValue, BasicValueEnum, FloatValue, IntValue, StructValue};
 use tsuki_frontend::ast::{Ast, NodeHandle, NodeKind};
-use tsuki_frontend::types::{IntegerSize, TypeId, TypeKind, Types};
+use tsuki_frontend::types::{FloatSize, IntegerSize, TypeId, TypeKind, Types};
 use tsuki_frontend::Ir;
 
 use crate::codegen::CodeGen;
+use crate::libc;
 
 impl<'c> CodeGen<'c> {
+   /// Generates code for a unit literal.
+   fn generate_unit_literal(&self, _ast: &Ast, _node: NodeHandle) -> StructValue {
+      self.unit_type.const_zero()
+   }
+
    /// Returns the integer type for the provided type, or panics if the type is not an integer type.
    fn get_int_type(&self, types: &Types, typ: TypeId) -> IntType {
       if let TypeKind::Integer(size) = types.kind(typ) {
@@ -29,9 +35,22 @@ impl<'c> CodeGen<'c> {
       typ.const_int(ir.ast.extra(node).unwrap_uint(), false)
    }
 
-   /// Generates code for a unit literal.
-   fn generate_unit_literal(&self, _ast: &Ast, _node: NodeHandle) -> StructValue {
-      self.unit_type.const_zero()
+   /// Returns the float type for the provided type, or panics if the type is not a float type.
+   fn get_float_type(&self, types: &Types, typ: TypeId) -> FloatType {
+      if let TypeKind::Float(size) = types.kind(typ) {
+         match size {
+            FloatSize::S32 => self.context.f32_type(),
+            FloatSize::S64 => self.context.f64_type(),
+         }
+      } else {
+         panic!("type is not a float type")
+      }
+   }
+
+   /// Generates code for a float literal.
+   fn generate_float_literal(&self, ir: &Ir, node: NodeHandle) -> FloatValue {
+      let typ = self.get_float_type(&ir.types, ir.ast.type_id(node));
+      typ.const_float(ir.ast.extra(node).unwrap_float())
    }
 
    /// Generates code for integer math.
@@ -58,13 +77,30 @@ impl<'c> CodeGen<'c> {
       math.as_basic_value_enum()
    }
 
+   fn generate_float_math(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
+      let left_value = self.generate_expression(ir, ir.ast.first_handle(node));
+      let right_value = self.generate_expression(ir, ir.ast.second_handle(node));
+      let (left, right) = (
+         left_value.into_float_value(),
+         right_value.into_float_value(),
+      );
+      let math = match ir.ast.kind(node) {
+         NodeKind::Plus => self.builder.build_float_add(left, right, "faddtmp"),
+         NodeKind::Minus => self.builder.build_float_sub(left, right, "fsubtmp"),
+         NodeKind::Mul => self.builder.build_float_mul(left, right, "fmultmp"),
+         NodeKind::Div => self.builder.build_float_div(left, right, "fdivtmp"),
+         _ => unreachable!(),
+      };
+      math.as_basic_value_enum()
+   }
+
    /// Generates code for integer and floating-point math operations.
    fn generate_math(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
       let typ = ir.types.kind(ir.ast.type_id(node));
       if typ.is_integer() {
          self.generate_int_math(ir, node)
       } else if typ.is_float() {
-         todo!()
+         self.generate_float_math(ir, node)
       } else {
          unreachable!()
       }
@@ -95,6 +131,7 @@ impl<'c> CodeGen<'c> {
          | NodeKind::Int16
          | NodeKind::Int32
          | NodeKind::Int64 => self.generate_int_literal(ir, node).into(),
+         NodeKind::Float32 | NodeKind::Float64 => self.generate_float_literal(ir, node).into(),
 
          // Operators
          NodeKind::Plus | NodeKind::Minus | NodeKind::Mul | NodeKind::Div => {
@@ -103,7 +140,9 @@ impl<'c> CodeGen<'c> {
 
          // Intrinsics
          NodeKind::WidenUint | NodeKind::WidenInt => self.generate_int_conversion(ir, node),
-         NodeKind::PrintInt32 => self.generate_call_like_intrinsic(ir, node),
+         NodeKind::PrintInt32 | NodeKind::PrintFloat32 => {
+            self.generate_call_like_intrinsic(ir, node)
+         }
          other => unreachable!("invalid expression node: {:?}", other),
       }
    }
@@ -112,15 +151,30 @@ impl<'c> CodeGen<'c> {
    fn generate_call_like_intrinsic(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
       let arguments = ir.ast.extra(node).unwrap_node_list();
       match ir.ast.kind(node) {
-         NodeKind::PrintInt32 => {
-            let printf = self.module.get_function("printf").expect("libc must be loaded");
+         kind @ (NodeKind::PrintInt32 | NodeKind::PrintFloat32) => {
+            // This is not the, um, cleanest... piece of code here, but it'll get replaced
+            // anyway once c_import is implemented.
+            let printf = self.module.get_function(libc::FN_PRINTF).expect("libc must be loaded");
             let zero = self.context.i32_type().const_zero();
-            let format = self.module.get_global("printf_int_format").unwrap();
+            let global_name = if kind == NodeKind::PrintInt32 {
+               libc::GLOBAL_PRINTF_INT_FORMAT
+            } else {
+               libc::GLOBAL_PRINTF_FLOAT_FORMAT
+            };
+            let format = self.module.get_global(global_name).unwrap();
             let format_ptr = unsafe {
                self.builder.build_in_bounds_gep(format.as_pointer_value(), &[zero, zero], "fmt")
             };
-            let argument = self.generate_expression(ir, arguments[0]);
-            self.builder.build_call(printf, &[format_ptr.into(), argument.into()], "");
+            let mut argument = self.generate_expression(ir, arguments[0]);
+            // We need to convert `float` to `double` for passing to printf.
+            if kind == NodeKind::PrintFloat32 {
+               let f64_type = self.context.f64_type();
+               argument = self
+                  .builder
+                  .build_float_cast(argument.into_float_value(), f64_type, "printf_dbl")
+                  .as_basic_value_enum();
+            }
+            self.builder.build_call(printf, &[format_ptr.into(), argument.into()], "_");
          }
          _ => unreachable!(),
       }

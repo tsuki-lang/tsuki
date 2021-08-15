@@ -59,15 +59,8 @@ impl<'c> CodeGen<'c> {
    pub fn generate_statement(&mut self, ir: &Ir, node: NodeHandle) -> Result<(), Error> {
       match ir.ast.kind(node) {
          NodeKind::StatementList => self.generate_statement_list(ir, node)?,
-         NodeKind::PrintInt32 => {
+         _ => {
             let _ = self.generate_expression(ir, node);
-         }
-         other => {
-            return Err(self.error(
-               &ir.ast,
-               node,
-               format!("node kind not supported: {:?}", other),
-            ))
          }
       }
       Ok(())

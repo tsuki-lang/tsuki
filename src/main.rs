@@ -23,6 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
          filename: "test.tsu".into(),
          source: r#"
             __intrin_print_int32(42 / 2 * 4)
+            __intrin_print_float32(10.0)
          "#
          .into(),
       }),

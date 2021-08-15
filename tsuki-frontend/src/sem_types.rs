@@ -224,6 +224,10 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
             expected_argument_count = 1;
             ast.convert_preserve(node, NodeKind::PrintInt32);
          }
+         "__intrin_print_float32" => {
+            expected_argument_count = 1;
+            ast.convert_preserve(node, NodeKind::PrintFloat32);
+         }
          _ => return self.error(ast, node, ErrorKind::NonIntrinCall),
       }
       let arguments = ast.extra(node).unwrap_node_list();

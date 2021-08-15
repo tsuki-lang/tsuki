@@ -378,6 +378,7 @@ pub enum NodeKind {
    WidenUint,
    WidenInt,
    PrintInt32,
+   PrintFloat32,
 }
 
 impl NodeKind {
@@ -453,6 +454,15 @@ impl NodeData {
          &Self::Int32(x) => x as u64,
          &Self::Int64(x) => x as u64,
          _ => panic!("unwrap_uint called on node data that isn't a u?int"),
+      }
+   }
+
+   /// Unwraps `Float` data to the largest possible float.
+   pub fn unwrap_float(&self) -> f64 {
+      match self {
+         &Self::Float32(x) => x as f64,
+         &Self::Float64(x) => x,
+         _ => panic!("unwrap_float called on node data that isn't a float"),
       }
    }
 }
