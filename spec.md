@@ -1699,10 +1699,152 @@ Here's a list of all supported directives:
 
 More directives may be added in the future.
 
+# Pragmas
+
+Pragmas are tsuki's way of specifying extra hints to the compiler. They are always placed after a `::` following the full declaration of a symbol, but before its definition. Examples of how to apply pragmas:
+```
+fun abc() :: some_pragma
+# Pragmas can also be wrapped around to the next line for readability.
+fun abc()
+:: some_pragma
+
+object MyObject :: some_pragma
+# Pragmas follow the _full_ declaration, so they come after parent objects.
+object MyObject of Root :: some_pragma
+
+atom Things :: some_pragma
+atom Pink in Color :: some_pragma
+
+# There are currently no pragmas for unions, so the syntax is not supported.
+```
+Various pragmas that can be applied in specific places are mentioned throughout this manual.
+
 # Macros
 
 TODO: still to be discussed with others, need some opinions on how a _good_ macro system should work.
+Maybe tsuki should not have macros after all? My opinion is that macros should operate on a limited subset of the AST, such that AST breakage should almost never affect them.
+What about syntax and autocomplete support? Maybe two different kinds of macros should be exposed, like Rust's `macro_rules!` and `proc_macro`s?
+Also, would inline iterators be considered macros, or implemented as macros, or...?
 
 # C FFI
 
-TODO: not important right now, and I'm leaving home for the weekend so I don't really have time to finish this.
+To facilitate interfacing with libraries written in other programming languages, tsuki sports a foreign function system for importing and exporting functionality, from and to C.
+
+## C integer types
+
+tsuki exposes a set of integer types that correspond to platform-specific C types.
+
+| tsuki type | C type |
+| --- | --- |
+| `CChar` | `char` |
+| `CUChar` | `unsigned char` |
+| `CShort` | `short` |
+| `CUShort` | `unsigned short` |
+| `CInt` | `int` |
+| `CUint` | `unsigned int` |
+| `CLong` | `long` |
+| `CULong` | `unsigned long` |
+| `CLongLong` | `long long` |
+| `CULongLong` | `unsigned long long` |
+
+## `Ptr[T]`, `PtrVar[T]`, and `PtrArray[T]`
+
+The `Ptr` type is used for creating and manipulating unmanaged pointers to data. Though it looks like a normal type, it's actually a magic type implemented in the compiler itself. `Ptr[T]` acts similar to `^T`, and `PtrVar[T]` acts similar to `^var T`, but their lifetime is not managed by the compiler. They can be created freely by using their `to` functions, and they can be dereferenced just like regular pointers:
+
+```
+var x = 1
+var p = Ptr.to(x)
+print(p^)  # 1
+```
+
+`Ptr.to`, `PtrVar.to`, and `PtrArray.to` take a pointer as an argument, and convert it to the appropriate unmanaged pointer.
+
+Reading from an unmanaged pointer that points to invalid memory (aka dangling pointer) is undefined behavior.
+```
+var p: Ptr[Int]
+do
+  var a = 1
+  p = Ptr.to(a)
+print(p^)  # undefined behavior, because `a` doesn't exist anymore!!!
+```
+
+`PtrArray[T]` can be used to create pointers to slices. Its `to` function accepts a slice, and a starting index the pointer should point to. Note that `PtrArray` cannot be dereferenced using the usual `^` operator, but rather the index operator.
+```
+var s = [1, 2, 3]
+var a = PtrArray.to(s[..], 0)
+print(a[1])  # 2
+```
+
+`CString` is available as an alias to `PtrArray[CChar]`.
+
+## Importing C functions
+
+Functions can be imported from C by using the `c_import` pragma. This pragma accepts a string as a paramter, specifying what the C function is called.
+
+```c
+int hello_ffi(int x)
+{
+   return x + 2;
+}
+```
+```
+fun hello_ffi(x: CInt) :: c_import("hello_ffi")
+```
+Functions imported from C must not have a body.
+
+## Exporting functions to C
+
+Functions can also be exported to C by using the `c_export` pragma. Similarly to `c_import`, it accepts a string that specifies the function name.
+```
+fun add_three(a, b, c: CInt): CInt :: c_export("add_three")
+  a + b + c
+```
+```c
+#include <stdio.h>
+
+int add_three(int a, int b, int c);
+
+int main(void)
+{
+   printf("%i\n", add_three(1, 2, 3));
+   return 0;
+}
+```
+
+## C structs
+
+tsuki allows for defining objects that are compatible with the C ABI. For that, the `c_struct` pragma can be used.
+```
+object Things :: c_struct
+  val a, b, c: Int
+impl type
+  # C structs can also have associated and instance functions.
+  fun init(): Self :: c_import("things_init")
+impl
+  fun var increment() :: c_import("things_increment")
+```
+Instance functions imported from C with `var self` are assumed to accept `Self *` as the first argument, and functions with `val self` are assumed to accept `const Self *` as the first argument. Note that in case of functions imported from C the `var`-ness of `self` must be specified explicitly, as there is no body to infer it from.
+```c
+struct things {
+   int a, b, c;
+};
+
+struct things things_init();
+void things_increment(struct things *);
+```
+
+## C unions
+
+tsuki unions are never ABI-compatible with C unions. However, tsuki exposes a mechanism for declaring C unions, via the `c_union` pragma attachable to objects.
+```
+object Caster :: c_union
+  var x: Float32
+  var y: Int32
+```
+Uninitialized fields from C unions can always be read from, to mimic C bitcasting behavior. In most cases the `bitcast` function should be used for the purposes of bitcasting, rather than dealing with C unions directly.
+
+## Compiling and linking external object files and libraries
+
+tsuki does not expose a way of linking extra object files with the program from within the language itself. These must be done by the compiler, using the `--link-object` and `--link-library` flags. These flags are usually managed by a build system or package manager.
+
+tsuki also does not expose a way of compiling C objects. Again, running the C compiler must be done by an external build system.
