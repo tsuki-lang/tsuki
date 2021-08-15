@@ -4,6 +4,7 @@ pub mod backend;
 pub mod common;
 pub mod lexer;
 pub mod parser;
+mod scope;
 pub mod sem;
 mod sem_literals;
 mod sem_types;

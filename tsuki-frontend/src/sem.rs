@@ -2,6 +2,7 @@
 
 use crate::ast::{Ast, NodeHandle};
 use crate::common::{Error, ErrorKind, Errors, Span};
+use crate::scope::Scopes;
 pub use crate::types::DefaultTypes;
 use crate::types::{BuiltinTypes, TypeLog, Types};
 
@@ -97,6 +98,7 @@ pub fn analyze(options: AnalyzeOptions) -> Result<(Ast, Types), Errors> {
    let mut types = Types::new();
    let mut type_log = TypeLog::new();
    let builtin_types = BuiltinTypes::add_to(&mut types, &common.default_types);
+   let mut scopes = Scopes::new();
 
    // NOTE: Maybe split errors into normal and fatal?
    // Normal errors would be accumulated into the existing error list, but would not halt the
@@ -109,6 +111,7 @@ pub fn analyze(options: AnalyzeOptions) -> Result<(Ast, Types), Errors> {
       &mut types,
       &mut type_log,
       &builtin_types,
+      &mut scopes,
    ))?;
 
    Ok((state.ast, types))

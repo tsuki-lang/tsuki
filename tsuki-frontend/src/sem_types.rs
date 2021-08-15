@@ -2,32 +2,52 @@
 
 use crate::ast::{Ast, NodeData, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors};
+use crate::scope::{ScopeId, ScopeStack, Scopes};
 use crate::sem::{SemCommon, SemPass};
-use crate::types::{BuiltinTypes, IntegerSize, TypeId, TypeLog, TypeLogEntry, Types};
+use crate::types::{BuiltinTypes, FloatSize, IntegerSize, TypeId, TypeLog, TypeLogEntry, Types};
 
-pub(crate) struct SemTypes<'c, 't, 'tl, 'bt> {
+pub(crate) struct SemTypes<'c, 't, 'tl, 'bt, 's> {
    common: &'c SemCommon,
    errors: Errors,
 
    types: &'t mut Types,
    log: &'tl mut TypeLog,
    builtin: &'bt BuiltinTypes,
+   scopes: &'s mut Scopes,
+
+   scope_stack: ScopeStack,
 }
 
-impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
+/// Specifies whether a node should be annotated in expression or statement context.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum NodeContext {
+   Expression,
+   Statement,
+}
+
+impl<'c, 't, 'tl, 'bt, 's> SemTypes<'c, 't, 'tl, 'bt, 's> {
    /// Creates a new instance of the `SemTypes` analysis phase.
    pub fn new(
       common: &'c SemCommon,
       types: &'t mut Types,
       log: &'tl mut TypeLog,
       builtin: &'bt BuiltinTypes,
+      scopes: &'s mut Scopes,
    ) -> Self {
+      let mut scope_stack = ScopeStack::new();
+      // The scope stack is always initialized with a top-level module scope, such that there is
+      // always a valid scope on top.
+      let _module_scope = scope_stack.push(scopes.create_scope());
       SemTypes {
          common,
          errors: Errors::new(),
+
          types,
          log,
          builtin,
+         scopes,
+
+         scope_stack,
       }
    }
 
@@ -35,6 +55,12 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
    fn annotate(&mut self, ast: &mut Ast, node: NodeHandle, typ: TypeId) -> TypeLogEntry {
       ast.set_type_id(node, typ);
       self.log.push(typ, node)
+   }
+
+   /// Emits an error of the given kind, also returning the error type.
+   fn error(&mut self, ast: &Ast, node: NodeHandle, kind: ErrorKind) -> TypeLogEntry {
+      self.emit_error(kind, ast.span(node).clone());
+      self.log.push(self.builtin.t_error, node)
    }
 
    /// Annotates a literal with a concrete type.
@@ -64,7 +90,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
 
    /// Annotates a unary operator with types.
    fn annotate_unary_operator(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
-      let log_entry = self.annotate_node(ast, ast.first_handle(node));
+      let log_entry = self.annotate_node(ast, ast.first_handle(node), NodeContext::Expression);
       let right = self.log.typ(log_entry);
       let right_kind = self.types.kind(right);
       let typ = match ast.kind(node) {
@@ -143,6 +169,39 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
       )
    }
 
+   /// Widens a float node to the given size.
+   ///
+   /// Behavior with literals is similar to `widen_integer`.
+   fn widen_float(&mut self, ast: &mut Ast, node: NodeHandle, new_size: FloatSize) -> TypeLogEntry {
+      if ast.kind(node).is_float() {
+         let as_float = ast.extra(node).unwrap_float();
+         ast.convert(
+            node,
+            match new_size {
+               FloatSize::S32 => NodeKind::Float32,
+               FloatSize::S64 => NodeKind::Float64,
+            },
+         );
+         ast.set_extra(
+            node,
+            match new_size {
+               FloatSize::S32 => NodeData::Float32(as_float as f32),
+               FloatSize::S64 => NodeData::Float64(as_float),
+            },
+         );
+      } else {
+         ast.wrap(node, NodeKind::WidenFloat);
+      }
+      self.annotate(
+         ast,
+         node,
+         match new_size {
+            FloatSize::S32 => self.builtin.t_float32,
+            FloatSize::S64 => self.builtin.t_float64,
+         },
+      )
+   }
+
    /// Attempts to convert the type `from` to type `tp`. If an implicit conversion is not possible,
    /// returns `None`. Otherwise returns the converted type ID.
    fn perform_implicit_conversion(
@@ -178,7 +237,7 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
          let from_size = from_kind.unwrap_float();
          let to_size = to_kind.unwrap_float();
          if to_size >= from_size {
-            return Some(self.log.push(to, node));
+            return Some(self.widen_float(ast, node, to_size));
          }
       }
 
@@ -188,8 +247,8 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
    /// Annotates a binary operator with types.
    fn annotate_binary_operator(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
       let (left, right) = (ast.first_handle(node), ast.second_handle(node));
-      let left_entry = self.annotate_node(ast, left);
-      let right_entry = self.annotate_node(ast, right);
+      let left_entry = self.annotate_node(ast, left, NodeContext::Expression);
+      let right_entry = self.annotate_node(ast, right, NodeContext::Expression);
       let left_type = self.log.typ(left_entry);
       let right_type = self.log.typ(right_entry);
       let conversion = self.perform_implicit_conversion(ast, right, right_type, left_type);
@@ -239,30 +298,77 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
       for i in 0..arguments.len() {
          // TODO: Argument type checking.
          let argument = ast.extra(node).unwrap_node_list()[i];
-         let _ = self.annotate_node(ast, argument);
+         let _ = self.annotate_node(ast, argument, NodeContext::Expression);
       }
       self.annotate(ast, node, self.builtin.t_unit)
    }
 
    /// Annotates statements in a list of statements.
-   fn annotate_statement_list(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
-      ast.walk_mut(node, |ast, node| {
+   fn annotate_statement_list(
+      &mut self,
+      ast: &mut Ast,
+      node: NodeHandle,
+      context: NodeContext,
+   ) -> TypeLogEntry {
+      let mut last_log = None;
+      ast.walk_node_list_mut(node, |ast, index, child| {
          // TODO: Don't ignore the type. Instead, enforce it to be ().
          // Right now this isn't done for testing purposes.
          // Also, there are no `val` statements yet so there isn't a way of ignoring the return
          // type in case it's not ().
-         let _ = self.annotate_node(ast, node);
+         let is_last = ast.is_last_child(node, index);
+         let log_entry = self.annotate_node(
+            ast,
+            child,
+            if is_last {
+               NodeContext::Expression
+            } else {
+               NodeContext::Statement
+            },
+         );
+         if context == NodeContext::Expression && is_last {
+            last_log = Some(log_entry);
+         }
       });
+      // Nodes in expression context inherit their type from the last expression statement in
+      // the list.
+      if let Some(log) = last_log {
+         self.annotate(ast, node, self.log.typ(log))
+      } else {
+         self.annotate(ast, node, self.builtin.t_statement)
+      }
+   }
+
+   /// Annotates a "pass" (`_`) statement.
+   fn annotate_pass(
+      &mut self,
+      ast: &mut Ast,
+      node: NodeHandle,
+      context: NodeContext,
+   ) -> TypeLogEntry {
       self.annotate(ast, node, self.builtin.t_statement)
    }
 
-   /// Emits an error of the given kind, also returning the error type.
-   fn error(&mut self, ast: &Ast, node: NodeHandle, kind: ErrorKind) -> TypeLogEntry {
-      self.emit_error(kind, ast.span(node).clone());
-      self.log.push(self.builtin.t_error, node)
+   /// Annotates a prefix `do` block.
+   fn annotate_do(
+      &mut self,
+      ast: &mut Ast,
+      node: NodeHandle,
+      context: NodeContext,
+   ) -> TypeLogEntry {
+      let _scope = self.scope_stack.push(self.scopes.create_scope());
+      let log_entry = self.annotate_statement_list(ast, node, context);
+      self.scope_stack.pop();
+      log_entry
    }
 
-   fn annotate_node(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
+   /// Annotates the given AST node.
+   fn annotate_node(
+      &mut self,
+      ast: &mut Ast,
+      node: NodeHandle,
+      context: NodeContext,
+   ) -> TypeLogEntry {
       match ast.kind(node) {
          // Literals
          | NodeKind::True
@@ -300,23 +406,21 @@ impl<'c, 't, 'tl, 'bt> SemTypes<'c, 't, 'tl, 'bt> {
          // Other operators are to be implemented later.
 
          // Control flow
-         NodeKind::StatementList => self.annotate_statement_list(ast, node),
+         NodeKind::StatementList => self.annotate_statement_list(ast, node, context),
+         NodeKind::Do => self.annotate_do(ast, node, context),
 
-         // Other nodes are invalid.
-         _ => {
-            println!("{:?}", ast.kind(node));
-            self.error(ast, node, ErrorKind::SemTypesInvalidAstNode)
-         }
+         // Other nodes are invalid (or not implemented yet).
+         other => self.error(ast, node, ErrorKind::SemTypesInvalidAstNode(other)),
       }
    }
 }
 
-impl SemPass for SemTypes<'_, '_, '_, '_> {
+impl SemPass for SemTypes<'_, '_, '_, '_, '_> {
    type Result = TypeLogEntry;
 
    /// Performs type analysis for the given AST node. This annotates the node with a concrete type.
    fn analyze(&mut self, mut ast: Ast, root_node: NodeHandle) -> Ast {
-      let _ = self.annotate_node(&mut ast, root_node);
+      let _ = self.annotate_node(&mut ast, root_node, NodeContext::Statement);
       ast
    }
 

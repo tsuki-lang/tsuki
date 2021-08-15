@@ -124,7 +124,8 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
       | NodeKind::Ref
       | NodeKind::IfBranch
       | NodeKind::WidenInt
-      | NodeKind::WidenUint => {
+      | NodeKind::WidenUint
+      | NodeKind::WidenFloat => {
          let left = ast.first_handle(node);
          dump_node(
             s,
@@ -139,7 +140,7 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
                | NodeKind::Ref => Prefix::R,
                NodeKind::Call => Prefix::Fun,
                NodeKind::IfBranch => Prefix::Cond,
-               NodeKind::WidenInt | NodeKind::WidenUint => Prefix::X,
+               NodeKind::WidenInt | NodeKind::WidenUint | NodeKind::WidenFloat => Prefix::X,
                _ => unreachable!(),
             }),
          );

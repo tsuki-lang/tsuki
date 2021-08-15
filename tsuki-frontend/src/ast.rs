@@ -5,6 +5,7 @@
 //! This also works much better with the borrow checker.
 
 use crate::common::Span;
+use crate::scope::ScopeId;
 use crate::types::TypeId;
 
 /// A handle to a single node in the AST. The actual AST is not stored next to the handle for
@@ -44,6 +45,8 @@ pub struct Ast {
    /// The type information is stored inside of the AST so that duplications also copy type info
    /// around.
    types: Vec<TypeId>,
+   /// Each AST node can introduce a new scope for looking up names.
+   scopes: Vec<Option<ScopeId>>,
 }
 
 impl Ast {
@@ -57,6 +60,7 @@ impl Ast {
          extra: Vec::new(),
          ancestors: Vec::new(),
          types: Vec::new(),
+         scopes: Vec::new(),
       };
       // Create a Nil node at ID 0 so that if some invalid AST node reference is dumped, it'll
       // instead go to this Error node.
@@ -75,6 +79,7 @@ impl Ast {
       self.extra.push(NodeData::None);
       self.ancestors.push(NodeHandle::null());
       self.types.push(TypeId::null());
+      self.scopes.push(None);
       NodeHandle(id)
    }
 
@@ -160,6 +165,16 @@ impl Ast {
       self.types[handle.0] = typ;
    }
 
+   /// Returns the scope that is introduced by this node, or `None` if it doesn't introduce a scope.
+   pub fn scope(&self, handle: NodeHandle) -> Option<ScopeId> {
+      self.scopes[handle.0]
+   }
+
+   /// Sets the scope that is introduced by the node.
+   pub fn set_scope(&mut self, handle: NodeHandle, scope: Option<ScopeId>) {
+      self.scopes[handle.0] = scope;
+   }
+
    /// Duplicates the given node, and returns a handle to the new node.
    fn duplicate(&mut self, node: NodeHandle) -> NodeHandle {
       let new = self.create_node(self.kind(node));
@@ -170,6 +185,7 @@ impl Ast {
       // Maybe move the extra data out of here instead, like `Option::take`?
       self.set_extra(new, self.extra(node).clone());
       self.set_type_id(new, self.type_id(node));
+      self.set_scope(new, self.scope(node));
       new
    }
 
@@ -188,6 +204,7 @@ impl Ast {
       self.set_first(node, 0);
       self.set_second(node, 0);
       self.set_extra(node, NodeData::None);
+      self.set_scope(node, None);
    }
 
    /// Wraps the old node in a new node of the given kind.
@@ -217,7 +234,7 @@ macro_rules! walk_node_list_impl {
       if matches!($ast.extra($node), NodeData::NodeList(..)) {
          let n = $ast.extra($node).unwrap_node_list().len();
          for i in 0..n {
-            $then($ast, $ast.extra($node).unwrap_node_list()[i]);
+            $then($ast, i, $ast.extra($node).unwrap_node_list()[i]);
          }
       }
    };
@@ -232,7 +249,7 @@ macro_rules! walk_impl {
                $then($ast, $ast.second_handle($node));
             }
          }
-         $ast.$walk_node_list($node, |ast, child| {
+         $ast.$walk_node_list($node, |ast, _, child| {
             $then(ast, child);
          })
       }
@@ -247,7 +264,7 @@ macro_rules! walk_impl {
 impl Ast {
    /// Walks through the node data of a node whose `NodeData` is a node list.
    /// If the `NodeData` isn't a node list, this is a noop.
-   pub fn walk_node_list(&self, node: NodeHandle, mut then: impl FnMut(&Self, NodeHandle)) {
+   pub fn walk_node_list(&self, node: NodeHandle, mut then: impl FnMut(&Self, usize, NodeHandle)) {
       walk_node_list_impl!(self, node, then);
    }
 
@@ -255,7 +272,7 @@ impl Ast {
    pub fn walk_node_list_mut(
       &mut self,
       node: NodeHandle,
-      mut then: impl FnMut(&mut Self, NodeHandle),
+      mut then: impl FnMut(&mut Self, usize, NodeHandle),
    ) {
       walk_node_list_impl!(self, node, then);
    }
@@ -268,6 +285,15 @@ impl Ast {
    /// Walks through the given node's children, but the first argument of `then` is mutable.
    pub fn walk_mut(&mut self, node: NodeHandle, mut then: impl FnMut(&mut Self, NodeHandle)) {
       walk_impl!(self, node, then, walk_node_list_mut);
+   }
+
+   /// Returns whether the given index is the last child index in a node's node list.
+   pub fn is_last_child(&self, parent: NodeHandle, index: usize) -> bool {
+      if let NodeData::NodeList(list) = self.extra(parent) {
+         index == list.len() - 1
+      } else {
+         false
+      }
    }
 }
 
@@ -374,9 +400,14 @@ pub enum NodeKind {
    Float32,
    Float64,
 
+   // Concrete control flow
+   DoExpression,
+   DoStatement,
+
    // Intrinsics
    WidenUint,
    WidenInt,
+   WidenFloat,
    PrintInt32,
    PrintFloat32,
 }
@@ -392,7 +423,7 @@ impl NodeKind {
       self > NodeKind::_LastLeaf
    }
 
-   /// Returns whether the node kind is for a typed unsigned integer node.
+   /// Returns whether the node kind is for a typed unsigned integer literal node.
    pub fn is_unsigned_integer(self) -> bool {
       matches!(
          self,
@@ -400,14 +431,19 @@ impl NodeKind {
       )
    }
 
-   /// Returns whether the node kind is for a typed signed integer node.
+   /// Returns whether the node kind is for a typed signed integer literal node.
    pub fn is_signed_integer(self) -> bool {
       matches!(self, Self::Int8 | Self::Int16 | Self::Int32 | Self::Int64)
    }
 
-   /// Returns whether the node kind is for a typed integer node, be it signed, or unsigned.
+   /// Returns whether the node kind is for a typed integer literal node, be it signed, or unsigned.
    pub fn is_integer(self) -> bool {
       self.is_unsigned_integer() || self.is_signed_integer()
+   }
+
+   /// Returns whether the node kind is for a typed float literal node.
+   pub fn is_float(self) -> bool {
+      matches!(self, Self::Float32 | Self::Float64)
    }
 }
 

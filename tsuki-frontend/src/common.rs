@@ -4,7 +4,10 @@ use std::fmt;
 
 use smallvec::SmallVec;
 
-use crate::lexer::{IndentLevel, Token, TokenKind};
+use crate::{
+   ast::NodeKind,
+   lexer::{IndentLevel, Token, TokenKind},
+};
 
 /// Represents a source file.
 pub struct SourceFile {
@@ -198,8 +201,8 @@ pub enum ErrorKind {
     * Every internal error must be prefixed by "<component> internal error:" to tell the user that
     * something went terribly wrong in the compiler, and that the error should be reported.
     */
-   #[error("SemTypes internal error: invalid AST node passed to analyze()")]
-   SemTypesInvalidAstNode,
+   #[error("SemTypes internal error: invalid AST node passed to analyze(): {0:?}")]
+   SemTypesInvalidAstNode(NodeKind),
 
    #[error("backend internal error: code generation error: {0}")]
    CodeGen(String),
