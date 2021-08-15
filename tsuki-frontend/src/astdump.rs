@@ -78,6 +78,9 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
       let typ = ast.type_id(node);
       print!(" : {}", types.name(typ));
    }
+   if let Some(scope) = ast.scope(node) {
+      print!(" +{:?}", scope);
+   }
    println!();
 
    match kind {

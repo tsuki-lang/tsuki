@@ -356,7 +356,8 @@ impl<'c, 't, 'tl, 'bt, 's> SemTypes<'c, 't, 'tl, 'bt, 's> {
       node: NodeHandle,
       context: NodeContext,
    ) -> TypeLogEntry {
-      let _scope = self.scope_stack.push(self.scopes.create_scope());
+      let scope = self.scope_stack.push(self.scopes.create_scope());
+      ast.set_scope(node, Some(scope));
       let log_entry = self.annotate_statement_list(ast, node, context);
       self.scope_stack.pop();
       log_entry
