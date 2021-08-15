@@ -16,6 +16,7 @@ pub struct CodeGen<'c> {
    pub(crate) source: SourceFile,
    pub(crate) context: &'c Context,
    pub(crate) module: Module<'c>,
+   pub(crate) builder: Builder<'c>,
 
    pub(crate) unit_type: StructType<'c>,
 }
@@ -28,6 +29,7 @@ impl<'c> CodeGen<'c> {
          // TODO: import, module resolution and names.
          module: context.create_module("main"),
          unit_type: context.struct_type(&[], false),
+         builder: context.create_builder(),
       };
       // Temporary: set up some libc functions.
       state.load_libc();
@@ -54,16 +56,11 @@ impl<'c> CodeGen<'c> {
    }
 
    /// Generates code for an arbitrary node.
-   pub fn generate_statement(
-      &mut self,
-      ir: &Ir,
-      node: NodeHandle,
-      builder: &Builder,
-   ) -> Result<(), Error> {
+   pub fn generate_statement(&mut self, ir: &Ir, node: NodeHandle) -> Result<(), Error> {
       match ir.ast.kind(node) {
-         NodeKind::StatementList => self.generate_statement_list(ir, node, builder)?,
+         NodeKind::StatementList => self.generate_statement_list(ir, node)?,
          NodeKind::PrintInt32 => {
-            let _ = self.generate_expression(ir, node, builder);
+            let _ = self.generate_expression(ir, node);
          }
          other => {
             return Err(self.error(
@@ -77,14 +74,9 @@ impl<'c> CodeGen<'c> {
    }
 
    /// Generates code for a list of statements.
-   fn generate_statement_list(
-      &mut self,
-      ir: &Ir,
-      node: NodeHandle,
-      builder: &Builder,
-   ) -> Result<(), Error> {
+   fn generate_statement_list(&mut self, ir: &Ir, node: NodeHandle) -> Result<(), Error> {
       for &statement in ir.ast.extra(node).unwrap_node_list() {
-         self.generate_statement(ir, statement, builder)?;
+         self.generate_statement(ir, statement)?;
       }
       Ok(())
    }

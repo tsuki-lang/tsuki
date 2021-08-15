@@ -76,15 +76,14 @@ impl backend::Backend for LlvmBackend {
 
       // Create the function, and an entry block.
       let main_fn = state.module.add_function("main", main_fn_type, None);
-      let builder = context.create_builder();
       let entry = context.append_basic_block(main_fn, "entry");
-      builder.position_at_end(entry);
+      state.builder.position_at_end(entry);
 
       // Compile the modules' code.
-      state.generate_statement(&ir, ir.root_node, &builder).map_err(|e| common::single_error(e))?;
+      state.generate_statement(&ir, ir.root_node).map_err(|e| common::single_error(e))?;
 
       // Return the zero exit code.
-      builder.build_return(Some(&i32_type.const_zero()));
+      state.builder.build_return(Some(&i32_type.const_zero()));
 
       let pass_manager = PassManager::create(&state.module);
       pass_manager.initialize();

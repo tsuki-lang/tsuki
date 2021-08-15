@@ -1,50 +1,73 @@
 //! Code generation for expressions.
 
+use std::rc::Rc;
+
 use inkwell::builder::Builder;
-use inkwell::types::IntType;
+use inkwell::types::{IntMathType, IntType};
 use inkwell::values::{
-   AnyValue, AnyValueEnum, BasicValueEnum, CallSiteValue, IntValue, PointerValue, StructValue,
-   VectorValue,
+   AnyValue, AnyValueEnum, BasicValue, BasicValueEnum, CallSiteValue, IntMathValue, IntValue,
+   PointerValue, StructValue, VectorValue,
 };
 use tsuki_frontend::ast::{Ast, NodeHandle, NodeKind};
+use tsuki_frontend::types::{IntegerSize, TypeId, TypeKind, Types};
 use tsuki_frontend::Ir;
 
 use crate::codegen::CodeGen;
 
 impl<'c> CodeGen<'c> {
-   /// Returns the integer type for the provided node kind, panics if the node kind is not
-   /// an integer.
-   fn get_int_type(&self, node_kind: NodeKind) -> IntType {
-      match node_kind {
-         NodeKind::Uint8 | NodeKind::Int8 => self.context.i8_type(),
-         NodeKind::Uint16 | NodeKind::Int16 => self.context.i16_type(),
-         NodeKind::Uint32 | NodeKind::Int32 => self.context.i32_type(),
-         NodeKind::Uint64 | NodeKind::Int64 => self.context.i64_type(),
-         _ => panic!(),
+   /// Returns the integer type for the provided type, or panics if the type is not an integer type.
+   fn get_int_type(&self, types: &Types, typ: TypeId) -> IntType {
+      if let TypeKind::Integer(size) = types.kind(typ) {
+         match size {
+            IntegerSize::U8 | IntegerSize::S8 => self.context.i8_type(),
+            IntegerSize::U16 | IntegerSize::S16 => self.context.i16_type(),
+            IntegerSize::U32 | IntegerSize::S32 => self.context.i32_type(),
+            IntegerSize::U64 | IntegerSize::S64 => self.context.i64_type(),
+         }
+      } else {
+         panic!("type is not an integer type")
       }
    }
 
    /// Generates code for an integer literal.
-   fn generate_int_literal(&self, ast: &Ast, node: NodeHandle) -> IntValue {
-      let typ = self.get_int_type(ast.kind(node));
-      typ.const_int(ast.extra(node).unwrap_uint(), false)
+   fn generate_int_literal(&self, ir: &Ir, node: NodeHandle) -> IntValue {
+      let typ = self.get_int_type(&ir.types, ir.ast.type_id(node));
+      typ.const_int(ir.ast.extra(node).unwrap_uint(), false)
    }
 
-   fn generate_unit_literal(&self, ast: &Ast, node: NodeHandle) -> StructValue {
+   /// Generates code for a unit literal.
+   fn generate_unit_literal(&self, _ast: &Ast, _node: NodeHandle) -> StructValue {
       self.unit_type.const_zero()
    }
 
-   fn generate_add(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
-      todo!()
+   /// Generates code for integer math.
+   fn generate_int_math(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
+      let left_value = self.generate_expression(ir, ir.ast.first_handle(node));
+      let right_value = self.generate_expression(ir, ir.ast.second_handle(node));
+      let (left, right) = (left_value.into_int_value(), right_value.into_int_value());
+      let math = match ir.ast.kind(node) {
+         NodeKind::Plus => self.builder.build_int_add(left, right, "addtmp"),
+         NodeKind::Minus => self.builder.build_int_sub(left, right, "subtmp"),
+         _ => unreachable!(),
+      };
+      math.as_basic_value_enum()
+   }
+
+   /// Generates code for an integer type conversion (`WidenUint` or `WidenInt`).
+   fn generate_int_conversion(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
+      let inner = ir.ast.first_handle(node);
+      let inner_value = self.generate_expression(ir, inner).into_int_value();
+      let dest_type = self.get_int_type(&ir.types, ir.ast.type_id(node));
+      match ir.ast.kind(node) {
+         NodeKind::WidenUint => self.builder.build_int_z_extend(inner_value, dest_type, "uwidened"),
+         NodeKind::WidenInt => self.builder.build_int_s_extend(inner_value, dest_type, "swidened"),
+         _ => unreachable!(),
+      }
+      .as_basic_value_enum()
    }
 
    /// Generates code for any expression node.
-   pub(crate) fn generate_expression(
-      &self,
-      ir: &Ir,
-      node: NodeHandle,
-      builder: &Builder,
-   ) -> BasicValueEnum {
+   pub(crate) fn generate_expression(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
       match ir.ast.kind(node) {
          // Literals
          | NodeKind::Uint8
@@ -54,19 +77,20 @@ impl<'c> CodeGen<'c> {
          | NodeKind::Int8
          | NodeKind::Int16
          | NodeKind::Int32
-         | NodeKind::Int64 => self.generate_int_literal(&ir.ast, node).into(),
+         | NodeKind::Int64 => self.generate_int_literal(ir, node).into(),
 
          // Operators
-         NodeKind::Plus => self.generate_add(ir, node),
+         NodeKind::Plus | NodeKind::Minus => self.generate_int_math(ir, node),
 
          // Intrinsics
-         NodeKind::PrintInt32 => self.generate_intrinsic(ir, node, builder),
-         _ => unreachable!(),
+         NodeKind::WidenUint | NodeKind::WidenInt => self.generate_int_conversion(ir, node),
+         NodeKind::PrintInt32 => self.generate_call_like_intrinsic(ir, node),
+         other => unreachable!("invalid expression node: {:?}", other),
       }
    }
 
-   /// Generates code for an intrinsic function call node.
-   fn generate_intrinsic(&self, ir: &Ir, node: NodeHandle, builder: &Builder) -> BasicValueEnum {
+   /// Generates code for a function call-like intrinsic.
+   fn generate_call_like_intrinsic(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
       let arguments = ir.ast.extra(node).unwrap_node_list();
       match ir.ast.kind(node) {
          NodeKind::PrintInt32 => {
@@ -74,10 +98,10 @@ impl<'c> CodeGen<'c> {
             let zero = self.context.i32_type().const_zero();
             let format = self.module.get_global("printf_int_format").unwrap();
             let format_ptr = unsafe {
-               builder.build_in_bounds_gep(format.as_pointer_value(), &[zero, zero], "fmt")
+               self.builder.build_in_bounds_gep(format.as_pointer_value(), &[zero, zero], "fmt")
             };
-            let argument = self.generate_expression(ir, arguments[0], builder);
-            builder.build_call(printf, &[format_ptr.into(), argument.into()], "");
+            let argument = self.generate_expression(ir, arguments[0]);
+            self.builder.build_call(printf, &[format_ptr.into(), argument.into()], "");
          }
          _ => unreachable!(),
       }
