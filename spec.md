@@ -1777,6 +1777,10 @@ print(a[1])  # 2
 
 `CString` is available as an alias to `PtrArray[CChar]`.
 
+Idiomatic tsuki programs should avoid using these unmanaged pointers whenever possible. When interfacing with C, idiomatic wrappers should be provided when time allows, such that developers do not need to think about managing lifetimes.
+
+Unmanaged pointers can be used for optimization purposes if necessary, but should be avoided like the fire wherever better, more robust solutions exist.
+
 ## Importing C functions
 
 Functions can be imported from C by using the `c_import` pragma. This pragma accepts a string as a paramter, specifying what the C function is called.
