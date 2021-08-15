@@ -36,15 +36,38 @@ impl<'c> CodeGen<'c> {
 
    /// Generates code for integer math.
    fn generate_int_math(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
+      // TODO: Panic on overflow. This can be done using LLVM's arithmetic intrinsics that return
+      // an aggregate {T, i1}, where the second field is a flag signifying whether overflow occured.
       let left_value = self.generate_expression(ir, ir.ast.first_handle(node));
       let right_value = self.generate_expression(ir, ir.ast.second_handle(node));
       let (left, right) = (left_value.into_int_value(), right_value.into_int_value());
       let math = match ir.ast.kind(node) {
          NodeKind::Plus => self.builder.build_int_add(left, right, "addtmp"),
          NodeKind::Minus => self.builder.build_int_sub(left, right, "subtmp"),
+         NodeKind::Mul => self.builder.build_int_mul(left, right, "multmp"),
+         NodeKind::Div => {
+            let is_signed = ir.types.kind(ir.ast.type_id(node)).unwrap_integer().is_signed();
+            if is_signed {
+               self.builder.build_int_signed_div(left, right, "sdivtmp")
+            } else {
+               self.builder.build_int_unsigned_div(left, right, "udivtmp")
+            }
+         }
          _ => unreachable!(),
       };
       math.as_basic_value_enum()
+   }
+
+   /// Generates code for integer and floating-point math operations.
+   fn generate_math(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
+      let typ = ir.types.kind(ir.ast.type_id(node));
+      if typ.is_integer() {
+         self.generate_int_math(ir, node)
+      } else if typ.is_float() {
+         todo!()
+      } else {
+         unreachable!()
+      }
    }
 
    /// Generates code for an integer type conversion (`WidenUint` or `WidenInt`).
@@ -74,7 +97,9 @@ impl<'c> CodeGen<'c> {
          | NodeKind::Int64 => self.generate_int_literal(ir, node).into(),
 
          // Operators
-         NodeKind::Plus | NodeKind::Minus => self.generate_int_math(ir, node),
+         NodeKind::Plus | NodeKind::Minus | NodeKind::Mul | NodeKind::Div => {
+            self.generate_math(ir, node)
+         }
 
          // Intrinsics
          NodeKind::WidenUint | NodeKind::WidenInt => self.generate_int_conversion(ir, node),
