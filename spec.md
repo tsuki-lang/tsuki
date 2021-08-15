@@ -1747,7 +1747,7 @@ tsuki exposes a set of integer types that correspond to platform-specific C type
 | `CLongLong` | `long long` |
 | `CULongLong` | `unsigned long long` |
 
-## `Ptr[T]`, `PtrVar[T]`, and `PtrArray[T]`
+## `Ptr[T]`, `PtrVar[T]`, `PtrArray[T]`, and `PtrVarArray[T]`
 
 The `Ptr` type is used for creating and manipulating unmanaged pointers to data. Though it looks like a normal type, it's actually a magic type implemented in the compiler itself. `Ptr[T]` acts similar to `^T`, and `PtrVar[T]` acts similar to `^var T`, but their lifetime is not managed by the compiler. They can be created freely by using their `to` functions, and they can be dereferenced just like regular pointers:
 
@@ -1757,7 +1757,7 @@ var p = Ptr.to(x)
 print(p^)  # 1
 ```
 
-`Ptr.to`, `PtrVar.to`, and `PtrArray.to` take a pointer as an argument, and convert it to the appropriate unmanaged pointer.
+`Ptr.to`, `PtrVar.to`, `PtrArray.to`, and `PtrVarArray.to` take a (non-`var` or `var`) pointer as an argument, and convert it to the appropriate unmanaged pointer. `Var` unmanaged pointers require `^var T` pointers.
 
 Reading from an unmanaged pointer that points to invalid memory (aka dangling pointer) is undefined behavior.
 ```
