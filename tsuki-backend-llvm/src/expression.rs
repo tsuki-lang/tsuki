@@ -1,13 +1,7 @@
 //! Code generation for expressions.
 
-use std::rc::Rc;
-
-use inkwell::builder::Builder;
-use inkwell::types::{IntMathType, IntType};
-use inkwell::values::{
-   AnyValue, AnyValueEnum, BasicValue, BasicValueEnum, CallSiteValue, IntMathValue, IntValue,
-   PointerValue, StructValue, VectorValue,
-};
+use inkwell::types::IntType;
+use inkwell::values::{BasicValue, BasicValueEnum, IntValue, StructValue};
 use tsuki_frontend::ast::{Ast, NodeHandle, NodeKind};
 use tsuki_frontend::types::{IntegerSize, TypeId, TypeKind, Types};
 use tsuki_frontend::Ir;

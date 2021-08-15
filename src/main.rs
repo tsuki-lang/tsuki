@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use tsuki_backend_llvm::{ExecutableFile, LlvmBackend, LlvmBackendConfig};
 use tsuki_frontend::backend::Backend;
 use tsuki_frontend::common::{Errors, SourceFile};
