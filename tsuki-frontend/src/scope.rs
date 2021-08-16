@@ -4,22 +4,89 @@ use std::{collections::HashMap, num::NonZeroUsize};
 
 use crate::{ast::NodeHandle, types::TypeId};
 
+/// An ID uniquely identifying a symbol.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct SymbolId(usize);
+
+impl SymbolId {
+   /// Returns the internal ID of the symbol.
+   pub(crate) fn id(self) -> usize {
+      self.0
+   }
+
+   /// Creates a symbol from an internal ID.
+   pub(crate) fn new(id: usize) -> Self {
+      Self(id)
+   }
+}
+
 /// The kind of a symbol, as well as extra metadata attached to it.
 pub enum SymbolKind {
    /// A symbol that represents a type.
    Type(TypeId),
 }
 
-pub struct Symbol {
-   /// The AST node the symbol comes from.
-   pub node: NodeHandle,
-   /// The kind of the symbol.
-   pub kind: SymbolKind,
-   /// The symbol's type.
-   pub typ: TypeId,
+/// Symbol storage. Symbols are looked up identifiers.
+pub struct Symbols {
+   names: Vec<String>,
+   nodes: Vec<NodeHandle>,
+   types: Vec<TypeId>,
+   kinds: Vec<SymbolKind>,
 }
 
-type SymbolMap = HashMap<String, Symbol>;
+impl Symbols {
+   /// Creates a new symbol storage.
+   pub fn new() -> Symbols {
+      Self {
+         names: Vec::new(),
+         nodes: Vec::new(),
+         types: Vec::new(),
+         kinds: Vec::new(),
+      }
+   }
+
+   /// Creates a symbol from a name, handle, type, and kind.
+   pub fn create(
+      &mut self,
+      name: &str,
+      node: NodeHandle,
+      typ: TypeId,
+      kind: SymbolKind,
+   ) -> SymbolId {
+      let id = self.nodes.len();
+      self.names.push(name.to_owned());
+      self.nodes.push(node);
+      self.types.push(typ);
+      self.kinds.push(kind);
+      SymbolId::new(id)
+   }
+
+   /// Returns the name of the symbol.
+   pub fn name(&self, symbol: SymbolId) -> &str {
+      &self.names[symbol.0]
+   }
+
+   /// Returns the symbol's ancestor node.
+   pub fn node(&self, symbol: SymbolId) -> NodeHandle {
+      self.nodes[symbol.0]
+   }
+
+   /// Returns the symbol's type.
+   pub fn type_id(&self, symbol: SymbolId) -> TypeId {
+      self.types[symbol.0]
+   }
+
+   /// Returns the symbol's associated data.
+   pub fn kind(&self, symbol: SymbolId) -> &SymbolKind {
+      &self.kinds[symbol.0]
+   }
+
+   pub fn kind_mut(&mut self, symbol: SymbolId) -> &mut SymbolKind {
+      &mut self.kinds[symbol.0]
+   }
+}
+
+type SymbolMap = HashMap<String, SymbolId>;
 
 /// Represents a local scope.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -53,20 +120,14 @@ impl Scopes {
 
    /// Inserts a symbol to the scope, under the given identifier. If there already is a symbol with
    /// the given name, it's lost.
-   pub fn insert(&mut self, scope: ScopeId, identifier: &str, symbol: Symbol) {
+   pub fn insert(&mut self, scope: ScopeId, identifier: &str, symbol: SymbolId) {
       let _ = self.scopes[scope.index()].insert(identifier.to_owned(), symbol);
    }
 
    /// Retrieves a reference to the provided identifier in the given scope, or `None` if the
    /// identifier is not in the given scope.
-   pub fn get(&self, scope: ScopeId, identifier: &str) -> Option<&Symbol> {
-      self.scopes[scope.index()].get(identifier)
-   }
-
-   /// Retrieves a mutable reference to a symbol in the scope, or `None` if there is no symbol with
-   /// the given name.
-   pub fn get_mut(&mut self, scope: ScopeId, identifier: &str) -> Option<&mut Symbol> {
-      self.scopes[scope.index()].get_mut(identifier)
+   pub fn get(&self, scope: ScopeId, identifier: &str) -> Option<SymbolId> {
+      self.scopes[scope.index()].get(identifier).map(|id| *id)
    }
 }
 

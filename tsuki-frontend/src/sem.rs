@@ -2,12 +2,12 @@
 
 use crate::ast::{Ast, NodeHandle};
 use crate::common::{Error, ErrorKind, Errors, Span};
-use crate::scope::Scopes;
+use crate::scope::{Scopes, Symbols};
 pub use crate::types::DefaultTypes;
 use crate::types::{BuiltinTypes, TypeLog, Types};
 
 use crate::sem_literals::SemLiterals;
-use crate::sem_types::SemTypes;
+use crate::sem_types::{SemTypes, SemTypesBorrows};
 
 /// A semantic analyzer.
 pub(crate) trait SemPass {
@@ -99,6 +99,7 @@ pub fn analyze(options: AnalyzeOptions) -> Result<(Ast, Types), Errors> {
    let mut type_log = TypeLog::new();
    let builtin_types = BuiltinTypes::add_to(&mut types, &common.default_types);
    let mut scopes = Scopes::new();
+   let mut symbols = Symbols::new();
 
    // NOTE: Maybe split errors into normal and fatal?
    // Normal errors would be accumulated into the existing error list, but would not halt the
@@ -106,13 +107,14 @@ pub fn analyze(options: AnalyzeOptions) -> Result<(Ast, Types), Errors> {
    // goes wrong inside of a phase, yielding AST that might break the phase after it.
    // Also, warnings anyone?
    state = state.perform(SemLiterals::new(&common))?;
-   state = state.perform(SemTypes::new(
-      &common,
-      &mut types,
-      &mut type_log,
-      &builtin_types,
-      &mut scopes,
-   ))?;
+   state = state.perform(SemTypes::new(SemTypesBorrows {
+      common: &common,
+      types: &mut types,
+      log: &mut type_log,
+      builtin: &builtin_types,
+      scopes: &mut scopes,
+      symbols: &mut symbols,
+   }))?;
 
    Ok((state.ast, types))
 }

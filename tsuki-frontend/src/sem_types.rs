@@ -2,11 +2,11 @@
 
 use crate::ast::{Ast, NodeData, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors};
-use crate::scope::{ScopeId, ScopeStack, Scopes};
+use crate::scope::{ScopeId, ScopeStack, Scopes, Symbols};
 use crate::sem::{SemCommon, SemPass};
 use crate::types::{BuiltinTypes, FloatSize, IntegerSize, TypeId, TypeLog, TypeLogEntry, Types};
 
-pub(crate) struct SemTypes<'c, 't, 'tl, 'bt, 's> {
+pub(crate) struct SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
    common: &'c SemCommon,
    errors: Errors,
 
@@ -14,8 +14,19 @@ pub(crate) struct SemTypes<'c, 't, 'tl, 'bt, 's> {
    log: &'tl mut TypeLog,
    builtin: &'bt BuiltinTypes,
    scopes: &'s mut Scopes,
+   symbols: &'sy mut Symbols,
 
    scope_stack: ScopeStack,
+}
+
+/// Values borrowed to `SemTypes`, used during its construction.
+pub(crate) struct SemTypesBorrows<'c, 't, 'tl, 'bt, 's, 'sy> {
+   pub(crate) common: &'c SemCommon,
+   pub(crate) types: &'t mut Types,
+   pub(crate) log: &'tl mut TypeLog,
+   pub(crate) builtin: &'bt BuiltinTypes,
+   pub(crate) scopes: &'s mut Scopes,
+   pub(crate) symbols: &'sy mut Symbols,
 }
 
 /// Specifies whether a node should be annotated in expression or statement context.
@@ -25,15 +36,17 @@ enum NodeContext {
    Statement,
 }
 
-impl<'c, 't, 'tl, 'bt, 's> SemTypes<'c, 't, 'tl, 'bt, 's> {
+impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
    /// Creates a new instance of the `SemTypes` analysis phase.
-   pub fn new(
-      common: &'c SemCommon,
-      types: &'t mut Types,
-      log: &'tl mut TypeLog,
-      builtin: &'bt BuiltinTypes,
-      scopes: &'s mut Scopes,
-   ) -> Self {
+   pub fn new(borrows: SemTypesBorrows<'c, 't, 'tl, 'bt, 's, 'sy>) -> Self {
+      let SemTypesBorrows {
+         common,
+         types,
+         log,
+         builtin,
+         scopes,
+         symbols,
+      } = borrows;
       let mut scope_stack = ScopeStack::new();
       // The scope stack is always initialized with a top-level module scope, such that there is
       // always a valid scope on top.
@@ -46,6 +59,7 @@ impl<'c, 't, 'tl, 'bt, 's> SemTypes<'c, 't, 'tl, 'bt, 's> {
          log,
          builtin,
          scopes,
+         symbols,
 
          scope_stack,
       }
@@ -312,21 +326,23 @@ impl<'c, 't, 'tl, 'bt, 's> SemTypes<'c, 't, 'tl, 'bt, 's> {
    ) -> TypeLogEntry {
       let mut last_log = None;
       ast.walk_node_list_mut(node, |ast, index, child| {
-         // TODO: Don't ignore the type. Instead, enforce it to be ().
+         // TODO: Don't ignore the type. Instead, enforce it to be () if the statement isn't a
+         // trailing expression statement.
          // Right now this isn't done for testing purposes.
          // Also, there are no `val` statements yet so there isn't a way of ignoring the return
          // type in case it's not ().
-         let is_last = ast.is_last_child(node, index);
+         let is_last_expression =
+            ast.is_last_child(node, index) && context == NodeContext::Expression;
          let log_entry = self.annotate_node(
             ast,
             child,
-            if is_last {
+            if is_last_expression {
                NodeContext::Expression
             } else {
                NodeContext::Statement
             },
          );
-         if context == NodeContext::Expression && is_last {
+         if is_last_expression {
             last_log = Some(log_entry);
          }
       });
@@ -340,12 +356,7 @@ impl<'c, 't, 'tl, 'bt, 's> SemTypes<'c, 't, 'tl, 'bt, 's> {
    }
 
    /// Annotates a "pass" (`_`) statement.
-   fn annotate_pass(
-      &mut self,
-      ast: &mut Ast,
-      node: NodeHandle,
-      context: NodeContext,
-   ) -> TypeLogEntry {
+   fn annotate_pass(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
       self.annotate(ast, node, self.builtin.t_statement)
    }
 
@@ -408,6 +419,7 @@ impl<'c, 't, 'tl, 'bt, 's> SemTypes<'c, 't, 'tl, 'bt, 's> {
 
          // Control flow
          NodeKind::StatementList => self.annotate_statement_list(ast, node, context),
+         NodeKind::Pass => self.annotate_pass(ast, node),
          NodeKind::Do => self.annotate_do(ast, node, context),
 
          // Other nodes are invalid (or not implemented yet).
@@ -416,7 +428,7 @@ impl<'c, 't, 'tl, 'bt, 's> SemTypes<'c, 't, 'tl, 'bt, 's> {
    }
 }
 
-impl SemPass for SemTypes<'_, '_, '_, '_, '_> {
+impl SemPass for SemTypes<'_, '_, '_, '_, '_, '_> {
    type Result = TypeLogEntry;
 
    /// Performs type analysis for the given AST node. This annotates the node with a concrete type.

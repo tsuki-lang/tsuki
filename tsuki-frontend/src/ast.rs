@@ -5,7 +5,7 @@
 //! This also works much better with the borrow checker.
 
 use crate::common::Span;
-use crate::scope::ScopeId;
+use crate::scope::{ScopeId, SymbolId};
 use crate::types::TypeId;
 
 /// A handle to a single node in the AST. The actual AST is not stored next to the handle for
@@ -117,6 +117,26 @@ impl Ast {
    /// Sets the first value of a node handle. The value stored is a node handle.
    pub fn set_first_handle(&mut self, handle: NodeHandle, first: NodeHandle) {
       self.first[handle.0] = first.0;
+   }
+
+   /// Returns the symbol ID stored in a node. This function must only be used on nodes whose kind
+   /// is `NodeKind::Symbol`.
+   pub fn symbol_id(&self, handle: NodeHandle) -> SymbolId {
+      assert!(
+         self.kind(handle) == NodeKind::Symbol,
+         "node passed to symbol_id must be a symbol"
+      );
+      SymbolId::new(self.first(handle))
+   }
+
+   /// Sets the first value of a node to the given symbol ID. This function must only be used on
+   /// nodes whose kind is `NodeKind::Symbol`.
+   pub fn set_symbol_id(&mut self, handle: NodeHandle, symbol: SymbolId) {
+      assert!(
+         self.kind(handle) == NodeKind::Symbol,
+         "node passed to set_symbol_id must be a symbol"
+      );
+      self.set_first(handle, symbol.id())
    }
 
    /// Returns the second value of the node with the given handle.
@@ -388,6 +408,9 @@ pub enum NodeKind {
    /*
     * Post-sem'check
     */
+   // Symbols
+   Symbol,
+
    // Concrete literals
    Uint8,
    Uint16,
