@@ -2,7 +2,7 @@
 
 use crate::ast::{Ast, NodeData, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors};
-use crate::scope::{ScopeId, ScopeStack, Scopes, Symbols};
+use crate::scope::{ScopeStack, Scopes, Symbols};
 use crate::sem::{SemCommon, SemPass};
 use crate::types::{BuiltinTypes, FloatSize, IntegerSize, TypeId, TypeLog, TypeLogEntry, Types};
 

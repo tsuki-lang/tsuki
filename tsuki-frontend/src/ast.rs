@@ -394,6 +394,10 @@ pub enum NodeKind {
    Index,
    IndexAlt,
 
+   // Declarations
+   Val,
+   Var,
+
    // Control flow
    // ---
    // *Expression kinds differ from *Statement kinds in that the last statement in the block must

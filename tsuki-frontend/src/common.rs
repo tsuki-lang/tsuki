@@ -167,6 +167,10 @@ pub enum ErrorKind {
    MissingLineBreakAfterStatement,
    #[error("indented block of level greater than {0} expected")]
    IndentedBlockExpected(IndentLevel),
+   #[error("identifier expected, but got '{0}'")]
+   IdentifierExpected(TokenKind),
+   #[error("expected '=' after variable name, but got '{0}'")]
+   VarMissingEquals(TokenKind),
 
    /*
     * Sem'check errors

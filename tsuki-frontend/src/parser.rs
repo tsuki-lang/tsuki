@@ -149,7 +149,7 @@ impl<'l, 's> Parser<'l, 's> {
          self.ast.set_span(handle, token.span);
          handle
       } else {
-         panic!("token must be an identifier")
+         self.error(ErrorKind::IdentifierExpected(token.kind), token.span)
       }
    }
 
@@ -304,6 +304,7 @@ impl<'l, 's> Parser<'l, 's> {
       Ok(node)
    }
 
+   /// Parses an `if` expression or statement.
    fn parse_if_expression(&mut self, token: Option<Token>) -> Result<NodeHandle, Error> {
       let mut branch_token = self.some_or_next(token)?;
       let mut branches = Vec::new();
@@ -507,10 +508,32 @@ impl<'l, 's> Parser<'l, 's> {
       Ok(node)
    }
 
+   /// Parses a `val` or `var` declaration.
+   fn parse_variable_declaration(&mut self) -> Result<NodeHandle, Error> {
+      let var_token = self.lexer.next()?;
+      let node_kind = match var_token.kind {
+         TokenKind::Val => NodeKind::Val,
+         TokenKind::Var => NodeKind::Var,
+         _ => unreachable!(),
+      };
+      // TODO: Tuple destructuring, multiple assignment.
+      // These will probably need completely different syntax nodes, because `Val` and `Var` are
+      // the "simple" assignments, while destructuring and multi-assignment is syntax sugar for the
+      // former two.
+      let name_token = self.lexer.next()?;
+      let name = self.create_identifier(name_token);
+      self.expect_token(TokenKind::Assign, |t| ErrorKind::VarMissingEquals(t.kind))?;
+      let value = self.parse_expression(0)?;
+      Ok(self.create_node_with_handles(node_kind, name, value))
+   }
+
    /// Parses a statement.
    fn parse_statement(&mut self) -> Result<NodeHandle, Error> {
       let token_kind = self.lexer.peek()?.kind.clone();
       let node = match token_kind {
+         // Declarations
+         TokenKind::Val | TokenKind::Var => self.parse_variable_declaration()?,
+         // Control flow
          TokenKind::Underscore => self.parse_pass()?,
          TokenKind::Do => self.parse_do_expression(None)?,
          TokenKind::If => self.parse_if_expression(None)?,
