@@ -1660,6 +1660,12 @@ The last part, `[+:feature1, -:feature2]` specifies which non-default features s
 
 All of these parts (except `as name`) are passed to the package manager, and its job is to resolve them to pairs of package names and paths to their `src` directories.
 
+This syntax looks quite long at first, but typical use cases are a lot shorter:
+```
+dependency github:"liquidev/gmath" @ "0.1.0"
+dependency lunar:"liquidev/image" @ "0.1.0" [+:png, +:jpg, +:webp]
+```
+
 ### Declaring package properties
 
 The `dependency` declaration can alternatively be followed by a block for declaring properties of the current package. Such a declaration looks like this:
