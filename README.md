@@ -22,7 +22,7 @@ pacman -S llvm
 
 Problems may arise when LLVM 13 or newer is released, but I'll make sure this guide is up to date when that happens.
 
-Not all distributions include LLVM static libraries in their `llvm` package (looking at you, Ubuntu), so you might have to use LLVM's binaries that can be downloaded off of [their GitHub](https://github.com/llvm/llvm-project/releases). __Be sure to download LLVM 12.x.x, but not anything older or newer than that.
+Not all distributions include LLVM static libraries in their `llvm` package (looking at you, Ubuntu), so you might have to use LLVM's binaries that can be downloaded off of [their GitHub](https://github.com/llvm/llvm-project/releases). __Be sure to download LLVM 12.x.x, but not anything older or newer than that.__
 
 After downloading LLVM, the environment variable `$LLVM_SYS_120_PREFIX` has to be set. If you installed LLVM from the package manager, simply set it to `/`. Otherwise, set it to the root directory of the extracted archive (the directory with `bin`, `lib`, etc.)
 
