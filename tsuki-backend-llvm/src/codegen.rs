@@ -56,22 +56,19 @@ impl<'c> CodeGen<'c> {
    }
 
    /// Generates code for an arbitrary node.
-   pub fn generate_statement(&mut self, ir: &Ir, node: NodeHandle) -> Result<(), Error> {
+   pub fn generate_statement(&self, ir: &Ir, node: NodeHandle) {
       match ir.ast.kind(node) {
-         NodeKind::StatementList => self.generate_statement_list(ir, node)?,
+         // Control flow
+         NodeKind::Pass => (),
+         NodeKind::StatementList => self.generate_statements(ir, node),
+         NodeKind::DoStatement => {
+            let _ = self.generate_do(ir, node);
+         }
+         // Expressions
          _ => {
             let _ = self.generate_expression(ir, node);
          }
       }
-      Ok(())
-   }
-
-   /// Generates code for a list of statements.
-   fn generate_statement_list(&mut self, ir: &Ir, node: NodeHandle) -> Result<(), Error> {
-      for &statement in ir.ast.extra(node).unwrap_node_list() {
-         self.generate_statement(ir, statement)?;
-      }
-      Ok(())
    }
 }
 

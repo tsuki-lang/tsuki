@@ -1,6 +1,7 @@
 //! The root of the LLVM backend. This implements high-level functionality - compiling code into
 //! object files, and linking those object files into executables.
 
+mod blocks;
 mod codegen;
 mod expression;
 mod libc;
@@ -80,7 +81,7 @@ impl backend::Backend for LlvmBackend {
       state.builder.position_at_end(entry);
 
       // Compile the modules' code.
-      state.generate_statement(&ir, ir.root_node).map_err(|e| common::single_error(e))?;
+      state.generate_statement(&ir, ir.root_node);
 
       // Return the zero exit code.
       state.builder.build_return(Some(&i32_type.const_zero()));

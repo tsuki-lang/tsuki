@@ -371,6 +371,14 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       ast.set_scope(node, Some(scope));
       let log_entry = self.annotate_statement_list(ast, node, context);
       self.scope_stack.pop();
+      ast.convert_preserve(
+         node,
+         if context == NodeContext::Expression {
+            NodeKind::DoExpression
+         } else {
+            NodeKind::DoStatement
+         },
+      );
       log_entry
    }
 

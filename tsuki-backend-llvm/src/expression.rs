@@ -11,7 +11,7 @@ use crate::libc;
 
 impl<'c> CodeGen<'c> {
    /// Generates code for a unit literal.
-   fn generate_unit_literal(&self, _ast: &Ast, _node: NodeHandle) -> StructValue {
+   pub(crate) fn generate_unit_literal(&self, _ast: &Ast, _node: NodeHandle) -> StructValue {
       self.unit_type.const_zero()
    }
 
@@ -137,6 +137,9 @@ impl<'c> CodeGen<'c> {
          NodeKind::Plus | NodeKind::Minus | NodeKind::Mul | NodeKind::Div => {
             self.generate_math(ir, node)
          }
+
+         // Control flow
+         NodeKind::DoExpression => self.generate_do(ir, node).unwrap(),
 
          // Intrinsics
          NodeKind::WidenUint | NodeKind::WidenInt => self.generate_int_conversion(ir, node),
