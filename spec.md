@@ -244,7 +244,7 @@ Note that the last statement *must* be an expression statement, as the `do` expr
 The `if..elif..else` expression evaluates a boolean condition, and if it's `true`, evaluates the block of code following that condition. If the condition is `false`, the next condition is evaluated, and so on. If none of the conditions evaluate to `true`, the `else` arm is executed.
 
 ```
-import std.io
+import @std.io
 
 val name = io.stdin.read_line()
 print(
@@ -534,8 +534,8 @@ The `break` statement can be used inside of `while` and `for` loops to jump past
 
 The following program will read integers from `stdin` and print them incremented by 1, until something that can't be parsed as a number is entered.
 ```
-import std.io
-import std.parsing
+import @std.io
+import @std.parsing
 
 while true
   write("Enter a number: ")
@@ -1523,11 +1523,11 @@ The `import` statement imports _all_ symbols from a given module into the curren
 
 It's possible to only import a limited set of symbols into the scope:
 ```
-import std.io for stdin, stdout
+import @std.io for stdin, stdout
 ```
 It's also possible to not import _any_ symbols into the scope, and instead force full qualification:
 ```
-import std.io for _
+import @std.io for _
 ```
 This is not recommended however, as having to fully qualify each module name results in ugly code. Unlike Python, tsuki can usually deal with cases where two symbol names conflict with each other, and in cases where it can't, the compiler will throw an error when trying to use such conflicting symbols.
 
@@ -1540,6 +1540,11 @@ This can be combined with importing a limited set of symbols; the `for` has to g
 import unbearably_long_module_name as ulmn for Thingy
 ```
 
+To tell the compiler that an import should be performed from within an external package, `import @name` must be used. This includes imports from the standard library, because it's treated as an external package.
+
+```
+import @std.testing
+```
 
 ## Packages
 
@@ -1575,7 +1580,7 @@ An external package manager may instruct the compiler to treat a directory as an
 
 Modules from external packages can be imported using a dot `.`:
 ```
-import std.os
+import @std.os
 ```
 
 If a package isn't necessarily split up into smaller modules, like `std` is, then it may have a _main module_. The main module's name must be the same as the package's name:
@@ -1620,7 +1625,7 @@ impl type
 
 Package: my_program, File: src/my_program.tsu
 ```
-import adder
+import @adder
 
 val two = Adder.init(2)
 print(two.add(2))  # 4
@@ -1628,8 +1633,53 @@ print(two.add(2))  # 4
 
 It's also possible to reexport some imported symbols, by using `pub` before an `import` statement.
 ```
-pub import std.math
+pub import @std.math
 ```
+
+## Package management
+
+tsuki uses a fairly novel way of dependency management. Instead of the traditional package manager giving the compiler paths to packages, instead _the compiler_ asks the package manager where all the dependencies can be found.
+
+Dependencies are specified using the `dependency` keyword, and must be specified in the main file of the package.
+
+### Adding dependencies
+
+A dependency declaration is made up of a few parts:
+```
+dependency source:"path/to/dependency" @ "version" as name [+:feature1, -:feature2]
+```
+The first part, `source`, specifies the source from which the dependency should be loaded. This can be any string, such as `zip`, or `git`. The exact list of supported sources is defined by the package manager.
+
+The second part, `"path/to/dependency"`, is a string specifying where in the source the dependency can be found. This is a string because paths may be eg. URLs, which cannot be parsed by the compiler.
+
+The third part, `@ "version"`, specifies a source-specific version. Sources can either require this to be present, or not support this at all, but not both.
+
+The fourth part, `as name`, is an optional name to assign the source in case there's a conflict or the package manager can't infer the name from the path itself.
+
+The last part, `[+:feature1, -:feature2]` specifies which non-default features should be enabled (marked with `+`), and which default features should be disabled (marked with `-`). Each feature name is an atom literal.
+
+All of these parts (except `as name`) are passed to the package manager, and its job is to resolve them to pairs of package names and paths to their `src` directories.
+
+### Declaring package properties
+
+The `dependency` declaration can alternatively be followed by a block for declaring properties of the current package. Such a declaration looks like this:
+```
+dependency
+  features = [:jpg, :png, :webp]
+  default_features = [:png]
+```
+
+Every property declaration is a name, followed by `=`, followed by a literal. The following properties are supported:
+- `features`: `Seq[Atom]` - specifies togglable features that can be enabled or disabled.
+- `default_features`: `Seq[Atom]` - specifies which features are enabled by default.
+
+### Querying features
+
+TODO: This will require some sort of compile-time constant expression evaluation and conditional compilation, like a `when` expression.
+
+I'm hestitant over adding this however, because I'm not really a fan of conditional compilation; it makes static analysis hard, as eg. for OS support only a single branch is active at a time.
+
+Maybe something can be done about this using symbolic evaluation?
 
 # Documentation
 
