@@ -1644,48 +1644,33 @@ Dependencies are specified using the `dependency` keyword, and must be specified
 
 ### Adding dependencies
 
-A dependency declaration is made up of a few parts:
+A dependency declaration is made up of the URL, and optionally `as some_name` specifying what the `import @` namespace should be:
+
 ```
-dependency source:"path/to/dependency" @ "version" as name [+:feature1, -:feature2]
-```
-The first part, `source`, specifies the source from which the dependency should be loaded. This can be any string, such as `zip`, or `git`. The exact list of supported sources is defined by the package manager.
-
-The second part, `"path/to/dependency"`, is a string specifying where in the source the dependency can be found. This is a string because paths may be eg. URLs, which cannot be parsed by the compiler.
-
-The third part, `@ "version"`, specifies a source-specific version. Sources can either require this to be present, or not support this at all, but not both.
-
-The fourth part, `as name`, is an optional name to assign the package in case there's a conflict or the package manager can't infer the name from the path itself.
-
-The last part, `[+:feature1, -:feature2]` specifies which non-default features should be enabled (marked with `+`), and which default features should be disabled (marked with `-`). Each feature name is an atom literal.
-
-All of these parts (except `as name`) are passed to the package manager, and its job is to resolve them to pairs of package names and paths to their `src` directories.
-
-This syntax looks quite long at first, but typical use cases are a lot shorter:
-```
-dependency github:"liquidev/gmath" @ "0.1.0"
-dependency lunar:"liquidev/image" @ "0.1.0" [+:png, +:jpg, +:webp]
+# Use a package from the lunarbase package registry:
+dependency "lunar:liquidev/gmath/0.1.0"
+# Clone a git package and rename its namespace:
+dependency "git://github.com/liquidev/tsukipng?tag=0.1.0" as git_gmath
 ```
 
-### Declaring package properties
+The compiler itself does not validate and interpret the URL. That task is on behalf of the package manager.
 
-The `dependency` declaration can alternatively be followed by a block for declaring properties of the current package. Such a declaration looks like this:
+#### Compiler-package manager IPC model
+
+TODO: Specify what medium should be used; `mkfifo` on Unix and named pipes on Windows? TCP sockets? Maybe just make the compiler read from stdin and write to stdout?
+
+The protocol used for communicating between the package manager and the compiler is fairly simple. The compiler simply sends the dependency URLs to the package manager, line by line. The package manager is expected to respond to each line with a package namespace, which must be a valid identifier, and the path to the package's `src` directory, separated by a tab (ASCII 09h).
+
+Example input:
 ```
-dependency
-  features = [:jpg, :png, :webp]
-  default_features = [:png]
+lunar:liquidev/gmath/0.1.0
+git://github.com/liquidev/tsukipng?tag=0.1.0
 ```
-
-Every property declaration is a name, followed by `=`, followed by a literal. The following properties are supported:
-- `features`: `Seq[Atom]` - specifies togglable features that can be enabled or disabled.
-- `default_features`: `Seq[Atom]` - specifies which features are enabled by default.
-
-### Querying features
-
-TODO: This will require some sort of compile-time constant expression evaluation and conditional compilation, like a `when` expression.
-
-I'm hestitant over adding this however, because I'm not really a fan of conditional compilation; it makes static analysis hard, as eg. for OS support only a single branch is active at a time.
-
-Maybe something can be done about this using symbolic evaluation?
+Example output:
+```
+gmath	/home/liquid/.packages/lunar/liquidev/gmath/0.1.0/src
+tsukipng	/home/liquid/.packages/git/github.com/liquidev/tsukipng/tags/0.1.0/src
+```
 
 # Documentation
 
