@@ -1654,7 +1654,7 @@ The second part, `"path/to/dependency"`, is a string specifying where in the sou
 
 The third part, `@ "version"`, specifies a source-specific version. Sources can either require this to be present, or not support this at all, but not both.
 
-The fourth part, `as name`, is an optional name to assign the source in case there's a conflict or the package manager can't infer the name from the path itself.
+The fourth part, `as name`, is an optional name to assign the package in case there's a conflict or the package manager can't infer the name from the path itself.
 
 The last part, `[+:feature1, -:feature2]` specifies which non-default features should be enabled (marked with `+`), and which default features should be disabled (marked with `-`). Each feature name is an atom literal.
 
