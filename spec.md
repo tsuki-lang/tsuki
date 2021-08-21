@@ -83,8 +83,8 @@ This is enforced by the compiler to keep a consistent coding style across variou
 
 The following identifiers are reserved as _keywords_:
 ```
-_ and atom catch derive do for fun if impl in is macro match not object of or
-pub return try type union while val var
+_ and atom catch dependency derive do elif else for fun if impl import
+in is macro match not object of or pub return try type union while val var
 ```
 
 The identifier `_` is special; it's an identifier that is used for ignoring things. Variables with the name `_` cannot be read from, and the identifier cannot be used as a valid function or object name. Additionally, when used as a statement, it's a no-op, and can be used to create empty blocks.
