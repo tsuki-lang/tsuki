@@ -116,7 +116,7 @@ not ~ - () [] {} . ^ ..
 
 The following infix operators are available. The list is sorted by precedence, where top = biggest precedence, and bottom = lowest precedence. Lines with more than one operator contain operators of equal precedence.
 ```
-() {} [] . ^ ? !
+() {} [] . ^ ?
 **
 * / << >> & | ^^
 + - ~
@@ -246,7 +246,7 @@ The `if..elif..else` expression evaluates a boolean condition, and if it's `true
 ```
 import @std.io
 
-val name = io.stdin.read_line()
+val name = stdin.read_line?
 print(
   if name == "Mark"
     "Oh hi Mark"
@@ -279,8 +279,8 @@ if val n = num
 The above code expands to the following:
 ```
 val num: ?Int = nil
-if num?
-  val n = num!
+if num.has_value
+  val n = num.unwrap
   do
     print("will not execute")
 ```
@@ -364,11 +364,11 @@ match rect
 ```
 `match` is the only way of retrieving the variant data from unions.
 
-## `try` expressions
+## `?` operator
 
-`try` expressions allow for easy error handling by safely unwrapping a result type. If the result is successful, the `try` expression results in the success value. If the result is an error, the `try` expression returns the error from the current function.
+The `?` operator allows for easy error handling by safely unwrapping a result type. If the result is successful, the `?` operator results in the success value. If the result is an error, the `?` operator returns the error from the current function.
 
-The current function must have a compatible result as its return type for this to work.
+The `?` operator is only allowed in [`try` blocks](#try-blocks). Functions that return results are implicitly wrapped in these blocks.
 
 ```
 fun fallible(x: Int): !Int
@@ -377,13 +377,13 @@ fun fallible(x: Int): !Int
   else -> x + 4
 
 fun try_example(): !()
-  var x = try fallible(2)
+  var x = fallible(2)?
   print(x)  # 6
 ```
 
 ## `catch` expressions
 
-As an alternative to `try`, it's possible to unwrap an error while still preserving the error value using the `catch` expression. Building on the above example, it's possible to handle the two errors separately by `catch`ing the error:
+As an alternative to `?`, it's possible to unwrap an error while still preserving the error value using the `catch` expression. Building on the above example, it's possible to handle the two errors separately by `catch`ing the error:
 
 ```
 fun catch_example()
@@ -396,6 +396,24 @@ fun catch_example()
 Note how in this case the function doesn't need to return a result type. This is because we _catch_ the result instead of bubbling it up the function call stack.
 
 The `catch` block must return a default value for the resulting expression, so as not to leave a value uninitialized. As per the usual rules, `NoReturn` is also allowed, as it implicitly converts to any other type.
+
+## `try` expressions
+
+`try` expressions enable usage of the `?` operator. By default, all functions that return a result act as if they were wrapped in an implicit `try` block.
+
+Using the `?` operator on an error result in a `try` block will break out of the block, and the block's result value will be the error result. Note that `try` blocks cannot be used in statement context, because an error result must not be discarded.
+```
+val a = try
+  val num_string = stdin.read_line?
+  val num = Int32.parse(num_string)?
+  num + 2
+print(a)
+```
+In cases where the compiler has trouble figuring out what the error result's type is supposed to be, the type can be provided explicitly by using a colon `:` after `try`.
+```
+val a = try: IoError!()
+  _  # do stuff
+```
 
 # Statements
 
@@ -539,7 +557,7 @@ import @std.parsing
 
 while true
   write("Enter a number: ")
-  val number_string = stdin.read_line
+  val number_string = stdin.read_line?
   write('\n')
   if val number = number_string.parse_int
     print(number + 1)
@@ -665,7 +683,7 @@ Narrowing conversions and conversions between unsigned and signed integers are n
 val x: Uint16 = 1_i8.to_u16 or 0
 ```
 
-These functions return an optional wrapping the final type, which must be unwrapped using `!` or `or`. The value returned is `nil` if overflow occurred. The `to_*_wrapping` and `to_*_saturating` variants can be used if different behavior is needed.
+These functions return an optional wrapping the final type, which must be unwrapped using `unwrap` or `or`. The value returned is `nil` if overflow occurred. The `to_*_wrapping` and `to_*_saturating` variants can be used if different behavior is needed.
 
 Arithmetic operators panic on overflow. `add_checked`, `add_wrapping`, `add_saturating`, and friends may be used to protect against panicking.
 
@@ -803,13 +821,13 @@ val opt: ?Int = nil
 val correct: ?Int = 3
 ```
 
-The presence of a value can be queried using the `?` "check" operator, and the value can later be read using the `!` unwrap operator.
+The presence of a value can be queried using the `has_value` function, and the value can later be read using the `unwrap` function.
 ```
-if opt?
+if opt.has_value
   print("That ain't happening, sir")
 
-if correct?
-  val ok = correct!
+if correct.has_value
+  val ok = correct.unwrap
   print("The unwrapped value is: " ~ ok.to_string)
 ```
 
@@ -832,7 +850,7 @@ The shorthand `!T` may be used instead of `Error!T`.
 
 For a given result type `Err!Ok`, both `Err` and `Ok` are implicitly convertible to that result type.
 
-Examples on handling errors can be found in the "`try` expressions" and "`catch` expressions" sections of this document.
+Examples on handling errors can be found in the "`?` operator" and [`catch` expressions](#catch-expressions) sections of this document.
 
 ## Pointers
 
@@ -1422,8 +1440,6 @@ Several built-in traits exist that allow for overloading existing operators. Her
 | unary `not` | `Not` | `unot` | boolean NOT |
 | unary `~` | `BitNot` | `bnot` | bitwise NOT |
 | unary `-` | `Neg` | `neg` | arithmetic negation |
-| unary `?` | `Check` | `check` | optional/result is present/successful |
-| unary `!` | `Unwrap` | `unwrap` | unwrap optional/result |
 | binary `+` | `Add` | `add` | arithmetic addition |
 | binary `-` | `Sub` | `sub` | arithmetic subtraction|
 | binary `*` | `Mul` | `mul` | arithmetic multiplciation |
@@ -1447,7 +1463,7 @@ Several built-in traits exist that allow for overloading existing operators. Her
 | ternary `{}=` | `PutAlt` | `put_alt` | `Put`, alternative version |
 | binary `<-` | `Push` | `push` | insertion into a list/set |
 
-Other operators are not user-overloadable (such as `and`, `or`), or derived from other operators (such as `>` and `>=`, derived from `<` and `<=` by flipping the arguments around).
+Other operators are not user-overloadable (such as `and`, `or`, `?`), or derived from other operators (such as `>` and `>=`, derived from `<` and `<=` by flipping the arguments around).
 
 Unary operator traits have a single associated type `Ret`, which signifies the result type of the operator. These traits are defined like so (example based on unary `not`):
 ```
