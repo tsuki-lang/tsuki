@@ -419,7 +419,7 @@ The `catch` block must return a default value for the resulting expression, so a
 
 `try` expressions enable usage of the `?` operator. By default, all functions that return a result act as if they were wrapped in an implicit `try` block.
 
-Using the `?` operator on an error result in a `try` block will break out of the block, and the block's result value will be the error result. Note that `try` blocks cannot be used in statement context, because an error result must not be discarded.
+Using the `?` operator on an error result in a `try` block will break out of the block, and the block's result value will be the error result.
 ```
 val a = try
   val num_string = stdin.read_line?
@@ -427,11 +427,15 @@ val a = try
   num + 2
 print(a)
 ```
-In cases where the compiler has trouble figuring out what the error result's type is supposed to be, the type can be provided explicitly by using a colon `:` after `try`.
+In cases where the compiler has trouble figuring out what the error result's type is supposed to be, the `try` can be assigned to a variable with an explicit type specified.
 ```
-val a = try: IoError!()
+val a: IoError!() = try
   _  # do stuff
 ```
+
+Note that `try` cannot be used as a statement. This has a few effects:
+- The result of `try` must be assigned to a variable, or otherwise treated as used (assigned to `_`, used as an argument, etc.)
+- The last statement in `try` must always be an expression.
 
 # Statements
 
@@ -862,7 +866,7 @@ Results are the primary method of handling errors in tsuki. Whenever a function 
 
 A result type is written like `Err!Ok`, where `Err` is the error type, and `Ok` is the success type.
 
-The built-in `Error` atom subset contains all possible error atoms defined throughout the program. `Error` and its subsets are the only allowed atom type in results. Objects and unions tagged with the `:: error` pragma can also be used as valid error types. Other types are not permitted as error types.
+The built-in `Error` atom subset contains all possible error atoms defined throughout the program. `Error` and its subsets are the only allowed atom type in results. Objects and unions tagged with the `Failure` trait can also be used as valid error types. Other types are not permitted as error types.
 
 The shorthand `!T` may be used instead of `Error!T`.
 
