@@ -111,7 +111,9 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
       | NodeKind::DivAssign
       | NodeKind::Push
       | NodeKind::Index
-      | NodeKind::IndexAlt => {
+      | NodeKind::IndexAlt
+      | NodeKind::Val
+      | NodeKind::Var => {
          let (left, right) = (ast.first_handle(node), ast.second_handle(node));
          dump_node(s, left, depth + 1, Some(Prefix::L));
          dump_node(s, right, depth + 1, Some(Prefix::R));

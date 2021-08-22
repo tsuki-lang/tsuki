@@ -524,7 +524,9 @@ impl<'l, 's> Parser<'l, 's> {
       let name = self.create_identifier(name_token);
       self.expect_token(TokenKind::Assign, |t| ErrorKind::VarMissingEquals(t.kind))?;
       let value = self.parse_expression(0)?;
-      Ok(self.create_node_with_handles(node_kind, name, value))
+      let node = self.create_node_with_handles(node_kind, name, value);
+      self.ast.set_span(node, Span::join(&var_token.span, self.ast.span(value)));
+      Ok(node)
    }
 
    /// Parses a statement.

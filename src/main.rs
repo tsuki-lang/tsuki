@@ -22,6 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       backend.compile(SourceFile {
          filename: "test.tsu".into(),
          source: r#"
+            val a = 1
             __intrin_print_int32(42 / 2 * 4)
             __intrin_print_float32(10.0)
             10.0_f64 + 5.0
