@@ -121,7 +121,7 @@ The following infix operators are available. The list is sorted by precedence, w
 **
 * / << >> & | ^^
 + - ~
-.. ..=
+.. ..<
 == != < > <= >= is of in
 and
 or
@@ -917,6 +917,33 @@ print_x_from(^example)
 
 The limitations concerning pointer storage may get lifted in the future if the language gets a proper borrow checker.
 
+## Ranges
+
+The inclusive and exclusive range operators (`..` and `..<` respectively) are one of the few non-overloadable operators in tsuki. These operators are binary operators, whose both sides must be of the same type, and produce a value of type `Range[T]` and `RangeExcl[T]`.
+
+```
+val a = 1..2   # Range[Int]
+val b = 1..<3  # RangeExcl[Int]
+# The lower and upper bounds can be retrieved using `.lower` and `.upper`.
+print(a.lower)  # 1
+print(a.upper)  # 2
+print(b.lower)  # 1
+print(b.upper)  # 3
+```
+
+There's also the value `..`, whose type is `RangeFull`.
+```
+val c = ..  # RangeFull
+```
+
+For a `RangeExcl[T]`, if `T` implements `Ordinal`, the exclusive range may be converted to an inclusive range, using the `to_inclusive` function.
+```
+val excl = 1..<5
+val incl = excl.to_inclusive
+print(incl)  # 1..4
+```
+The `to_inclusive` function returns a range with the upper bound replaced with `.upper.[Ordinal].pred`.
+
 ## Slices
 
 Slices allow for storing _views_ to arrays of data. In terms of semantics, they're very similar to pointers: you cannot store a slice in a permanent location, like a variable or an object; they can only appear in procedure parameters.
@@ -1527,6 +1554,12 @@ trait Animal
   fun val speak()
 ```
 
+When instantiating generic traits with associated types, the associated types are provided after generic types, using `K = V` syntax.
+```
+fun add_two[T: Add[Int, Ret = Int]](x: T): Int
+  x + 2
+```
+
 ### Operator overloading
 
 Several built-in traits exist that allow for overloading existing operators. Here's a list of all the traits, their function names, and the operators they overload:
@@ -1547,17 +1580,14 @@ Several built-in traits exist that allow for overloading existing operators. Her
 | binary <code>\|</code> | `BitOr` | `bor` | bitwise OR |
 | binary `^^` | `BitXor` | `bxor` | bitwise XOR |
 | binary `~` | `Concat` | `concat` | concatenation |
-| binary `..` | `UpTo` | `up_to` | exclusive range `[x; y)` |
-| binary `..=` | `UpToIncl` | `up_to_incl` | inclusive range `[x; y]` |
 | binary `==` | `Equal` | `equal` | value equality |
-| binary `<` | `Less` | `less` | number comparison |
+| binary `<` | `Less` | `less` | ordered relation |
 | binary `<=` | `LessEqual` | `less_equal` | |
 | binary `in` | `Contains` | `contains` | presence in a list/set |
-| binary `[]` | `Index` | `at` | indexing (slicing) |
-| binary `{}` | `IndexDup` | `at_dup` | indexing (duplicating) |
-| ternary `[]=` | `Put` | `put` | setting values at an index/range |
-| ternary `{}=` | `PutAlt` | `put_alt` | `Put`, alternative version |
+| binary `[]` | `Index` | `at` | indexing (panic when out of bounds) |
+| binary `{}` | `Get` | `get` | safe indexing (`nil` when out of bounds) |
 | binary `<-` | `Push` | `push` | insertion into a list/set |
+| binary `as` | `As` | `convert` | safe conversion to a different type |
 
 Other operators are not user-overloadable (such as `and`, `or`, `?`), or derived from other operators (such as `>` and `>=`, derived from `<` and `<=` by flipping the arguments around).
 
@@ -1575,13 +1605,23 @@ trait Add[R]
   type Ret
   fun val add(rhs: R): Self.Ret
 ```
-The only exception to this definition is `Push`, which accepts a `var self` and is expected to mutate the destination object.
-
-Ternary index operator traits have two generic arguments: `I`, and `V`, where `I` is the index type, and `V` is the value type. These operators do not return anything, so there is no associated `Ret` type.
-The functions for these operators require a `var self`.
+There are a few exceptions to this rule, though:
 ```
-trait SetIndex[I, V]
-  fun var set_at(index: I, value: V)
+# Index is supposed to return a potentially var pointer to the element,
+# such that it can be modified, and its address can be taken.
+trait Index[I]
+  type Ret
+  fun val at(index: I): ^Self.Ret
+  fun var at(index: I): ^var Self.Ret
+
+# Safe indexing returns an optional.
+trait Get[I]
+  type Ret
+  fun val get(index: I): ?Self.Ret
+
+# Push accepts a `var self` and does not return anything.
+trait Push[T]
+  fun var push(value: T)
 ```
 
 #### The `Unwrap` trait
