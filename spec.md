@@ -1064,8 +1064,6 @@ Certain elements of a tuple may be ignored while unpacking, using the `_` identi
 val (x, _, z, _) = (1, 2, 3, 4)
 ```
 
-A tuple's maximum allowed size is 8 fields. If more than that is needed, a named object should be used.
-
 ## Objects
 
 An object is a named type containing user-defined fields. An object is declared like so:
