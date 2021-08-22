@@ -83,11 +83,12 @@ This is enforced by the compiler to keep a consistent coding style across variou
 
 The following identifiers are reserved as _keywords_:
 ```
-_ and atom catch dependency derive do elif else for fun if impl import
-in is macro match not object of or pub return try type union while val var
+_ and as atom catch dependency derive do elif else for fun if impl import
+in is macro match move not object of or pub rc return try type uninit union
+weak while val var
 ```
 
-The identifier `_` is special; it's an identifier that is used for ignoring things. Variables with the name `_` cannot be read from, and the identifier cannot be used as a valid function or object name. Additionally, when used as a statement, it's a no-op, and can be used to create empty blocks.
+The identifier `_` is special; it's an identifier that is used for ignoring things. Declaring a variable with the name `_` discards its value, and the identifier cannot be used as a valid function or object name. Additionally, when used as a statement, it's a no-op, and can be used to create empty blocks.
 
 ## Blocks
 
@@ -116,7 +117,7 @@ not ~ - () [] {} . ^ ..
 
 The following infix operators are available. The list is sorted by precedence, where top = biggest precedence, and bottom = lowest precedence. Lines with more than one operator contain operators of equal precedence.
 ```
-() {} [] . ^ ?
+() {} [] . ^ ? as
 **
 * / << >> & | ^^
 + - ~
@@ -226,6 +227,23 @@ assert(not (p2 is Child))
 assert(p2 of Child)
 ```
 
+## `as` operator
+
+The `as` operator is used for converting types explicitly. It's syntax sugar for calling the `convert` method on a value's `As[T]` trait.
+
+```
+val x = Int32.parse(stdin.read_line?)
+val y = x as Float32
+```
+Is sugar for:
+```
+val y = x.[As[Float32]].convert
+```
+
+Unlike most other operators, `as` expects a type on the right-hand side, as opposed to another expression of lower precedence.
+
+TODO: Fallible conversions? Maybe a `MaybeAs` and a corresponding `as?` operator?
+
 ## `do` expressions
 
 The `do` expression evaluates a block of code and returns the result of the last statement in the block.
@@ -279,8 +297,8 @@ if val n = num
 The above code expands to the following:
 ```
 val num: ?Int = nil
-if num.has_value
-  val n = num.unwrap
+if num.[Unwrap].has_value
+  val n = num.[Unwrap].unwrap
   do
     print("will not execute")
 ```
@@ -351,7 +369,7 @@ union Shape
   :rectangle(Float, Float, Float, Float)
   :circle(Float, Float, Float)
 
-val rect = Shape:rectangle((32, 32, 64, 64))
+val rect = Shape:rectangle(32, 32, 64, 64)
 match rect
   :rectangle(x, y, width, height) ->
     print("Rectangle")
@@ -368,7 +386,7 @@ match rect
 
 The `?` operator allows for easy error handling by safely unwrapping a result type. If the result is successful, the `?` operator results in the success value. If the result is an error, the `?` operator returns the error from the current function.
 
-The `?` operator is only allowed in [`try` blocks](#try-blocks). Functions that return results are implicitly wrapped in these blocks.
+The `?` operator is only allowed in [`try` blocks](#try-expressions). Functions that return results are implicitly wrapped in these blocks.
 
 ```
 fun fallible(x: Int): !Int
@@ -701,7 +719,7 @@ tsuki has two floating point types: `Float32` and `Float64`. These are signed, I
 
 For user convenience, integer literals get converted to floating point literals whenever possible.
 
-The operators `+`, `-`, `*`, and `/` work as defined in the standard. There's one extra operator, `**`, which is the exponentiation operator. It accepts an integer exponent on its right hand side and, for the expression `x ** n`, returns `x` multiplied by itself `n` times. When `n` is a constant, the compiler expands the expression to `n` multiplications without involving a loop.
+The operators `+`, `-`, `*`, and `/` work as defined in the standard. There's one extra operator, `**`, which is the exponentiation operator. It accepts an integer or floating-point exponent on its right hand side and, for the expression `x ** n`, returns `x` multiplied by itself `n` times. When `n` is a constant, the compiler expands the expression to `n` multiplications without involving a loop.
 
 `impl`s containing extra operations, such as square roots and trigonometry, may be found in the `std.math` module.
 
@@ -766,9 +784,9 @@ atom IoError in Error
 
 Error handling is described in greater detail in [Results](#results).
 
-Sometimes, the type system isn't able to infer the correct type for an atom; in this case, the type can be specified explicitly by using the infix index operator `[]`:
+Sometimes, the type system isn't able to infer the correct type for an atom; in this case, the type can be specified explicitly, before the atom itself.
 ```
-val err = Error[:eaccess]
+val err = Error:eaccess
 assert(err is Error)
 ```
 
@@ -858,20 +876,24 @@ Pointers allow for passing _variables_ by reference. They differ from `rc` objec
 
 A mutable pointer type is written as `^var T`. An immutable pointer type is written as `^T`.
 
-Currently, pointers can only appear inside of procedure parameter lists, to allow a procedure to modify an outside variable.
+Pointers can only appear inside of procedure parameter lists, to allow a procedure to modify an outside variable, but also in procecure return types, to let outside code modify inner variables. Using these pointers is heavily restricted though: to maintain memory safety, they cannot be moved out of their original storage location.
 
 A simple example showcasing mutable pointers would incrementing an integer variable by passing its address to a procedure.
 ```
 fun inc(x: ^var Int)
-  x^ += 1
+  # Assignment operators automatically dereference pointers on the
+  # left-hand side.
+  x += 1
 
 var x = 0
-inc(^var x)
+inc(^x)
 print(x)  # 1
 ```
 It's also possible to create pointers to other things, such as object fields, and slice elements.
 
-Pointers can be created using the `^var` and `^` prefix operators, and dereferenced using the `^` postfix operator. Pointers are also subject to automatic dereferencing when calling instance functions. Consider this example:
+Pointers can be created using the `^` prefix operator, and dereferenced using the `^` postfix operator. The `^` prefix operator always creates a pointer of the biggest possible mutability; eg. when a pointer to a `var` variable is taken, using the `^` operator on that variable will return `^var T`. This isn't a problem since `^var T` is implicitly convertible to `^T`.
+
+Pointers are also subject to automatic dereferencing when calling instance functions. Consider this example:
 ```
 object Example
   val x: Int
@@ -966,6 +988,55 @@ Values in tables may be modified by using the `[]=` operator.
 numbers["half"] = 0.5
 ```
 
+## `rc T`, `rc var T`, `weak T`, and `weak var T`
+
+`rc T` is a smart pointer that allows for multiple ownership of a single value. Usually a value can only have a single owner; with `rc T` however a value can be owned by _multiple_ locations, through the use of _reference-counting_.
+
+An `rc T` stores a reference count alongside the actual data. Copying an `rc T` increments that reference count by 1, and dropping an `rc T` decrements the reference count by 1. The inner value is dropped and the rc's heap memory is freed once the count reaches 0.
+
+`weak T` on the other hand is a _downgraded_ version of `rc T`, in that creating it does not increment the reference count of an `rc T`. This however means that the value pointed to by the `weak T` does not have to exist at the time of referencing it, so `if val` has to be used to unwrap it.
+
+The inner value of an `rc T` or `weak T` is immutable by default. `rc var T` and `weak var T` are alternatives that allow for mutating the inner value.
+
+```
+# The `rc{}` operator can be used to create an rc value.
+val r = rc{1}
+# An rc's inner value is immutable by default.
+# r = 2  # error: rc cannot be implicitly converted to ^var T
+
+# The mutable alternative to rc is rc var:
+val r = rc var{1}
+# Unlike rc, its value can be modified.
+r = 3
+print(r^)  # 3
+
+# The Rc object houses some utilities for working with rc.
+# For instance, we can explicitly downgrade the rc var to a weak var:
+val w = Rc.downgrade_var(r)
+# We can also get the reference count:
+print(Rc.count(r))  # 1
+# In this case, it's 1, because only `r` owns a strong reference.
+
+# To read from the weak, we can use if val.
+if val v = w
+  print(v^)  # 3
+
+# Here's an example in which the weak does not store a valid reference:
+var w: weak Int32
+do
+  val r = rc{1}
+  w = r
+  # r's inner value is dropped here, because the strong reference count 
+  # becomes 0.
+  # The rc's heap allocations is _not_ dropped because there are still
+  # weaks pointing to it.
+if val v = w
+  print("ain't happening")  # ...because the inner value was dropped.
+else
+  print("rc's dead, long live the weak")
+# The heap allocation is only freed here.
+```
+
 ## Tuples
 
 Tuples are values that bind many values together. A tuple type is specified using the following syntax:
@@ -1047,11 +1118,13 @@ u.y = u.x + 2
 ```
 It is a compile-time error to try to read from a field that's `uninit`. It is also a compile-time error to try to move an object with `uninit` fields to a different location than where it already is, eg. via `return` or setting a variable.
 
-An object can be marked as an error type by using the `:: error` pragma.
+An object can be marked as an error type by implementing the `Failure` trait.
 ```
-object CompileError :: error
+object CompileError
   val line, column: Index
   val message: String
+impl Failure
+  # Failure is a "marker" trait, it doesn't require any types or functions.
 
 val e: CompileError!Int = CompileError {
   line = 3, column = 1,
@@ -1060,9 +1133,22 @@ val e: CompileError!Int = CompileError {
 ```
 Custom error types are better described in [Results](#results).
 
-### Copying
+### Move semantics
 
-Objects in tsuki cannot be copied by default. Instead, the `Dup` and `Copy` traits have to be implemented.
+Objects in tsuki cannot be copied by default. Instead, they get _moved_ to a new location.
+
+When an object in a location (a variable or object field) is referenced by value, that is, without taking its address using the pointer `^` operator, we say it's _moved_. The original location where the object was stored becomes `uninit` and the new location is the owner of the object. Because the old location becomes `uninit`, it cannot be read from. The moment at which the object is dropped also changes to whenever the new location goes out of scope.
+
+```
+object Example
+  val a: Int32 = 1
+
+val e = Example {}
+val f = e
+# print(e)  # error: `e` is uninitialized and cannot be read from
+```
+
+To enable implicit copying of the object, the `Dup` and `Copy` traits have to be implemented.
 
 `Dup` is a trait that exposes a `dup` function for the object. This function creates a brand new *dup*licate of the object, hence the name `dup`. When `derive`d, the `dup` function will default to simply copy over the existing fields of the object to a brand new instance.
 
@@ -1154,35 +1240,20 @@ val c = Child { of init_parent(), y = 2 }
 
 ### Reference counting
 
-tsuki allows for automatic memory management via _reference counting_. An object can be marked as reference counted by using the `rc` keyword after the name and parent object.
+Sometimes it's more convenient to specify an object as implicitly-`rc`.
+This can be done by using the `rc` keyword after the `object` keyword when declaring it.
+
 ```
-object Example rc
+object rc Test
   val x: Int32
 
-val ref = Example { x = 1 }
-```
+# with inheritance
 
-A reference counted object is always allocated on the heap, and stores a `refcount: Uint64` along with the object data. This field starts out at 1, and is increased with each new reference to the object. Similarly, it's decreased whenever a reference to the object is dropped. Once the reference count reaches 0, the object is freed from memory, and its `Drop` trait is called if applicable.
+object Parent of Root
+  val x: Int32
 
-Sometimes increasing the reference count is undesirable, eg. when implementing a doubly linked list. Such a list contains cycles, which reference counting cannot deal with. In this case, the `weak` type annotation may be used.
-
-```
-object DoubleLink[T]
-  var prev: ?DoubleLink[T] weak
-  var next: ?DoubleLink[T]
-  val value: T
-
-var a = DoubleLink[Int] {
-  prev = nil,
-  next = uninit,
-  value = 1
-}
-var b = DoubleLink[Int] {
-  prev = a,
-  next = nil,
-  value = 2,
-}
-a.next = b
+object rc Child of Root
+  val y: Int32
 ```
 
 ## Unions
@@ -1290,7 +1361,7 @@ Note the uppercase letter, though; this type is _not_ to be confused with the `s
 
 As already noted, `Self` is the only way of referring to associated types.
 
-### `self`, `fun var`, and `fun val`
+### `self`, `fun move`, fun var`, and `fun val`
 
 Non-`type` blocks implement functions on _instances_ of a given type. This instance can be accessed, and optionally mutated inside of the function, by using the special, implicit `self` variable.
 
@@ -1329,7 +1400,7 @@ impl Example
 
 `self` cannot be used to access fields; it can only be used for invoking methods.
 
-Now, about `fun val` and `fun var`: these are annotations that let the compiler know whether `self` must be `var` or not for the function to be callable. This property is usually inferred automatically, depending on what a given function does.
+Now, about `fun move`, `fun val` and `fun var`: these are annotations that let the compiler know whether `self` must be `var` or not for the function to be callable. This property is usually inferred automatically, depending on what a given function does.
 
 - If a function modifies any field directly, then it's `var`.
 - If a function calls another instance function that's `var`, then it's `var`.
@@ -1337,6 +1408,29 @@ Now, about `fun val` and `fun var`: these are annotations that let the compiler 
 - Otherwise, the function is `val` because it cannot possibly modify `self`.
 
 `fun val` and `fun var` can still be specified explicitly for readability purposes. In traits, specifying the `var`ness of `self` is necessary, because the compiler cannot infer `var`ness without looking at a function's body.
+
+`fun move` on the other hand is always explicit, and specifies that calling a function _consumes_ the original object, moving it out of the original location into `self`. This can be used to implement the _typestate_ pattern, where an object's compile-time type specifies the runtime state of an object. An example of this is `std.process.ProcessBuilder`:
+```
+object ProcessBuilder
+  # internal
+
+impl type
+  fun new(executable: OsString): Self
+    _  # internal
+
+impl
+  # This function has an implicitly `var self`, because it modifies `self`,
+  # albeit that's not visible in this example.
+  fun argument(arg: OsString): ^var Self
+    # ...
+    self
+
+  # ... other functions
+
+  fun move spawn(): Process
+    _  # internal
+```
+Once the `spawn` function is called, the builder is consumed and the arguments and environment variables of the process cannot be modified anymore.
 
 ### Getters and setters
 
@@ -1486,6 +1580,41 @@ The functions for these operators require a `var self`.
 ```
 trait SetIndex[I, V]
   fun var set_at(index: I, value: V)
+```
+
+#### The `Unwrap` trait
+
+The `Unwrap` trait is used to overload `if val` declarations. It's defined like so:
+```
+trait Unwrap
+  type Inner
+  fun val has_value(): bool
+  fun val unwrap(): Inner
+```
+
+### Calling functions from specific traits
+
+Sometimes, two functions from different traits can share the same name. In these cases the special `a.[T]` notation can be used to select the implementation of trait `T` on `a`.
+
+```
+trait ExampleA
+  fun my_method()
+
+trait ExampleB
+  fun my_method()
+
+object Example
+impl ExampleA
+  fun my_method()
+    print("Called on ExampleA")
+impl ExampleB
+  fun my_method()
+    print("Called on ExampleB")
+
+val e = Example {}
+# e.my_method  # error: ambiguous call; resolves to more than one function
+e.[ExampleA].my_method  # Called on ExampleA
+e.[ExampleB].my_method  # Called on ExampleB
 ```
 
 # Generics
