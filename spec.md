@@ -1361,7 +1361,7 @@ Note the uppercase letter, though; this type is _not_ to be confused with the `s
 
 As already noted, `Self` is the only way of referring to associated types.
 
-### `self`, `fun move`, fun var`, and `fun val`
+### `self`, `fun move`, `fun var`, and `fun val`
 
 Non-`type` blocks implement functions on _instances_ of a given type. This instance can be accessed, and optionally mutated inside of the function, by using the special, implicit `self` variable.
 
