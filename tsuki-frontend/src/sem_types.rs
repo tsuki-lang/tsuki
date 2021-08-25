@@ -2,7 +2,7 @@
 
 use crate::ast::{Ast, NodeData, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors};
-use crate::scope::{ScopeStack, Scopes, Symbols};
+use crate::scope::{ScopeStack, Scopes, SymbolKind, Symbols, Variable, VariableKind};
 use crate::sem::{SemCommon, SemPass};
 use crate::types::{BuiltinTypes, FloatSize, IntegerSize, TypeId, TypeLog, TypeLogEntry, Types};
 
@@ -382,6 +382,26 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       log_entry
    }
 
+   /// Annotates a variable declaration.
+   fn annotate_variable_declaration(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
+      let kind = if ast.kind(node) == NodeKind::Val {
+         VariableKind::Val
+      } else {
+         VariableKind::Var
+      };
+      let variable = Variable { kind };
+      let name_node = ast.first_handle(node);
+      let name = self.common.get_source_range_from_node(ast, name_node);
+      let value_node = ast.second_handle(node);
+      let value_log = self.annotate_node(ast, value_node, NodeContext::Expression);
+      let value_type = self.log.typ(value_log);
+      let symbol = self.symbols.create(name, node, value_type, SymbolKind::Variable(variable));
+      ast.convert_to_symbol(name_node, symbol);
+      let scope = self.scope_stack.top();
+      self.scopes.insert(scope, name, symbol);
+      self.annotate(ast, node, self.builtin.t_statement)
+   }
+
    /// Annotates the given AST node.
    fn annotate_node(
       &mut self,
@@ -429,6 +449,9 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
          NodeKind::StatementList => self.annotate_statement_list(ast, node, context),
          NodeKind::Pass => self.annotate_pass(ast, node),
          NodeKind::Do => self.annotate_do(ast, node, context),
+
+         // Declarations
+         NodeKind::Val | NodeKind::Var => self.annotate_variable_declaration(ast, node),
 
          // Other nodes are invalid (or not implemented yet).
          other => self.error(ast, node, ErrorKind::SemTypesInvalidAstNode(other)),

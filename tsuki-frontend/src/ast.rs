@@ -227,6 +227,12 @@ impl Ast {
       self.set_scope(node, None);
    }
 
+   /// Converts the given node to a symbol node.
+   pub fn convert_to_symbol(&mut self, node: NodeHandle, symbol: SymbolId) {
+      self.convert(node, NodeKind::Symbol);
+      self.set_symbol_id(node, symbol);
+   }
+
    /// Wraps the old node in a new node of the given kind.
    ///
    /// That is, converts the given node to the given kind, and sets the `first` to the

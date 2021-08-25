@@ -70,6 +70,15 @@ impl SemCommon {
    }
 }
 
+/// The intermediate representation output by the analyzer. This contains the AST and type
+/// information.
+pub struct Ir {
+   pub ast: Ast,
+   pub root_node: NodeHandle,
+   pub types: Types,
+   pub symbols: Symbols,
+}
+
 /// The options passed to `analyze`.
 pub struct AnalyzeOptions<'f, 's> {
    pub filename: &'f str,
@@ -80,7 +89,7 @@ pub struct AnalyzeOptions<'f, 's> {
 }
 
 /// Analyzes and lowers the AST to a representation ready to be used by the backend.
-pub fn analyze(options: AnalyzeOptions) -> Result<(Ast, Types), Errors> {
+pub fn analyze(options: AnalyzeOptions) -> Result<Ir, Errors> {
    let AnalyzeOptions {
       filename,
       source,
@@ -116,5 +125,10 @@ pub fn analyze(options: AnalyzeOptions) -> Result<(Ast, Types), Errors> {
       symbols: &mut symbols,
    }))?;
 
-   Ok((state.ast, types))
+   Ok(Ir {
+      ast: state.ast,
+      root_node,
+      types,
+      symbols,
+   })
 }

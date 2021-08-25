@@ -10,7 +10,7 @@ pub struct SymbolId(usize);
 
 impl SymbolId {
    /// Returns the internal ID of the symbol.
-   pub(crate) fn id(self) -> usize {
+   pub fn id(self) -> usize {
       self.0
    }
 
@@ -22,8 +22,32 @@ impl SymbolId {
 
 /// The kind of a symbol, as well as extra metadata attached to it.
 pub enum SymbolKind {
-   /// A symbol that represents a type.
-   Type(TypeId),
+   /// A symbol that represents a variable.
+   Variable(Variable),
+}
+
+impl SymbolKind {
+   /// Unwraps a variable symbol.
+   pub fn unwrap_variable(&self) -> &Variable {
+      if let SymbolKind::Variable(ref variable) = self {
+         variable
+      } else {
+         panic!("unwrap_variable called on a non-variable symbol")
+      }
+   }
+}
+
+/// The kind of a variable.
+pub enum VariableKind {
+   /// A `val` (immutable) variable.
+   Val,
+   /// A `var` (mutable) variable.
+   Var,
+}
+
+/// Symbol data for a variable declaration.
+pub struct Variable {
+   pub kind: VariableKind,
 }
 
 /// Symbol storage. Symbols are looked up identifiers.
