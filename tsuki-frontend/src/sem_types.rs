@@ -98,6 +98,18 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       self.annotate(ast, node, typ)
    }
 
+   /// Annotates an identifier in expression position, ie. a variable reference.
+   fn annotate_variable_reference(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
+      let name = self.common.get_source_range_from_node(ast, node);
+      if let Some(variable) = self.scope_stack.lookup(self.scopes, name) {
+         let typ = self.symbols.type_id(variable);
+         ast.convert_to_symbol(node, variable);
+         self.annotate(ast, node, typ)
+      } else {
+         self.error(ast, node, ErrorKind::UndeclaredSymbol(name.into()))
+      }
+   }
+
    // Currently, this does some rather simplistic analysis just to Make it Work™, but in the
    // future when operators will be lowered to trait instance function calls, this will be
    // replaced by much simpler logic and compiler intrinsics inside the stdlib.
@@ -399,6 +411,11 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       ast.convert_to_symbol(name_node, symbol);
       let scope = self.scope_stack.top();
       self.scopes.insert(scope, name, symbol);
+      // The variable type annotation is less relevant to error reporting than the fact that it's
+      // a statement. This sounds counterintuitive at first, but note that we're requested to
+      // annotate the Val/Var node, not the variable name node, so the calling function likely
+      // expects a statement instead of an expression.
+      let _ = self.annotate(ast, name_node, value_type);
       self.annotate(ast, node, self.builtin.t_statement)
    }
 
@@ -424,6 +441,9 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
          | NodeKind::Float32
          | NodeKind::Float64
          | NodeKind::Character => self.annotate_literal(ast, node),
+
+         // Identifiers
+         NodeKind::Identifier => self.annotate_variable_reference(ast, node),
 
          // Unary operators
          // ---

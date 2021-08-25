@@ -24,7 +24,7 @@ impl<'c> Variables<'c> {
       self.variables[symbol.id()] = Some(value);
    }
 
-   fn get(&mut self, symbol: SymbolId) -> Option<BasicValueEnum> {
+   fn get(&self, symbol: SymbolId) -> Option<BasicValueEnum<'c>> {
       if symbol.id() >= self.variables.len() {
          None
       } else {
@@ -34,6 +34,17 @@ impl<'c> Variables<'c> {
 }
 
 impl<'c> CodeGen<'c> {
+   pub(crate) fn generate_variable_reference(
+      &self,
+      ir: &Ir,
+      node: NodeHandle,
+   ) -> BasicValueEnum<'c> {
+      let variables = self.variables.borrow();
+      let symbol = ir.ast.symbol_id(node);
+      let alloca = variables.get(symbol).expect("reference to undeclared variable in IR");
+      self.builder.build_load(alloca.into_pointer_value(), ir.symbols.name(symbol))
+   }
+
    pub(crate) fn generate_variable_declaration(&self, ir: &Ir, node: NodeHandle) {
       let mut variables = self.variables.borrow_mut();
       let symbol_node = ir.ast.first_handle(node);

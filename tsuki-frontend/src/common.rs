@@ -190,6 +190,8 @@ pub enum ErrorKind {
    InvalidFloatSuffix,
 
    // SemTypes
+   #[error("'{0}' is not declared")]
+   UndeclaredSymbol(String),
    #[error("invalid unary operator for {0}")]
    InvalidUnaryOperator(String),
    #[error("type mismatch: expected {0}, but got {1}")]

@@ -57,6 +57,7 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
          print_string_range(lexer, start, end);
       }
       NodeKind::Character => print!("{:?}", char::from_u32(ast.first(node) as u32)),
+      NodeKind::Symbol => print!("{:?}", ast.first(node)),
       _ => (),
    }
    match extra {

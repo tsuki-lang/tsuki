@@ -182,4 +182,14 @@ impl ScopeStack {
    pub fn pop(&mut self) {
       let _ = self.scopes.pop();
    }
+
+   /// Looks for symbols with the given name in scopes on the stack, and returns the innermost one.
+   pub fn lookup(&self, scopes: &Scopes, name: &str) -> Option<SymbolId> {
+      for &scope in self.scopes.iter().rev() {
+         if let Some(symbol) = scopes.get(scope, name) {
+            return Some(symbol);
+         }
+      }
+      None
+   }
 }
