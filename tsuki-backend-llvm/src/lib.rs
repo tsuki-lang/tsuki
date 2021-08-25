@@ -5,6 +5,7 @@ mod blocks;
 mod codegen;
 mod expression;
 mod libc;
+mod variables;
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -69,7 +70,7 @@ impl backend::Backend for LlvmBackend {
    fn compile(&self, root: SourceFile) -> Result<Self::Target, Errors> {
       let ir = tsuki_frontend::analyze(&root)?;
       let context = Context::create();
-      let mut state = CodeGen::new(root, &context);
+      let state = CodeGen::new(root, &context);
 
       // Construct all the types.
       let i32_type = state.context.i32_type();

@@ -3,20 +3,20 @@
 use inkwell::types::{FloatType, IntType};
 use inkwell::values::{BasicValue, BasicValueEnum, FloatValue, IntValue, StructValue};
 use tsuki_frontend::ast::{Ast, NodeHandle, NodeKind};
+use tsuki_frontend::sem::Ir;
 use tsuki_frontend::types::{FloatSize, IntegerSize, TypeId, TypeKind, Types};
-use tsuki_frontend::Ir;
 
 use crate::codegen::CodeGen;
 use crate::libc;
 
 impl<'c> CodeGen<'c> {
    /// Generates code for a unit literal.
-   pub(crate) fn generate_unit_literal(&self, _ast: &Ast, _node: NodeHandle) -> StructValue {
+   pub(crate) fn generate_unit_literal(&self, _ast: &Ast, _node: NodeHandle) -> StructValue<'c> {
       self.unit_type.const_zero()
    }
 
    /// Returns the integer type for the provided type, or panics if the type is not an integer type.
-   fn get_int_type(&self, types: &Types, typ: TypeId) -> IntType {
+   fn get_int_type(&self, types: &Types, typ: TypeId) -> IntType<'c> {
       if let TypeKind::Integer(size) = types.kind(typ) {
          match size {
             IntegerSize::U8 | IntegerSize::S8 => self.context.i8_type(),
@@ -30,13 +30,13 @@ impl<'c> CodeGen<'c> {
    }
 
    /// Generates code for an integer literal.
-   fn generate_int_literal(&self, ir: &Ir, node: NodeHandle) -> IntValue {
+   fn generate_int_literal(&self, ir: &Ir, node: NodeHandle) -> IntValue<'c> {
       let typ = self.get_int_type(&ir.types, ir.ast.type_id(node));
       typ.const_int(ir.ast.extra(node).unwrap_uint(), false)
    }
 
    /// Returns the float type for the provided type, or panics if the type is not a float type.
-   fn get_float_type(&self, types: &Types, typ: TypeId) -> FloatType {
+   fn get_float_type(&self, types: &Types, typ: TypeId) -> FloatType<'c> {
       if let TypeKind::Float(size) = types.kind(typ) {
          match size {
             FloatSize::S32 => self.context.f32_type(),
@@ -48,13 +48,13 @@ impl<'c> CodeGen<'c> {
    }
 
    /// Generates code for a float literal.
-   fn generate_float_literal(&self, ir: &Ir, node: NodeHandle) -> FloatValue {
+   fn generate_float_literal(&self, ir: &Ir, node: NodeHandle) -> FloatValue<'c> {
       let typ = self.get_float_type(&ir.types, ir.ast.type_id(node));
       typ.const_float(ir.ast.extra(node).unwrap_float())
    }
 
    /// Generates code for integer math.
-   fn generate_int_math(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
+   fn generate_int_math(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
       // TODO: Panic on overflow. This can be done using LLVM's arithmetic intrinsics that return
       // an aggregate {T, i1}, where the second field is a flag signifying whether overflow occured.
       let left_value = self.generate_expression(ir, ir.ast.first_handle(node));
@@ -77,7 +77,7 @@ impl<'c> CodeGen<'c> {
       math.as_basic_value_enum()
    }
 
-   fn generate_float_math(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
+   fn generate_float_math(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
       let left_value = self.generate_expression(ir, ir.ast.first_handle(node));
       let right_value = self.generate_expression(ir, ir.ast.second_handle(node));
       let (left, right) = (
@@ -95,7 +95,7 @@ impl<'c> CodeGen<'c> {
    }
 
    /// Generates code for integer and floating-point math operations.
-   fn generate_math(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
+   fn generate_math(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
       let typ = ir.types.kind(ir.ast.type_id(node));
       if typ.is_integer() {
          self.generate_int_math(ir, node)
@@ -107,7 +107,7 @@ impl<'c> CodeGen<'c> {
    }
 
    /// Generates code for an integer type conversion (`WidenUint` or `WidenInt`).
-   fn generate_int_conversion(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
+   fn generate_int_conversion(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
       let inner = ir.ast.first_handle(node);
       let inner_value = self.generate_expression(ir, inner).into_int_value();
       let dest_type = self.get_int_type(&ir.types, ir.ast.type_id(node));
@@ -120,7 +120,7 @@ impl<'c> CodeGen<'c> {
    }
 
    /// Generates code for any expression node.
-   pub(crate) fn generate_expression(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
+   pub(crate) fn generate_expression(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
       match ir.ast.kind(node) {
          // Literals
          | NodeKind::Uint8
@@ -151,7 +151,7 @@ impl<'c> CodeGen<'c> {
    }
 
    /// Generates code for a function call-like intrinsic.
-   fn generate_call_like_intrinsic(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
+   fn generate_call_like_intrinsic(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
       let arguments = ir.ast.extra(node).unwrap_node_list();
       match ir.ast.kind(node) {
          kind @ (NodeKind::PrintInt32 | NodeKind::PrintFloat32) => {

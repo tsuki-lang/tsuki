@@ -3,7 +3,7 @@
 use inkwell::values::BasicValueEnum;
 use tsuki_frontend::ast::{NodeHandle, NodeKind};
 use tsuki_frontend::common::Error;
-use tsuki_frontend::Ir;
+use tsuki_frontend::sem::Ir;
 
 use crate::codegen::CodeGen;
 
@@ -16,7 +16,11 @@ impl<'c> CodeGen<'c> {
    }
 
    /// Generates code for a list of statements with a tail expression.
-   fn generate_statements_with_tail_expression(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum {
+   fn generate_statements_with_tail_expression(
+      &self,
+      ir: &Ir,
+      node: NodeHandle,
+   ) -> BasicValueEnum<'c> {
       let mut tail = None;
       for (index, &child) in ir.ast.extra(node).unwrap_node_list().iter().enumerate() {
          if ir.ast.is_last_child(node, index) {
@@ -36,7 +40,7 @@ impl<'c> CodeGen<'c> {
    ///
    /// If the node is a `DoExpression`, returns `Some` with the tail expression. Otherwise
    /// if the kind is `DoStatement`, returns `None`.
-   pub(crate) fn generate_do(&self, ir: &Ir, node: NodeHandle) -> Option<BasicValueEnum> {
+   pub(crate) fn generate_do(&self, ir: &Ir, node: NodeHandle) -> Option<BasicValueEnum<'c>> {
       match ir.ast.kind(node) {
          NodeKind::DoExpression => Some(self.generate_statements_with_tail_expression(ir, node)),
          NodeKind::DoStatement => {

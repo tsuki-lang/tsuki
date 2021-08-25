@@ -1,5 +1,6 @@
 //! Common code generation state.
 
+use std::cell::RefCell;
 use std::fmt;
 
 use inkwell::builder::Builder;
@@ -7,9 +8,13 @@ use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::support::LLVMString;
 use inkwell::types::StructType;
+use inkwell::values::{BasicValueEnum, PointerValue};
 use tsuki_frontend::ast::{Ast, NodeHandle, NodeKind};
 use tsuki_frontend::common::{Error, ErrorKind, SourceFile};
-use tsuki_frontend::Ir;
+use tsuki_frontend::scope::SymbolId;
+use tsuki_frontend::sem::Ir;
+
+use crate::variables::Variables;
 
 /// Code generation state shared across functions.
 pub struct CodeGen<'c> {
@@ -17,6 +22,8 @@ pub struct CodeGen<'c> {
    pub(crate) context: &'c Context,
    pub(crate) module: Module<'c>,
    pub(crate) builder: Builder<'c>,
+
+   pub(crate) variables: RefCell<Variables<'c>>,
 
    pub(crate) unit_type: StructType<'c>,
 }
@@ -28,8 +35,10 @@ impl<'c> CodeGen<'c> {
          context,
          // TODO: import, module resolution and names.
          module: context.create_module("main"),
-         unit_type: context.struct_type(&[], false),
          builder: context.create_builder(),
+
+         variables: RefCell::new(Variables::new()),
+         unit_type: context.struct_type(&[], false),
       };
       // Temporary: set up some libc functions.
       state.load_libc();
@@ -64,6 +73,8 @@ impl<'c> CodeGen<'c> {
          NodeKind::DoStatement => {
             let _ = self.generate_do(ir, node);
          }
+         // Declarations
+         NodeKind::Val | NodeKind::Var => self.generate_variable_declaration(ir, node),
          // Expressions
          _ => {
             let _ = self.generate_expression(ir, node);
