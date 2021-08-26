@@ -33,6 +33,16 @@ With all that, running tsuki should be as simple as:
 cargo run
 ```
 
+## Using the compiler
+
+While still in its early stages, the compiler is able to compile arbitrary user code into a working executable. The most basic usage of the compiler would be:
+```
+tsuki -p package-name path/to/code.tsu
+```
+`package-name` currently only specifies the name of the output file, but might be used for other things in the future, such as mangling and/or debug information.
+
+Refer to the code examples in `code` to see what's currently implemented or being worked on.
+
 ## Other notes
 
 ### Nim version
