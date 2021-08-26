@@ -160,7 +160,7 @@ impl<'c> CodeGen<'c> {
          kind @ (NodeKind::PrintInt32 | NodeKind::PrintFloat32) => {
             // This is not the, um, cleanest... piece of code here, but it'll get replaced
             // anyway once c_import is implemented.
-            let printf = self.module.get_function(libc::FN_PRINTF).expect("libc must be loaded");
+            let printf = self.module.get_function(libc::FUN_PRINTF).expect("libc must be loaded");
             let zero = self.context.i32_type().const_zero();
             let global_name = if kind == NodeKind::PrintInt32 {
                libc::GLOBAL_PRINTF_INT_FORMAT

@@ -4,7 +4,7 @@ use crate::codegen::CodeGen;
 
 // Named constants for string values. This should simplify refactoring if they ever need to
 // be changed.
-pub const FN_PRINTF: &str = "printf";
+pub const FUN_PRINTF: &str = "printf";
 pub const GLOBAL_PRINTF_INT_FORMAT: &str = "printf_int_format";
 pub const GLOBAL_PRINTF_FLOAT_FORMAT: &str = "printf_float_format";
 
@@ -21,7 +21,7 @@ impl<'c> CodeGen<'c> {
       let string_type = self.context.i8_type().ptr_type(AddressSpace::Generic);
       let i32_type = self.context.i32_type();
       let printf_fn_type = i32_type.fn_type(&[string_type.into()], true);
-      self.module.add_function(FN_PRINTF, printf_fn_type, None);
+      self.module.add_function(FUN_PRINTF, printf_fn_type, None);
 
       // printf format strings
       self.add_const_string(GLOBAL_PRINTF_INT_FORMAT, b"%i\n");
