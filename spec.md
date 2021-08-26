@@ -901,14 +901,15 @@ Pointers are also subject to automatic dereferencing when calling instance funct
 ```
 object Example
   val x: Int
-impl
+
+impl Example
   fun print_x()
     print(.x)
 
 fun print_x_from(example: ^Example)
-  # we can dereference the pointer manually, but...
+  # we can dereference the pointer manually...
   # example^.print_x
-  # ...we can also let the compiler dereference it for us
+  # ...but we can also let the compiler dereference it for us
   example.print_x
 
 var example = Example { x = 1 }
@@ -1057,7 +1058,7 @@ var w: weak Int32
 do
   val r = rc{1}
   w = r
-  # r's inner value is dropped here, because the strong reference count 
+  # r's inner value is dropped here, because the strong reference count
   # becomes 0.
   # The rc's heap allocations is _not_ dropped because there are still
   # weaks pointing to it.
@@ -1152,7 +1153,8 @@ An object can be marked as an error type by implementing the `Failure` trait.
 object CompileError
   val line, column: Index
   val message: String
-impl Failure
+
+impl Failure for CompileError
   # Failure is a "marker" trait, it doesn't require any types or functions.
 
 val e: CompileError!Int = CompileError {
@@ -1187,7 +1189,8 @@ Both traits are `derive`able, so there's no need to write the boilerplate yourse
 ```
 object DupExample
   var x, y: Int
-impl
+
+impl DupExample
   derive Dup
 
 val a = DupExample { x = 1, y = 2 }
@@ -1198,7 +1201,8 @@ print(b)  # DupExample { x = 1, y = 3 }
 
 object CopyExample
   var x, y: Int
-impl
+
+impl CopyExample
   derive Dup, Copy
 
 val c = CopyExample { x = 1, y = 2 }
@@ -1228,7 +1232,8 @@ fun next_id(): Int
 
 object Dropper
   val id: Int = next_id()
-impl Drop
+
+impl Drop for Dropper
   fun drop()
     print("Dropping " ~ .id.to_string)
 
@@ -1358,22 +1363,12 @@ Functions defined on _instances_ of types are referred to as _instance functions
 
 Types defined both on types and instances of types are referred to as _associated types_. Note that it does not matter whether a type is declared in an `impl`, or an `impl type`: an associated type is _always_ bound to the `impl type`. Associated types can be referred to using `Self.T`, where `T` is the type name.
 
-The shorthand form variants are similar, but omit the destination type name:
-```
-object MyObject
-impl
-impl type
-impl MyTrait
-```
-Note how these implementations have to be defined right below an object declaration. This is because the shorthand form is actually part of the object declaration syntax.
-
-Shorthand declarations end with the first token that is not `impl`, or with full `impl` that contains a type name.
-
 `impl type` may be used to define functions inside of the object type itself, essentially using the type as a namespace.
 
 ```
 object MathStuff
-impl type
+
+impl type MathStuff
   fun add_two(x: Int): Int
     x + 2
 
@@ -1400,7 +1395,8 @@ Fields inside of the object can be accessed using the special `.field_name` nota
 object Example
   val x: Int
   var y: Int
-impl
+
+impl Example
   # getter for x
   fun x(): Int
     .x
@@ -1443,11 +1439,11 @@ Now, about `fun move`, `fun val` and `fun var`: these are annotations that let t
 object ProcessBuilder
   # internal
 
-impl type
+impl type ProcessBuilder
   fun new(executable: OsString): Self
     _  # internal
 
-impl
+impl ProcessBuilder
   # This function has an implicitly `var self`, because it modifies `self`,
   # albeit that's not visible in this example.
   fun argument(arg: OsString): ^var Self
@@ -1478,7 +1474,8 @@ Instance functions may also be named with a trailing `=`. In this case, the func
 ```
 object SetterExample
   var x: Int
-impl
+
+impl SetterExample
   fun x=(val: Int)
     print("Setting x to " ~ val.to_string)
     .x = val
@@ -1493,7 +1490,8 @@ Because writing getters and setters can quickly get old, tsuki provides some syn
 object AutoGetSet
   var x, y: Int
   val z: Int
-impl
+
+impl AutoGetSet
   getset x, x=, y, y=, z
 ```
 The `getset` declaration will automatically generate getters and setters for the provided fields. A name without a `=` generates a getter, and a name with a `=` generates a setter. Note that setters cannot be created for `val` fields; this is (obviously) because `val` fields are read-only.
@@ -1505,7 +1503,8 @@ The compiler allows for some trait implementations to be _derived_ automatically
 ```
 object Copycat
   val x: Int
-impl
+
+impl Copycat
   derive Dup, Copy
 ```
 
@@ -1797,7 +1796,7 @@ pub object Adder
   # object fields _cannot_ be public...
   val increment: Int
 
-impl
+impl Adder
   # ...but getters and setters can
   pub getset increment
 
@@ -1805,7 +1804,7 @@ impl
   pub fun add(to: Int): Int
     adding_abstraction(to, .increment)
 
-impl type
+impl type Adder
   pub fun init(increment: Int): Self
     Self { increment = increment }
 ```
@@ -1870,7 +1869,7 @@ fun adding_abstraction(a, b: Int): Int
 pub object Adder
   val increment: Int
 
-impl
+impl Adder
   ## Retrieves the increment of the adder.
   pub getset increment
 
@@ -1883,7 +1882,7 @@ impl
   pub fun add(to: Int): Int
     adding_abstraction(to, .increment)
 
-impl type
+impl type Adder
   ## Initializes a new adder with the given increment and returns it.
   ##
   ## @param increment  The increment to initialize the adder with.
@@ -2050,10 +2049,12 @@ tsuki allows for defining objects that are compatible with the C ABI. For that, 
 ```
 object Things :: c_struct
   val a, b, c: Int
-impl type
+
+impl type Things
   # C structs can also have associated and instance functions.
   fun init(): Self :: c_import("things_init")
-impl
+
+impl Things
   fun var increment() :: c_import("things_increment")
 ```
 Instance functions imported from C with `var self` are assumed to accept `Self *` as the first argument, and functions with `val self` are assumed to accept `const Self *` as the first argument. Note that in case of functions imported from C the `var`-ness of `self` must be specified explicitly, as there is no body to infer it from.
