@@ -13,3 +13,5 @@ members = [
 [dependencies]
 tsuki-frontend = { path = "tsuki-frontend" }
 tsuki-backend-llvm = { path = "tsuki-backend-llvm" }
+
+structopt = "0.3.22"

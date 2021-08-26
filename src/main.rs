@@ -1,38 +1,68 @@
+use std::fmt::Display;
+use std::path::PathBuf;
+
+use structopt::StructOpt;
 use tsuki_backend_llvm::{ExecutableFile, LlvmBackend, LlvmBackendConfig};
 use tsuki_frontend::backend::Backend;
 use tsuki_frontend::common::{Errors, SourceFile};
+
+#[derive(StructOpt)]
+#[structopt(name = "tsuki")]
+struct Options {
+   /// The directory for storing intermediary files.
+   #[structopt(long, parse(from_os_str))]
+   cache_dir: Option<PathBuf>,
+
+   /// The name of the package. This is used for controlling the object file's name.
+   #[structopt(short = "p", long, name = "name")]
+   package_name: String,
+
+   /// The root source file.
+   #[structopt(name = "main file")]
+   main_file: String,
+}
+
+const EXIT_COMPILE: i32 = 1;
+const EXIT_FATAL: i32 = 2;
+
+fn unwrap_error<T, E>(r: Result<T, E>) -> T
+where
+   E: Display,
+{
+   match r {
+      Ok(ok) => ok,
+      Err(error) => {
+         eprintln!("error: {}", error);
+         std::process::exit(EXIT_FATAL)
+      }
+   }
+}
 
 fn unwrap_errors<T>(r: Result<T, Errors>) -> T {
    match r {
       Ok(ok) => ok,
       Err(errors) => {
          errors.iter().for_each(|error| eprintln!("{:#}", error));
-         std::process::exit(1)
+         std::process::exit(EXIT_COMPILE)
       }
    }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+   let options = Options::from_args();
    let backend = LlvmBackend::new(LlvmBackendConfig {
-      cache_dir: &std::env::current_dir()?.join("bin"),
-      package_name: "test",
+      cache_dir: &options.cache_dir.unwrap_or(std::env::current_dir()?.join("bin")),
+      package_name: &options.package_name,
+      // TODO: Cross-compilation.
       target_triple: None,
    });
-   let object = unwrap_errors(
-      backend.compile(SourceFile {
-         filename: "test.tsu".into(),
-         source: r#"
-            val a = 42
-            __intrin_print_int32(a / 2 * 4)
-            __intrin_print_float32(10.0)
-            10.0_f64 + 5.0
-            val b = 2
-            do
-              __intrin_print_int32(10)
-         "#
-         .into(),
-      }),
-   );
+
+   let source = unwrap_error(std::fs::read_to_string(&options.main_file));
+
+   let object = unwrap_errors(backend.compile(SourceFile {
+      filename: options.main_file,
+      source,
+   }));
 
    let executable = ExecutableFile::link(backend, &[object])?;
    executable.run(&[])?;
