@@ -98,13 +98,15 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       self.annotate(ast, node, typ)
    }
 
-   /// Annotates an identifier in expression position, ie. a variable reference.
-   fn annotate_variable_reference(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
+   /// Annotates an identifier in expression position.
+   fn annotate_identifier(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
       let name = self.common.get_source_range_from_node(ast, node);
       if let Some(variable) = self.scope_stack.lookup(self.scopes, name) {
          let typ = self.symbols.type_id(variable);
          ast.convert_to_symbol(node, variable);
-         self.annotate(ast, node, typ)
+         let log = self.annotate(ast, node, typ);
+         ast.wrap(node, NodeKind::Variable);
+         log
       } else {
          self.error(ast, node, ErrorKind::UndeclaredSymbol(name.into()))
       }
@@ -443,7 +445,7 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
          | NodeKind::Character => self.annotate_literal(ast, node),
 
          // Identifiers
-         NodeKind::Identifier => self.annotate_variable_reference(ast, node),
+         NodeKind::Identifier => self.annotate_identifier(ast, node),
 
          // Unary operators
          // ---

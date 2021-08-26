@@ -421,6 +421,9 @@ pub enum NodeKind {
    // Symbols
    Symbol,
 
+   // Paths
+   Variable, // variable reference, wraps a symbol
+
    // Concrete literals
    Uint8,
    Uint16,

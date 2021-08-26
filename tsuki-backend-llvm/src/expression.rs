@@ -134,8 +134,7 @@ impl<'c> CodeGen<'c> {
          NodeKind::Float32 | NodeKind::Float64 => self.generate_float_literal(ir, node).into(),
 
          // Variables
-         // TODO: Maybe a different kind of node should be used for annotating variable refs?
-         NodeKind::Symbol => self.generate_variable_reference(ir, node),
+         NodeKind::Variable => self.generate_variable_reference(ir, node),
 
          // Operators
          NodeKind::Plus | NodeKind::Minus | NodeKind::Mul | NodeKind::Div => {

@@ -40,7 +40,8 @@ impl<'c> CodeGen<'c> {
       node: NodeHandle,
    ) -> BasicValueEnum<'c> {
       let variables = self.variables.borrow();
-      let symbol = ir.ast.symbol_id(node);
+      let symbol_node = ir.ast.first_handle(node);
+      let symbol = ir.ast.symbol_id(symbol_node);
       let alloca = variables.get(symbol).expect("reference to undeclared variable in IR");
       self.builder.build_load(alloca.into_pointer_value(), ir.symbols.name(symbol))
    }
