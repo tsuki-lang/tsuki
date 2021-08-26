@@ -992,7 +992,10 @@ impl<'i> Lexer<'i> {
          b';' => Ok(self.trivial_token(TokenKind::Semicolon)),
 
          // Magic tokens (and magic smoke)
-         Self::EOF_CHAR => Ok(self.token(TokenKind::Eof)),
+         Self::EOF_CHAR => {
+            self.indent_level = 0;
+            Ok(self.token(TokenKind::Eof))
+         }
          b'\r' => Err(self.error(ErrorKind::CrlfNotSupported)),
          other => Err(self.error(ErrorKind::UnexpectedCharacter(other as char))),
       }
