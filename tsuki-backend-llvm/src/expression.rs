@@ -9,7 +9,7 @@ use tsuki_frontend::types::{FloatSize, IntegerSize, TypeId, TypeKind, Types};
 use crate::codegen::CodeGen;
 use crate::libc;
 
-impl<'c> CodeGen<'c> {
+impl<'c, 'pm> CodeGen<'c, 'pm> {
    /// Generates code for a unit literal.
    pub(crate) fn generate_unit_literal(&self, _ast: &Ast, _node: NodeHandle) -> StructValue<'c> {
       self.unit_type.const_zero()

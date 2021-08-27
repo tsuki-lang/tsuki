@@ -4,6 +4,7 @@
 mod blocks;
 mod codegen;
 mod expression;
+mod functions;
 mod libc;
 mod variables;
 
@@ -21,6 +22,8 @@ use tsuki_frontend::backend;
 use tsuki_frontend::common::{self, Error, ErrorKind, Errors, SourceFile, Span};
 
 use codegen::CodeGen;
+
+use crate::functions::Function;
 
 /// Struct representing the LLVM compilation backend and options passed to it.
 pub struct LlvmBackend {
@@ -70,25 +73,50 @@ impl backend::Backend for LlvmBackend {
    fn compile(&self, root: SourceFile) -> Result<Self::Target, Errors> {
       let ir = tsuki_frontend::analyze(&root)?;
       let context = Context::create();
-      let state = CodeGen::new(root, &context);
+      let module = context.create_module(&root.filename);
+
+      // Set up the pass manager.
+      let pm = PassManager::create(&module);
+
+      // Make sure that the code we generate in makes sense.
+      pm.add_verifier_pass();
+
+      // Constant folding passes run twice: once at startup, and once after CFG simplicifation
+      // and mem2reg, such that constant folding is also performed after simplifying the IR to use
+      // more SSA and less allocas.
+      pm.add_instruction_combining_pass();
+      pm.add_reassociate_pass();
+
+      // TODO: Figure out what GVN (global value numbering) is. The LLVM docs for passes don't
+      // really say much about it.
+      // (https://llvm.org/docs/Passes.html)
+      pm.add_gvn_pass();
+
+      // These passes simplify the control flow graph and turn memory operations into SSA form
+      // wherever possible.
+      pm.add_cfg_simplification_pass();
+      pm.add_basic_alias_analysis_pass();
+      pm.add_promote_memory_to_register_pass();
+
+      // As said before, constant folding is performed twice.
+      pm.add_instruction_combining_pass();
+      pm.add_reassociate_pass();
+
+      pm.initialize();
 
       // Construct all the types.
-      let i32_type = state.context.i32_type();
-      let main_fn_type = i32_type.fn_type(&[], false);
+      let i32_type = context.i32_type();
+      let main_fun_type = i32_type.fn_type(&[], false);
 
-      // Create the function, and an entry block.
-      let main_fn = state.module.add_function("main", main_fn_type, None);
-      let entry = context.append_basic_block(main_fn, "entry");
-      state.builder.position_at_end(entry);
+      // Create the function and the codegen state.
+      let main_fun = Function::new(&context, &module, "main", main_fun_type);
+      let state = CodeGen::new(root, &context, &pm, module, main_fun);
 
       // Compile the modules' code.
       state.generate_statement(&ir, ir.root_node);
 
       // Return the zero exit code.
-      state.builder.build_return(Some(&i32_type.const_zero()));
-
-      let pass_manager = PassManager::create(&state.module);
-      pass_manager.initialize();
+      state.finish_function(Some(&i32_type.const_zero()));
 
       println!(":: LLVM IR");
       println!("{:?}", state);

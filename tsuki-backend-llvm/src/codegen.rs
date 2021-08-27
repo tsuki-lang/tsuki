@@ -6,40 +6,54 @@ use std::fmt;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
+use inkwell::passes::PassManager;
 use inkwell::support::LLVMString;
 use inkwell::types::StructType;
-use inkwell::values::{BasicValueEnum, PointerValue};
+use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue};
 use tsuki_frontend::ast::{Ast, NodeHandle, NodeKind};
 use tsuki_frontend::common::{Error, ErrorKind, SourceFile};
 use tsuki_frontend::scope::SymbolId;
 use tsuki_frontend::sem::Ir;
 
+use crate::functions::Function;
 use crate::variables::Variables;
 
 /// Code generation state shared across functions.
-pub struct CodeGen<'c> {
+pub struct CodeGen<'c, 'pm> {
    pub(crate) source: SourceFile,
    pub(crate) context: &'c Context,
    pub(crate) module: Module<'c>,
    pub(crate) builder: Builder<'c>,
+   pub(crate) pass_manager: &'pm PassManager<FunctionValue<'c>>,
 
+   pub(crate) function: Function<'c>,
    pub(crate) variables: RefCell<Variables<'c>>,
 
    pub(crate) unit_type: StructType<'c>,
 }
 
-impl<'c> CodeGen<'c> {
-   pub fn new(source: SourceFile, context: &'c Context) -> Self {
+impl<'c, 'pm> CodeGen<'c, 'pm> {
+   pub fn new(
+      source: SourceFile,
+      context: &'c Context,
+      pass_manager: &'pm PassManager<FunctionValue<'c>>,
+      module: Module<'c>,
+      function: Function<'c>,
+   ) -> Self {
       let mut state = Self {
          source,
          context,
          // TODO: import, module resolution and names.
-         module: context.create_module("main"),
+         module,
          builder: context.create_builder(),
+         pass_manager,
 
+         function,
          variables: RefCell::new(Variables::new()),
+
          unit_type: context.struct_type(&[], false),
       };
+      state.builder.position_at_end(state.function.entry_block);
       // Temporary: set up some libc functions.
       state.load_libc();
       state
@@ -81,9 +95,14 @@ impl<'c> CodeGen<'c> {
          }
       }
    }
+
+   pub fn finish_function(&self, return_value: Option<&dyn BasicValue<'c>>) {
+      self.builder.build_return(return_value);
+      self.pass_manager.run_on(&self.function.value);
+   }
 }
 
-impl fmt::Debug for CodeGen<'_> {
+impl fmt::Debug for CodeGen<'_, '_> {
    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
       write!(f, "{}", &self.module.print_to_string().to_str().unwrap())
    }

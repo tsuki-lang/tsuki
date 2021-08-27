@@ -33,7 +33,7 @@ impl<'c> Variables<'c> {
    }
 }
 
-impl<'c> CodeGen<'c> {
+impl<'c, 'pm> CodeGen<'c, 'pm> {
    pub(crate) fn generate_variable_reference(
       &self,
       ir: &Ir,

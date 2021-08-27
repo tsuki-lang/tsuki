@@ -7,7 +7,7 @@ use tsuki_frontend::sem::Ir;
 
 use crate::codegen::CodeGen;
 
-impl<'c> CodeGen<'c> {
+impl<'c, 'pm> CodeGen<'c, 'pm> {
    /// Generates code for a list of statements.
    pub(crate) fn generate_statements(&self, ir: &Ir, node: NodeHandle) {
       ir.ast.walk_node_list(node, |ast, _index, node| {
