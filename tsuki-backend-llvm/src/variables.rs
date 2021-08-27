@@ -74,4 +74,10 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
 
       variables.insert(symbol, alloca.as_basic_value_enum());
    }
+
+   /// Generates code for `AssignDiscard`.
+   pub(crate) fn generate_discarding_assignment(&self, ir: &Ir, node: NodeHandle) {
+      let value_node = ir.ast.first_handle(node);
+      let _ = self.generate_expression(ir, value_node);
+   }
 }

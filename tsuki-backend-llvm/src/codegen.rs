@@ -88,6 +88,7 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
          }
          // Declarations
          NodeKind::Val | NodeKind::Var => self.generate_variable_declaration(ir, node),
+         NodeKind::AssignDiscard => self.generate_discarding_assignment(ir, node),
          // Expressions
          _ => {
             let _ = self.generate_expression(ir, node);
