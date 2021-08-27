@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::path::PathBuf;
 
 use structopt::StructOpt;
-use tsuki_backend_llvm::{ExecutableFile, LlvmBackend, LlvmBackendConfig};
+use tsuki_backend_llvm::{ExecutableFile, LlvmBackend, LlvmBackendConfig, OptimizationLevel};
 use tsuki_frontend::backend::Backend;
 use tsuki_frontend::common::{Errors, SourceFile};
 
@@ -16,6 +16,10 @@ struct Options {
    /// The name of the package. This is used for controlling the object file's name.
    #[structopt(short = "p", long, name = "name")]
    package_name: String,
+
+   /// The optimization level to use when compiling.
+   #[structopt(long, name = "level", default_value = "essential")]
+   optimize: OptimizationLevel,
 
    /// The root source file.
    #[structopt(name = "main file")]
@@ -55,6 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       package_name: &options.package_name,
       // TODO: Cross-compilation.
       target_triple: None,
+      optimization_level: options.optimize,
    });
 
    let source = unwrap_error(std::fs::read_to_string(&options.main_file));

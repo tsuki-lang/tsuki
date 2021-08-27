@@ -8,15 +8,16 @@ mod functions;
 mod libc;
 mod variables;
 
+use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::str::FromStr;
 
 use inkwell::context::Context;
 use inkwell::passes::PassManager;
 use inkwell::targets::{
    CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
 };
-use inkwell::OptimizationLevel;
 use thiserror::Error;
 use tsuki_frontend::backend;
 use tsuki_frontend::common::{self, Error, ErrorKind, Errors, SourceFile, Span};
@@ -30,6 +31,7 @@ pub struct LlvmBackend {
    cache_dir: PathBuf,
    executable_name: String,
    target_triple: TargetTriple,
+   optimization_level: OptimizationLevel,
 }
 
 /// Options for creating an LLVM backend instance.
@@ -37,6 +39,7 @@ pub struct LlvmBackendConfig<'c, 'e, 't> {
    pub cache_dir: &'c Path,
    pub package_name: &'e str,
    pub target_triple: Option<&'t str>,
+   pub optimization_level: OptimizationLevel,
 }
 
 impl LlvmBackend {
@@ -49,6 +52,7 @@ impl LlvmBackend {
             Some(triple) => TargetTriple::create(triple),
             None => TargetMachine::get_default_triple(),
          },
+         optimization_level: config.optimization_level,
       }
    }
 
@@ -78,29 +82,31 @@ impl backend::Backend for LlvmBackend {
       // Set up the pass manager.
       let pm = PassManager::create(&module);
 
-      // Make sure that the code we generate in makes sense.
+      // Make sure that the code we generate makes sense.
       pm.add_verifier_pass();
 
-      // Constant folding passes run twice: once at startup, and once after CFG simplicifation
-      // and mem2reg, such that constant folding is also performed after simplifying the IR to use
-      // more SSA and less allocas.
-      pm.add_instruction_combining_pass();
-      pm.add_reassociate_pass();
+      if self.optimization_level >= OptimizationLevel::Essential {
+         // Constant folding passes run twice: once at startup, and once after CFG simplicifation
+         // and mem2reg, such that constant folding is also performed after simplifying the IR to
+         // use more SSA and less allocas.
+         pm.add_instruction_combining_pass();
+         pm.add_reassociate_pass();
 
-      // TODO: Figure out what GVN (global value numbering) is. The LLVM docs for passes don't
-      // really say much about it.
-      // (https://llvm.org/docs/Passes.html)
-      pm.add_gvn_pass();
+         // TODO: Figure out what GVN (global value numbering) is. The LLVM docs for passes don't
+         // really say much about it.
+         // (https://llvm.org/docs/Passes.html)
+         pm.add_gvn_pass();
 
-      // These passes simplify the control flow graph and turn memory operations into SSA form
-      // wherever possible.
-      pm.add_cfg_simplification_pass();
-      pm.add_basic_alias_analysis_pass();
-      pm.add_promote_memory_to_register_pass();
+         // These passes simplify the control flow graph and turn memory operations into SSA form
+         // wherever possible.
+         pm.add_cfg_simplification_pass();
+         pm.add_basic_alias_analysis_pass();
+         pm.add_promote_memory_to_register_pass();
 
-      // As said before, constant folding is performed twice.
-      pm.add_instruction_combining_pass();
-      pm.add_reassociate_pass();
+         // As said before, constant folding is performed twice.
+         pm.add_instruction_combining_pass();
+         pm.add_reassociate_pass();
+      }
 
       pm.initialize();
 
@@ -145,7 +151,7 @@ impl backend::Backend for LlvmBackend {
                &self.target_triple,
                "generic",
                "",
-               OptimizationLevel::Default,
+               inkwell::OptimizationLevel::Default,
                RelocMode::Default,
                CodeModel::Default,
             )
@@ -171,6 +177,46 @@ impl backend::Backend for LlvmBackend {
       Self::to_errors(machine.write_to_file(&state.module, FileType::Object, &object_path))?;
 
       Ok(ObjectFile { path: object_path })
+   }
+}
+
+/// Specifies the amount of optimizations to apply when compiling.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum OptimizationLevel {
+   /// Perform no optimizations at all.
+   None,
+   Essential,
+   Release,
+}
+
+/// Returned when an invalid optimization level is used.
+#[derive(Clone, Copy, Debug)]
+pub struct InvalidOptimizationLevel;
+
+impl Display for InvalidOptimizationLevel {
+   fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+      write!(f, "invalid optimization level")
+   }
+}
+
+impl FromStr for OptimizationLevel {
+   type Err = InvalidOptimizationLevel;
+
+   /// Converts a string to an optimization level.
+   ///
+   /// Valid values include:
+   /// - `"none"` → `None`
+   /// - `"essential"` → `Essential`
+   /// - `"release"` → `Release`
+   ///
+   /// Any other levels result in an `InvalidOptimizationLevel` error.
+   fn from_str(s: &str) -> Result<Self, Self::Err> {
+      match s {
+         "none" => Ok(Self::None),
+         "essential" => Ok(Self::Essential),
+         "release" => Ok(Self::Release),
+         _ => Err(InvalidOptimizationLevel),
+      }
    }
 }
 
