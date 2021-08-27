@@ -21,6 +21,22 @@ struct Options {
    #[structopt(long, name = "level", default_value = "essential")]
    optimize: OptimizationLevel,
 
+   /// Dumps the source code before compiling.
+   #[structopt(long)]
+   dump_source: bool,
+
+   /// Dumps the AST directly after parsing.
+   #[structopt(long)]
+   dump_ast_pre_sem: bool,
+
+   /// Dumps the AST after checking it semantically.
+   #[structopt(long)]
+   dump_ast_post_sem: bool,
+
+   /// Dumps the generated LLVM IR.
+   #[structopt(long)]
+   dump_llvm_ir: bool,
+
    /// The root source file.
    #[structopt(name = "main file")]
    main_file: String,
@@ -60,6 +76,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       // TODO: Cross-compilation.
       target_triple: None,
       optimization_level: options.optimize,
+      frontend_debug_options: tsuki_frontend::DebugOptions {
+         dump_source: options.dump_source,
+         dump_ast_pre_sem: options.dump_ast_pre_sem,
+         dump_ast_post_sem: options.dump_ast_post_sem,
+      },
+      backend_debug_options: tsuki_backend_llvm::DebugOptions {
+         dump_ir: options.dump_llvm_ir,
+      },
    });
 
    let source = unwrap_error(std::fs::read_to_string(&options.main_file));

@@ -15,16 +15,16 @@ enum Prefix {
 
 fn print_indentation(depth: usize) {
    for _ in 0..depth * 2 {
-      print!(" ");
+      eprint!(" ");
    }
 }
 
 fn print_source_range(lexer: &Lexer, start: usize, end: usize) {
-   print!("{}", &lexer.input()[start..end]);
+   eprint!("{}", &lexer.input()[start..end]);
 }
 
 fn print_string_range(lexer: &Lexer, start: usize, end: usize) {
-   print!("{}", &lexer.string_data()[start..end]);
+   eprint!("{}", &lexer.string_data()[start..end]);
 }
 
 struct State<'l, 'll, 'a, 't> {
@@ -42,11 +42,11 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
 
    // Optional prefix.
    if let Some(prefix) = prefix {
-      print!("{:?}: ", prefix);
+      eprint!("{:?}: ", prefix);
    }
 
    // Node header: the name, and optionally some source code.
-   print!("{:?} ", kind);
+   eprint!("{:?} ", kind);
    match kind {
       NodeKind::Integer | NodeKind::Float | NodeKind::Atom | NodeKind::Identifier => {
          let (start, end) = (ast.first(node), ast.second(node));
@@ -56,8 +56,8 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
          let (start, end) = (ast.first(node), ast.second(node));
          print_string_range(lexer, start, end);
       }
-      NodeKind::Character => print!("{:?}", char::from_u32(ast.first(node) as u32)),
-      NodeKind::Symbol => print!("{:?}", ast.first(node)),
+      NodeKind::Character => eprint!("{:?}", char::from_u32(ast.first(node) as u32)),
+      NodeKind::Symbol => eprint!("{:?}", ast.first(node)),
       _ => (),
    }
    match extra {
@@ -72,17 +72,17 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
       | NodeData::Int32(..)
       | NodeData::Int64(..)
       | NodeData::Float32(..)
-      | NodeData::Float64(..)) => print!("{:?}", number),
+      | NodeData::Float64(..)) => eprint!("{:?}", number),
       _ => (),
    }
    if let Some(types) = types {
       let typ = ast.type_id(node);
-      print!(" : {}", types.name(typ));
+      eprint!(" : {}", types.name(typ));
    }
    if let Some(scope) = ast.scope(node) {
-      print!(" +{:?}", scope);
+      eprint!(" +{:?}", scope);
    }
-   println!();
+   eprintln!();
 
    match kind {
       | NodeKind::Dot

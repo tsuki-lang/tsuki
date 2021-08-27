@@ -26,12 +26,25 @@ use codegen::CodeGen;
 
 use crate::functions::Function;
 
+/// Debug options for the backend.
+pub struct DebugOptions {
+   pub dump_ir: bool,
+}
+
+impl Default for DebugOptions {
+   fn default() -> Self {
+      Self { dump_ir: false }
+   }
+}
+
 /// Struct representing the LLVM compilation backend and options passed to it.
 pub struct LlvmBackend {
    cache_dir: PathBuf,
    executable_name: String,
    target_triple: TargetTriple,
    optimization_level: OptimizationLevel,
+   frontend_debug_options: tsuki_frontend::DebugOptions,
+   backend_debug_options: DebugOptions,
 }
 
 /// Options for creating an LLVM backend instance.
@@ -40,6 +53,8 @@ pub struct LlvmBackendConfig<'c, 'e, 't> {
    pub package_name: &'e str,
    pub target_triple: Option<&'t str>,
    pub optimization_level: OptimizationLevel,
+   pub frontend_debug_options: tsuki_frontend::DebugOptions,
+   pub backend_debug_options: DebugOptions,
 }
 
 impl LlvmBackend {
@@ -53,6 +68,8 @@ impl LlvmBackend {
             None => TargetMachine::get_default_triple(),
          },
          optimization_level: config.optimization_level,
+         frontend_debug_options: config.frontend_debug_options,
+         backend_debug_options: config.backend_debug_options,
       }
    }
 
@@ -75,7 +92,7 @@ impl backend::Backend for LlvmBackend {
 
    /// Compiles the given source file to an executable.
    fn compile(&self, root: SourceFile) -> Result<Self::Target, Errors> {
-      let ir = tsuki_frontend::analyze(&root)?;
+      let ir = tsuki_frontend::analyze(&root, &self.frontend_debug_options)?;
       let context = Context::create();
       let module = context.create_module(&root.filename);
 
@@ -124,9 +141,11 @@ impl backend::Backend for LlvmBackend {
       // Return the zero exit code.
       state.finish_function(Some(&i32_type.const_zero()));
 
-      println!(":: LLVM IR");
-      println!("{:?}", state);
-      println!();
+      if self.backend_debug_options.dump_ir {
+         eprintln!(":: LLVM IR");
+         eprintln!("{:?}", state);
+         eprintln!();
+      }
 
       // Cross-compilation support, anyone?
       // Right now we initialize the native target only.
