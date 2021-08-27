@@ -229,8 +229,10 @@ impl Ast {
 
    /// Converts the given node to a symbol node.
    pub fn convert_to_symbol(&mut self, node: NodeHandle, symbol: SymbolId) {
+      let span = self.span(node).clone();
       self.convert(node, NodeKind::Symbol);
       self.set_symbol_id(node, symbol);
+      self.set_span(node, span);
    }
 
    /// Wraps the old node in a new node of the given kind.
@@ -238,8 +240,10 @@ impl Ast {
    /// That is, converts the given node to the given kind, and sets the `first` to the
    /// ancestor node.
    pub fn wrap(&mut self, node: NodeHandle, kind: NodeKind) {
+      let span = self.span(node).clone();
       self.convert(node, kind);
       self.set_first_handle(node, self.ancestors[node.0]);
+      self.set_span(node, span);
    }
 
    /// Returns an iterator over all node handles in the AST.

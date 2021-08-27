@@ -210,7 +210,7 @@ pub enum ErrorKind {
    UnusedValue,
    #[error("invalid location (left hand side of assignment)")]
    InvalidLhsOfAssignment,
-   #[error("the target immutable and cannot be assigned to")]
+   #[error("the target is immutable and cannot be assigned to")]
    CannotAssignImmutableLocation,
 
    /*
