@@ -3,9 +3,10 @@
 // Note: Because `type` is a keyword in Rust, sometimes a truncated form `typ` is used to prevent
 // conflicts.
 
-use std::{cmp::Ordering, ops::Range};
+use std::cmp::Ordering;
+use std::ops::Range;
 
-use crate::ast::NodeHandle;
+use crate::ast::{Ast, NodeHandle};
 
 /// Data-oriented type storage.
 pub struct Types {

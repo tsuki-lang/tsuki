@@ -98,20 +98,6 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       self.annotate(ast, node, typ)
    }
 
-   /// Annotates an identifier in expression position.
-   fn annotate_identifier(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
-      let name = self.common.get_source_range_from_node(ast, node);
-      if let Some(variable) = self.scope_stack.lookup(self.scopes, name) {
-         let typ = self.symbols.type_id(variable);
-         ast.convert_to_symbol(node, variable);
-         let log = self.annotate(ast, node, typ);
-         ast.wrap(node, NodeKind::Variable);
-         log
-      } else {
-         self.error(ast, node, ErrorKind::UndeclaredSymbol(name.into()))
-      }
-   }
-
    // Currently, this does some rather simplistic analysis just to Make it Work™, but in the
    // future when operators will be lowered to trait instance function calls, this will be
    // replaced by much simpler logic and compiler intrinsics inside the stdlib.
@@ -272,6 +258,27 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       None
    }
 
+   /// Annotates a location expression, ie. variables `a`, members `.x`.
+   fn annotate_location(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
+      match ast.kind(node) {
+         NodeKind::Identifier => {
+            let name = self.common.get_source_range_from_node(ast, node);
+            if let Some(variable) = self.scope_stack.lookup(self.scopes, name) {
+               let typ = self.symbols.type_id(variable);
+               ast.convert_to_symbol(node, variable);
+               let log = self.annotate(ast, node, typ);
+               ast.wrap(node, NodeKind::Variable);
+               log
+            } else {
+               self.error(ast, node, ErrorKind::UndeclaredSymbol(name.into()))
+            }
+         }
+         // TODO: Make this into a better error. This would require slicing the source string,
+         // which we can't do because spans don't store direct byte indices to it at the moment.
+         _ => self.error(ast, node, ErrorKind::InvalidLhsOfAssignment),
+      }
+   }
+
    /// Annotates a binary operator with types.
    fn annotate_binary_operator(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
       let (left, right) = (ast.first_handle(node), ast.second_handle(node));
@@ -329,6 +336,49 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
          let _ = self.annotate_node(ast, argument, NodeContext::Expression);
       }
       self.annotate(ast, node, self.builtin.t_unit)
+   }
+
+   /// Annotates an assignment.
+   fn annotate_assignment(
+      &mut self,
+      ast: &mut Ast,
+      node: NodeHandle,
+      context: NodeContext,
+   ) -> TypeLogEntry {
+      // TODO: Pointers and assigning values to them.
+      let (left, right) = (ast.first_handle(node), ast.second_handle(node));
+      let left_entry = self.annotate_location(ast, left);
+      let left_type = self.log.typ(left_entry);
+      let right_entry = self.annotate_node(ast, right, NodeContext::Expression);
+      let right_type = self.log.typ(right_entry);
+      // Check types.
+      if right_type != left_type {
+         let target_type_name = self.types.name(left_type).to_owned();
+         let value_type_name = self.types.name(right_type).to_owned();
+         return self.error(
+            ast,
+            right,
+            ErrorKind::TypeMismatch(target_type_name, value_type_name),
+         );
+      }
+      // Check mutability.
+      // TODO: This could maybe be moved into a different check, shoving this logic into assignments
+      // doesn't seem very clean.
+      let target_is_mutable = match ast.kind(left) {
+         NodeKind::Variable => {
+            let symbol = ast.first_handle(left);
+            let variable = self.symbols.kind(ast.symbol_id(symbol)).unwrap_variable();
+            variable.kind == VariableKind::Var
+         }
+         _ => unreachable!(),
+      };
+      if !target_is_mutable {
+         return self.error(ast, left, ErrorKind::CannotAssignImmutableLocation);
+      }
+      match context {
+         NodeContext::Expression => self.annotate(ast, node, left_type),
+         NodeContext::Statement => self.annotate(ast, node, self.builtin.t_statement),
+      }
    }
 
    /// Annotates statements in a list of statements.
@@ -470,8 +520,8 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
          | NodeKind::Float64
          | NodeKind::Character => self.annotate_literal(ast, node),
 
-         // Identifiers
-         NodeKind::Identifier => self.annotate_identifier(ast, node),
+         // Locations
+         NodeKind::Identifier => self.annotate_location(ast, node),
 
          // Unary operators
          // ---
@@ -491,6 +541,7 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
             self.annotate_binary_operator(ast, node)
          }
          NodeKind::Call => self.annotate_call(ast, node),
+         NodeKind::Assign => self.annotate_assignment(ast, node, context),
          // Other operators are to be implemented later.
 
          // Control flow

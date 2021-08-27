@@ -208,6 +208,10 @@ pub enum ErrorKind {
    MissingResult,
    #[error("result value of expression is unused; use `val _ = x` to discard it")]
    UnusedValue,
+   #[error("invalid location (left hand side of assignment)")]
+   InvalidLhsOfAssignment,
+   #[error("the target immutable and cannot be assigned to")]
+   CannotAssignImmutableLocation,
 
    /*
     * Internal errors

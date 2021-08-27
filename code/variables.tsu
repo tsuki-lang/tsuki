@@ -1,0 +1,7 @@
+val a = 2
+__intrin_print_int32(a * 2)
+
+var b = 3
+__intrin_print_int32(b)
+b = 5
+__intrin_print_int32(b)

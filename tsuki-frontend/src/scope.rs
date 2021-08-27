@@ -38,6 +38,7 @@ impl SymbolKind {
 }
 
 /// The kind of a variable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VariableKind {
    /// A `val` (immutable) variable.
    Val,
