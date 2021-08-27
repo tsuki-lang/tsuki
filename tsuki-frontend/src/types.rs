@@ -100,6 +100,11 @@ pub enum TypeKind {
 }
 
 impl TypeKind {
+   /// Returns whether the type kind represents an invalid type.
+   pub fn is_invalid(&self) -> bool {
+      matches!(self, TypeKind::Missing | TypeKind::Error)
+   }
+
    /// Returns whether the type kind represents an integer type.
    pub fn is_integer(&self) -> bool {
       matches!(self, TypeKind::Integer(..))
@@ -113,6 +118,15 @@ impl TypeKind {
    /// Returns whether the type kind represents a numeric (integer or float) type.
    pub fn is_numeric(&self) -> bool {
       self.is_integer() || self.is_float()
+   }
+
+   /// Returns whether the type kind is for a type that's valid when used as a statement.
+   pub fn is_statement(&self) -> bool {
+      self.is_invalid()
+         || matches!(
+            self,
+            TypeKind::Statement | TypeKind::Unit | TypeKind::NoReturn
+         )
    }
 
    /// Unwraps the integer size stored in the type kind, panics if the kind is not an integer.

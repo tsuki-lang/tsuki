@@ -517,11 +517,17 @@ impl<'l, 's> Parser<'l, 's> {
          _ => unreachable!(),
       };
       // TODO: Tuple destructuring, multiple assignment.
-      // These will probably need completely different syntax nodes, because `Val` and `Var` are
-      // the "simple" assignments, while destructuring and multi-assignment is syntax sugar for the
-      // former two.
+      // Similarly to a discarding assignment `val _ = x`, these should use a separate node kind for
+      // the name node.
       let name_token = self.lexer.next()?;
-      let name = self.create_identifier(name_token);
+      let name = match name_token.kind {
+         TokenKind::Underscore => self.ast.create_node(NodeKind::Discard),
+         // Don't use create_identifier here, neither do we need to set the span, nor
+         // error when the token is not an identifier.
+         TokenKind::Identifier(range) => self.create_node_with_range(NodeKind::Identifier, range),
+         _ => return Ok(self.error(ErrorKind::VarNameExpected, name_token.span)),
+      };
+      self.ast.set_span(name, name_token.span);
       self.expect_token(TokenKind::Assign, |t| ErrorKind::VarMissingEquals(t.kind))?;
       let value = self.parse_expression(0)?;
       let node = self.create_node_with_handles(node_kind, name, value);

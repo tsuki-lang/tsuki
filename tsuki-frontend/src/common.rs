@@ -169,6 +169,8 @@ pub enum ErrorKind {
    IndentedBlockExpected(IndentLevel),
    #[error("identifier expected, but got '{0}'")]
    IdentifierExpected(TokenKind),
+   #[error("missing variable name (an identifier, or '_' to discard the value)")]
+   VarNameExpected,
    #[error("expected '=' after variable name, but got '{0}'")]
    VarMissingEquals(TokenKind),
 
@@ -200,6 +202,10 @@ pub enum ErrorKind {
    NonIntrinCall,
    #[error("{0} arguments expected, got {1}")]
    NArgumentsExpected(usize, usize),
+   #[error("missing result value in expression")]
+   MissingResult,
+   #[error("result value of expression is unused; use `val _ = x` to discard it")]
+   UnusedValue,
 
    /*
     * Internal errors

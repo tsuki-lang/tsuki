@@ -340,11 +340,11 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
    ) -> TypeLogEntry {
       let mut last_log = None;
       ast.walk_node_list_mut(node, |ast, index, child| {
-         // TODO: Don't ignore the type. Instead, enforce it to be () if the statement isn't a
-         // trailing expression statement.
-         // Right now this isn't done for testing purposes.
-         // Also, there are no `val` statements yet so there isn't a way of ignoring the return
-         // type in case it's not ().
+         // Trailing expressions in expression context statement lists get special treatment.
+         // They are resulting expressions of the these statement lists, and thus get analyzed as
+         // proper expressions rather than statements. They are also not subject to triggering the
+         // UnusedValue error, as the resulting value _is_ actually used - it's the result of the
+         // statement list.
          let is_last_expression =
             ast.is_last_child(node, index) && context == NodeContext::Expression;
          let log_entry = self.annotate_node(
@@ -356,10 +356,24 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
                NodeContext::Statement
             },
          );
-         if is_last_expression {
-            last_log = Some(log_entry);
+         let typ = self.log.typ(log_entry);
+         let type_kind = self.types.kind(typ);
+         // For expressions, we have some special cases.
+         if !type_kind.is_statement() {
+            if is_last_expression {
+               // Trailing expressions get assigned to the `last_log`, so that we know what the
+               // result of the statement list is.
+               last_log = Some(log_entry);
+            } else {
+               // Other expressions are unused, which is invalid.
+               self.emit_error(ErrorKind::UnusedValue, ast.span(child).clone());
+            }
          }
       });
+      // Statement lists in expression context must always have a trailing expression.
+      if context == NodeContext::Expression && last_log.is_none() {
+         return self.error(ast, node, ErrorKind::MissingResult);
+      }
       // Nodes in expression context inherit their type from the last expression statement in
       // the list.
       if let Some(log) = last_log {
@@ -405,19 +419,31 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       };
       let variable = Variable { kind };
       let name_node = ast.first_handle(node);
-      let name = self.common.get_source_range_from_node(ast, name_node);
       let value_node = ast.second_handle(node);
       let value_log = self.annotate_node(ast, value_node, NodeContext::Expression);
       let value_type = self.log.typ(value_log);
-      let symbol = self.symbols.create(name, node, value_type, SymbolKind::Variable(variable));
-      ast.convert_to_symbol(name_node, symbol);
-      let scope = self.scope_stack.top();
-      self.scopes.insert(scope, name, symbol);
-      // The variable type annotation is less relevant to error reporting than the fact that it's
-      // a statement. This sounds counterintuitive at first, but note that we're requested to
-      // annotate the Val/Var node, not the variable name node, so the calling function likely
-      // expects a statement instead of an expression.
-      let _ = self.annotate(ast, name_node, value_type);
+      match ast.kind(name_node) {
+         NodeKind::Discard => {
+            // A discarding assignment is converted to an AssignDiscard node containing
+            // the original value.
+            ast.convert(node, NodeKind::AssignDiscard);
+            ast.set_first_handle(node, value_node);
+         }
+         NodeKind::Identifier => {
+            let name = self.common.get_source_range_from_node(ast, name_node);
+            let symbol =
+               self.symbols.create(name, node, value_type, SymbolKind::Variable(variable));
+            ast.convert_to_symbol(name_node, symbol);
+            let scope = self.scope_stack.top();
+            self.scopes.insert(scope, name, symbol);
+            // The variable type annotation is less relevant to error reporting than the fact that
+            // it's a statement. This sounds counterintuitive at first, but note that we're
+            // requested to annotate the Val/Var node, not the variable name node, so the calling
+            // function likely expects a statement instead of an expression.
+            let _ = self.annotate(ast, name_node, value_type);
+         }
+         _ => unreachable!(),
+      }
       self.annotate(ast, node, self.builtin.t_statement)
    }
 

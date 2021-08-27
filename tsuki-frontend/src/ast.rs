@@ -403,6 +403,7 @@ pub enum NodeKind {
    // Declarations
    Val,
    Var,
+   Discard, // used as the name of a variable when `val _ = x` is used
 
    // Control flow
    // ---
@@ -435,6 +436,9 @@ pub enum NodeKind {
    Int64,
    Float32,
    Float64,
+
+   // Concrete assignments
+   AssignDiscard,
 
    // Concrete control flow
    DoExpression,
