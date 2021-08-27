@@ -5,3 +5,7 @@ var b = 3
 __intrin_print_int32(b)
 b = 5
 __intrin_print_int32(b)
+
+var c = b = 1
+__intrin_print_int32(b)
+__intrin_print_int32(c)

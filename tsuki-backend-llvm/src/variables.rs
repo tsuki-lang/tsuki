@@ -1,6 +1,6 @@
 /// Code generation for variable declarations.
-use inkwell::values::{BasicValue, BasicValueEnum};
-use tsuki_frontend::ast::NodeHandle;
+use inkwell::values::{BasicValue, BasicValueEnum, PointerValue};
+use tsuki_frontend::ast::{NodeHandle, NodeKind};
 use tsuki_frontend::scope::SymbolId;
 use tsuki_frontend::sem::Ir;
 
@@ -8,7 +8,7 @@ use crate::CodeGen;
 
 /// Storage for variable values. This maps symbol IDs to `Value`s from LLVM.
 pub(crate) struct Variables<'c> {
-   variables: Vec<Option<BasicValueEnum<'c>>>,
+   variables: Vec<Option<PointerValue<'c>>>,
 }
 
 impl<'c> Variables<'c> {
@@ -20,7 +20,7 @@ impl<'c> Variables<'c> {
    }
 
    /// Inserts a new value under the given symbol ID.
-   fn insert(&mut self, symbol: SymbolId, value: BasicValueEnum<'c>) {
+   fn insert(&mut self, symbol: SymbolId, value: PointerValue<'c>) {
       if self.variables.len() <= symbol.id() {
          self.variables.resize(symbol.id() + 1, None);
       }
@@ -28,7 +28,7 @@ impl<'c> Variables<'c> {
    }
 
    /// Retrieves the value under the given symbol ID.
-   fn get(&self, symbol: SymbolId) -> Option<BasicValueEnum<'c>> {
+   fn get(&self, symbol: SymbolId) -> Option<PointerValue<'c>> {
       if symbol.id() >= self.variables.len() {
          None
       } else {
@@ -44,19 +44,16 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
       ir: &Ir,
       node: NodeHandle,
    ) -> BasicValueEnum<'c> {
-      let variables = self.variables.borrow();
-
       let symbol_node = ir.ast.first_handle(node);
       let symbol = ir.ast.symbol_id(symbol_node);
 
-      let alloca = variables.get(symbol).expect("reference to undeclared variable in IR");
-      self.builder.build_load(alloca.into_pointer_value(), ir.symbols.name(symbol))
+      let alloca =
+         self.variables.borrow().get(symbol).expect("reference to undeclared variable in IR");
+      self.builder.build_load(alloca, ir.symbols.name(symbol))
    }
 
    /// Generates code for variable declarations.
    pub(crate) fn generate_variable_declaration(&self, ir: &Ir, node: NodeHandle) {
-      let mut variables = self.variables.borrow_mut();
-
       let symbol_node = ir.ast.first_handle(node);
       let symbol = ir.ast.symbol_id(symbol_node);
 
@@ -72,12 +69,47 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
       let alloca = builder.build_alloca(value.get_type(), ir.symbols.name(symbol));
       self.builder.build_store(alloca, value);
 
-      variables.insert(symbol, alloca.as_basic_value_enum());
+      self.variables.borrow_mut().insert(symbol, alloca);
    }
 
    /// Generates code for `AssignDiscard`.
    pub(crate) fn generate_discarding_assignment(&self, ir: &Ir, node: NodeHandle) {
       let value_node = ir.ast.first_handle(node);
       let _ = self.generate_expression(ir, value_node);
+   }
+
+   /// Generates code for assignments to variables.
+   pub(crate) fn generate_assignment(
+      &self,
+      ir: &Ir,
+      node: NodeHandle,
+   ) -> Option<BasicValueEnum<'c>> {
+      // When the assignment is not an expression, we do a little optimization where we don't
+      // generate the load
+      let result_type = ir.ast.type_id(node);
+      let is_expression = !ir.types.kind(result_type).is_statement();
+
+      let target_node = ir.ast.first_handle(node);
+      let target = match ir.ast.kind(target_node) {
+         NodeKind::Variable => {
+            let symbol_node = ir.ast.first_handle(target_node);
+            let symbol = ir.ast.symbol_id(symbol_node);
+            self.variables.borrow().get(symbol).expect("reference to undeclared variable in IR")
+         }
+         _ => unreachable!(),
+      };
+      let value_node = ir.ast.second_handle(node);
+      let value = self.generate_expression(ir, value_node);
+
+      let result = if is_expression {
+         let old_value = self.builder.build_load(target, "old");
+         Some(old_value)
+      } else {
+         None
+      };
+      // Note that this does not care about mutability; that part is handled by SemTypes in the
+      // frontend.
+      self.builder.build_store(target, value);
+      result
    }
 }

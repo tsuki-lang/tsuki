@@ -140,6 +140,7 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
          NodeKind::Plus | NodeKind::Minus | NodeKind::Mul | NodeKind::Div => {
             self.generate_math(ir, node)
          }
+         NodeKind::Assign => self.generate_assignment(ir, node).unwrap(),
 
          // Control flow
          NodeKind::DoExpression => self.generate_do(ir, node).unwrap(),

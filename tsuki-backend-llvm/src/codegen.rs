@@ -86,10 +86,15 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
          NodeKind::DoStatement => {
             let _ = self.generate_do(ir, node);
          }
+
          // Declarations
          NodeKind::Val | NodeKind::Var => self.generate_variable_declaration(ir, node),
          NodeKind::AssignDiscard => self.generate_discarding_assignment(ir, node),
+
          // Expressions
+         NodeKind::Assign => {
+            let _ = self.generate_assignment(ir, node);
+         }
          _ => {
             let _ = self.generate_expression(ir, node);
          }
