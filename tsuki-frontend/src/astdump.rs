@@ -129,6 +129,7 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
       | NodeKind::Member
       | NodeKind::Ref
       | NodeKind::IfBranch
+      | NodeKind::Variable
       | NodeKind::WidenInt
       | NodeKind::WidenUint
       | NodeKind::WidenFloat => {
@@ -146,7 +147,10 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
                | NodeKind::Ref => Prefix::R,
                NodeKind::Call => Prefix::Fun,
                NodeKind::IfBranch => Prefix::Cond,
-               NodeKind::WidenInt | NodeKind::WidenUint | NodeKind::WidenFloat => Prefix::X,
+               | NodeKind::Variable
+               | NodeKind::WidenInt
+               | NodeKind::WidenUint
+               | NodeKind::WidenFloat => Prefix::X,
                _ => unreachable!(),
             }),
          );

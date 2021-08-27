@@ -225,7 +225,6 @@ impl<'l, 's> Parser<'l, 's> {
          next.indent_level
       };
       while self.lexer.peek()?.indent_level == indent_level {
-         eprintln!("{}", self.lexer.peek()?);
          dest.push(next(self)?);
       }
       Ok(())
