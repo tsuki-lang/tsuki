@@ -219,7 +219,6 @@ impl<'l, 's> Parser<'l, 's> {
          let next = self.lexer.peek()?;
          if next.indent_level <= parent_token.indent_level {
             let span = next.span.clone();
-            drop(next);
             self.emit_error(
                ErrorKind::IndentedBlockExpected(parent_token.indent_level),
                span,
