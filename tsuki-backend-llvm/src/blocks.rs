@@ -2,7 +2,6 @@
 
 use inkwell::values::BasicValueEnum;
 use tsuki_frontend::ast::{NodeHandle, NodeKind};
-use tsuki_frontend::common::Error;
 use tsuki_frontend::sem::Ir;
 
 use crate::codegen::CodeGen;
@@ -10,7 +9,7 @@ use crate::codegen::CodeGen;
 impl<'c, 'pm> CodeGen<'c, 'pm> {
    /// Generates code for a list of statements.
    pub(crate) fn generate_statements(&self, ir: &Ir, node: NodeHandle) {
-      ir.ast.walk_node_list(node, |ast, _index, node| {
+      ir.ast.walk_node_list(node, |_ast, _index, node| {
          self.generate_statement(ir, node);
       });
    }

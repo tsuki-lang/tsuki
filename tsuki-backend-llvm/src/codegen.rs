@@ -9,10 +9,9 @@ use inkwell::module::Module;
 use inkwell::passes::PassManager;
 use inkwell::support::LLVMString;
 use inkwell::types::StructType;
-use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue};
+use inkwell::values::{BasicValue, FunctionValue};
 use tsuki_frontend::ast::{Ast, NodeHandle, NodeKind};
 use tsuki_frontend::common::{Error, ErrorKind, SourceFile};
-use tsuki_frontend::scope::SymbolId;
 use tsuki_frontend::sem::Ir;
 
 use crate::functions::Function;
