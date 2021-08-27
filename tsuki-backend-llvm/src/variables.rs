@@ -65,6 +65,9 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
 
       // A variable declaration always performs an alloca for simplicity's sake.
       // These allocas, loads, and stores, are optimized by mem2reg later.
+      // To make the allocas optimizable by mem2reg, they need to be placed in the entry block of
+      // the function, and the most obvious place to put the allocas is the top, because then they
+      // are available to every other instruction, including loads and stores.
       let builder = self.function.create_entry_block_builder(self.context);
       let alloca = builder.build_alloca(value.get_type(), ir.symbols.name(symbol));
       self.builder.build_store(alloca, value);
