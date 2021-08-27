@@ -204,28 +204,41 @@ impl<'l, 's> Parser<'l, 's> {
 
    /// Parses rules in an indented block.
    ///
+   /// Each node parsed by a rule must be separated by a line break.
+   ///
    /// `parent_indent_level` specifies which indent level the tokens in the block must exceed to be
    /// in the block.
-   ///
-   /// `allow_immediate_expression` specifies whether an expression can be used instead of a block.
    fn parse_indented_block(
       &mut self,
       dest: &mut Vec<NodeHandle>,
-      parent_indent_level: IndentLevel,
+      parent_token: &Token,
       mut next: impl FnMut(&mut Self) -> Result<NodeHandle, Error>,
+      missing_line_break_error: impl FnOnce() -> ErrorKind,
    ) -> Result<(), Error> {
       let indent_level = {
          let next = self.lexer.peek()?;
-         if next.indent_level <= parent_indent_level {
+         if next.indent_level <= parent_token.indent_level {
             let span = next.span.clone();
             drop(next);
-            self.emit_error(ErrorKind::IndentedBlockExpected(parent_indent_level), span);
+            self.emit_error(
+               ErrorKind::IndentedBlockExpected(parent_token.indent_level),
+               span,
+            );
             return Ok(());
          }
          next.indent_level
       };
+      let mut previous_line = parent_token.line();
       while self.lexer.peek()?.indent_level == indent_level {
+         let next_token = self.lexer.peek()?;
+         let line = next_token.line();
+         if line == previous_line {
+            let span = next_token.span.clone();
+            self.emit_error(missing_line_break_error(), span);
+            break;
+         }
          dest.push(next(self)?);
+         previous_line = line;
       }
       Ok(())
    }
@@ -294,8 +307,12 @@ impl<'l, 's> Parser<'l, 's> {
       let token = self.some_or_next(token)?;
       let node = self.ast.create_node(NodeKind::Do);
       let mut statements = Vec::new();
-      let indent_level = token.indent_level;
-      self.parse_indented_block(&mut statements, indent_level, |p| p.parse_statement())?;
+      self.parse_indented_block(
+         &mut statements,
+         &token,
+         |p| p.parse_statement(),
+         || ErrorKind::MissingLineBreakAfterStatement,
+      )?;
       self.ast.set_span(
          node,
          Span::join(&token.span, &self.span_all_nodes(&statements)),
@@ -321,9 +338,12 @@ impl<'l, 's> Parser<'l, 's> {
          if let Some(..) = self.match_token(TokenKind::Then)? {
             branch_body.push(self.parse_expression(0)?);
          } else {
-            self.parse_indented_block(&mut branch_body, branch_token.indent_level, |p| {
-               p.parse_statement()
-            })?;
+            self.parse_indented_block(
+               &mut branch_body,
+               &branch_token,
+               |p| p.parse_statement(),
+               || ErrorKind::MissingLineBreakAfterStatement,
+            )?;
          }
          // Construct the branch.
          let branch = self.ast.create_node(if is_elif {
@@ -558,12 +578,17 @@ impl<'l, 's> Parser<'l, 's> {
       while self.lexer.peek()?.kind != TokenKind::Eof {
          let next = self.lexer.peek()?;
          let (line, span) = (next.line(), next.span.clone());
-         drop(next);
-         let statement = if next.line() == previous_line {
+         if next.line() == previous_line {
             return Ok(self.error(ErrorKind::MissingLineBreakAfterStatement, span));
-         } else {
-            self.parse_statement()?
-         };
+         }
+         if next.indent_level != 0 {
+            let indent_level = next.indent_level;
+            return Ok(self.error(
+               ErrorKind::NoIndentationExpectedAtModuleLevel(indent_level),
+               span,
+            ));
+         }
+         let statement = self.parse_statement()?;
          statements.push(statement);
          previous_line = line;
       }

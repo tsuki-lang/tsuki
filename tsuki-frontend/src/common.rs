@@ -165,6 +165,8 @@ pub enum ErrorKind {
    ExpectedCommaOrClosingToken(TokenKind, Token),
    #[error("statements must be separated by line breaks")]
    MissingLineBreakAfterStatement,
+   #[error("module-level code must not be indented (got {0} spaces of indentation)")]
+   NoIndentationExpectedAtModuleLevel(IndentLevel),
    #[error("indented block of level greater than {0} expected")]
    IndentedBlockExpected(IndentLevel),
    #[error("identifier expected, but got '{0}'")]
