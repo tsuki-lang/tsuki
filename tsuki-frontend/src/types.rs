@@ -106,6 +106,11 @@ impl TypeKind {
       matches!(self, TypeKind::Missing | TypeKind::Error)
    }
 
+   /// Returns whether the type kind represents the `Bool` type.
+   pub fn is_bool(&self) -> bool {
+      matches!(self, TypeKind::Bool)
+   }
+
    /// Returns whether the type kind represents an integer type.
    pub fn is_integer(&self) -> bool {
       matches!(self, TypeKind::Integer(..))

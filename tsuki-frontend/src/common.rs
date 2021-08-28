@@ -212,6 +212,8 @@ pub enum ErrorKind {
    InvalidLhsOfAssignment,
    #[error("the target is immutable and cannot be assigned to")]
    CannotAssignImmutableLocation,
+   #[error("`if` condition must be a Bool")]
+   IfConditionMustBeBool,
 
    /*
     * Internal errors
@@ -219,7 +221,7 @@ pub enum ErrorKind {
     * Every internal error must be prefixed by "<component> internal error:" to tell the user that
     * something went terribly wrong in the compiler, and that the error should be reported.
     */
-   #[error("SemTypes internal error: invalid AST node passed to analyze(): {0:?}")]
+   #[error("SemTypes internal error: invalid AST node passed to annotate_node(): {0:?}")]
    SemTypesInvalidAstNode(NodeKind),
 
    #[error("backend internal error: code generation error: {0}")]

@@ -447,6 +447,8 @@ pub enum NodeKind {
    // Concrete control flow
    DoExpression,
    DoStatement,
+   IfExpression,
+   IfStatement,
 
    // Intrinsics
    WidenUint,

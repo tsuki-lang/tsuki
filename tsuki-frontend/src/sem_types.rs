@@ -4,7 +4,9 @@ use crate::ast::{Ast, NodeData, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors};
 use crate::scope::{ScopeStack, Scopes, SymbolKind, Symbols, Variable, VariableKind};
 use crate::sem::{SemCommon, SemPass};
-use crate::types::{BuiltinTypes, FloatSize, IntegerSize, TypeId, TypeLog, TypeLogEntry, Types};
+use crate::types::{
+   BuiltinTypes, FloatSize, IntegerSize, TypeId, TypeKind, TypeLog, TypeLogEntry, Types,
+};
 
 pub(crate) struct SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
    common: &'c SemCommon,
@@ -279,6 +281,20 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       }
    }
 
+   /// Emits a type mismatch error.
+   fn type_mismatch(
+      &mut self,
+      ast: &Ast,
+      node: NodeHandle,
+      expected: TypeId,
+      got: TypeId,
+   ) -> TypeLogEntry {
+      let expected_name = self.types.name(expected);
+      let provided_name = self.types.name(got);
+      let kind = ErrorKind::TypeMismatch(expected_name.to_owned(), provided_name.to_owned());
+      self.error(ast, node, kind)
+   }
+
    /// Annotates a binary operator with types.
    fn annotate_binary_operator(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
       let (left, right) = (ast.first_handle(node), ast.second_handle(node));
@@ -288,16 +304,26 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       let right_type = self.log.typ(right_entry);
       let conversion = self.perform_implicit_conversion(ast, right, right_type, left_type);
       let typ = match ast.kind(node) {
+         // Arithmetic operators always evaluate to the same type as the LHS.
          NodeKind::Plus | NodeKind::Minus | NodeKind::Mul | NodeKind::Div
             if conversion.is_some() =>
          {
             left_type
          }
+         // Comparison operators always evaluate to `Bool`.
+         | NodeKind::Equal
+         | NodeKind::NotEqual
+         | NodeKind::Less
+         | NodeKind::LessEqual
+         | NodeKind::Greater
+         | NodeKind::GreaterEqual
+            if conversion.is_some() =>
+         {
+            self.builtin.t_bool
+         }
+         // Other operators, and failed conversions, raise a type mismatch error.
          _ => {
-            let left_name = self.types.name(left_type);
-            let right_name = self.types.name(right_type);
-            let kind = ErrorKind::TypeMismatch(left_name.into(), right_name.into());
-            return self.error(ast, node, kind);
+            return self.type_mismatch(ast, node, left_type, right_type);
          }
       };
       self.annotate(ast, node, typ)
@@ -353,13 +379,7 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       let right_type = self.log.typ(right_entry);
       // Check types.
       if right_type != left_type {
-         let target_type_name = self.types.name(left_type).to_owned();
-         let value_type_name = self.types.name(right_type).to_owned();
-         return self.error(
-            ast,
-            right,
-            ErrorKind::TypeMismatch(target_type_name, value_type_name),
-         );
+         return self.type_mismatch(ast, node, left_type, right_type);
       }
       // Check mutability.
       // TODO: This could maybe be moved into a different check, shoving this logic into assignments
@@ -451,13 +471,62 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       self.scope_stack.pop();
       ast.convert_preserve(
          node,
-         if context == NodeContext::Expression {
-            NodeKind::DoExpression
-         } else {
-            NodeKind::DoStatement
+         match context {
+            NodeContext::Expression => NodeKind::DoExpression,
+            NodeContext::Statement => NodeKind::DoStatement,
          },
       );
       log_entry
+   }
+
+   fn annotate_if(
+      &mut self,
+      ast: &mut Ast,
+      node: NodeHandle,
+      context: NodeContext,
+   ) -> TypeLogEntry {
+      let mut typ = None;
+      ast.walk_node_list_mut(node, |ast, _index, branch| {
+         // The scope is introduced before the condition is analyzed to have proper scoping behavior
+         // in `if val`.
+         let scope = self.scope_stack.push(self.scopes.create_scope());
+         ast.set_scope(branch, Some(scope));
+         // Only check the condition if it's an `if` branch. `else` branches do not have
+         // the condition.
+         if ast.kind(branch) == NodeKind::IfBranch {
+            let condition = ast.first_handle(branch);
+            let condition_entry = self.annotate_node(ast, condition, context);
+            let condition_type = self.log.typ(condition_entry);
+            if !self.types.kind(condition_type).is_bool() {
+               self.emit_error(
+                  ErrorKind::IfConditionMustBeBool,
+                  ast.span(condition).clone(),
+               );
+            }
+         }
+         let body_entry = self.annotate_statement_list(ast, branch, context);
+         let body_type = self.log.typ(body_entry);
+         if context == NodeContext::Expression {
+            match typ {
+               None => typ = Some(body_type),
+               Some(typ) if body_type != typ => {
+                  // The type log entry is discarded here, because more mismatch errors may
+                  // arise later in the `if` statement.
+                  let _ = self.type_mismatch(ast, node, typ, body_type);
+               }
+               _ => (),
+            }
+         }
+         self.scope_stack.pop();
+      });
+      ast.convert_preserve(
+         node,
+         match context {
+            NodeContext::Expression => NodeKind::IfExpression,
+            NodeContext::Statement => NodeKind::IfStatement,
+         },
+      );
+      self.annotate(ast, node, typ.unwrap_or(self.builtin.t_statement))
    }
 
    /// Annotates a variable declaration.
@@ -537,9 +606,16 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
          // ---
          // The following kinds were omitted from the generic rule:
          // NodeKind::Dot - magic for field access
-         NodeKind::Plus | NodeKind::Minus | NodeKind::Mul | NodeKind::Div => {
-            self.annotate_binary_operator(ast, node)
-         }
+         | NodeKind::Plus
+         | NodeKind::Minus
+         | NodeKind::Mul
+         | NodeKind::Div
+         | NodeKind::Equal
+         | NodeKind::NotEqual
+         | NodeKind::Less
+         | NodeKind::LessEqual
+         | NodeKind::Greater
+         | NodeKind::GreaterEqual => self.annotate_binary_operator(ast, node),
          NodeKind::Call => self.annotate_call(ast, node),
          NodeKind::Assign => self.annotate_assignment(ast, node, context),
          // Other operators are to be implemented later.
@@ -548,6 +624,7 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
          NodeKind::StatementList => self.annotate_statement_list(ast, node, context),
          NodeKind::Pass => self.annotate_pass(ast, node),
          NodeKind::Do => self.annotate_do(ast, node, context),
+         NodeKind::If => self.annotate_if(ast, node, context),
 
          // Declarations
          NodeKind::Val | NodeKind::Var => self.annotate_variable_declaration(ast, node),
