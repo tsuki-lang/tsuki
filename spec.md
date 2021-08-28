@@ -877,11 +877,11 @@ Examples on handling errors can be found in the "`?` operator" and [`catch` expr
 
 ## Pointers
 
-Pointers allow for passing _variables_ by reference. They differ from `rc` objects in that unlike an `rc` object, a pointer is not owned. To maintain memory safety, pointers can only be used in specific places, such as procedure parameters.
+Pointers allow for passing _locations_ by reference. They differ from `rc` in that unlike an `rc`, a pointer is not owned. To maintain memory safety, pointers can only be used in specific places, such as procedure parameters.
 
 A mutable pointer type is written as `^var T`. An immutable pointer type is written as `^T`.
 
-Pointers can only appear inside of procedure parameter lists, to allow a procedure to modify an outside variable, but also in procecure return types, to let outside code modify inner variables. Using these pointers is heavily restricted though: to maintain memory safety, they cannot be moved out of their original storage location.
+Pointers can only appear inside of procedure parameter lists, to allow a procedure to modify an outside variable, but also in procecure return types, to let outside code modify inner variables. Using these pointers is heavily restricted though: to maintain memory safety, they cannot be moved out of their original storage location (ie. a pointer cannot be stored in a variable).
 
 A simple example showcasing mutable pointers would incrementing an integer variable by passing its address to a procedure.
 ```
@@ -896,9 +896,9 @@ print(x)  # 1
 ```
 It's also possible to create pointers to other things, such as object fields, and slice elements.
 
-Pointers can be created using the `^` prefix operator, and dereferenced using the `^` postfix operator. The `^` prefix operator always creates a pointer of the biggest possible mutability; eg. when a pointer to a `var` variable is taken, using the `^` operator on that variable will return `^var T`. This isn't a problem since `^var T` is implicitly convertible to `^T`.
+`^var` pointers can be created `^` prefix operator, and all pointers can be dereferenced using the `^` postfix operator. `^T` pointers are created automatically when passing them into function arguments.
 
-Pointers are also subject to automatic dereferencing when calling instance functions. Consider this example:
+Pointers are also subject to automatic dereferencing when calling instance functions, using operators, and performing assignments. Consider this example:
 ```
 object Example
   val x: Int
@@ -914,10 +914,10 @@ fun print_x_from(example: ^Example)
   example.print_x
 
 var example = Example { x = 1 }
-print_x_from(^example)
+print_x_from(example)
 ```
 
-The limitations concerning pointer storage may get lifted in the future if the language gets a proper borrow checker.
+Usually using `^T` in arguments isn't necessary, because the compiler is smart enough to figure out which arguments are "big" for a given target, and pass them by pointer anyways.
 
 ## Ranges
 
@@ -1983,7 +1983,7 @@ The `Ptr` type is used for creating and manipulating unmanaged pointers to data.
 
 ```
 var x = 1
-var p = Ptr.to(x)
+var p = Ptr.to(^x)
 print(p^)  # 1
 ```
 
@@ -1994,8 +1994,8 @@ Reading from an unmanaged pointer that points to invalid memory (aka dangling po
 var p: Ptr[Int]
 do
   var a = 1
-  p = Ptr.to(a)
-print(p^)  # undefined behavior, because `a` doesn't exist anymore!!!
+  p = Ptr.to(^a)
+# print(p^)  # undefined behavior, because `a` doesn't exist anymore!!!
 ```
 
 `PtrArray[T]` can be used to create pointers to slices. Its `to` function accepts a slice, and a starting index the pointer should point to. Note that `PtrArray` cannot be dereferenced using the usual `^` operator, but rather the index operator.
