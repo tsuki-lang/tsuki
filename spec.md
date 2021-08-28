@@ -85,8 +85,9 @@ The following identifiers are reserved as _keywords_:
 ```
 _ and as atom catch dependency derive do elif else for fun if impl import
 in is macro match move not object of or pub rc return try type uninit union
-weak while val var
+where while val var
 ```
+TODO: This list of keywords is constantly changing as the language spec is refined, and may currently be imprecise. It should be updated once the compiler is finished.
 
 The identifier `_` is special; it's an identifier that is used for ignoring things. Declaring a variable with the name `_` discards its value, and the identifier cannot be used as a valid function or object name. Additionally, when used as a statement, it's a no-op, and can be used to create empty blocks.
 
@@ -1009,6 +1010,15 @@ val numbers = {
 }
 assert(numbers is Table[String, Float])
 ```
+Note that the `=` in a table constructor does not correspond to the assignment operator. In fact, the precedence of the left-hand side expression is a single level higher than assignments, so if the result of an assignment is to be used as a key, the assignment must be surrounded with parentheses.
+```
+var a = 1
+val table = {
+  (a = 2) = 3,
+  a = 4,
+}
+```
+"Clever" code like this should be avoided though, because it hinders readability.
 
 Tables can be indexed using the `[]` operator.
 ```
@@ -1020,15 +1030,13 @@ Values in tables may be modified by using the `[]=` operator.
 numbers["half"] = 0.5
 ```
 
-## `rc T`, `rc var T`, `weak T`, and `weak var T`
+## `rc T`, and `rc var T`
 
 `rc T` is a smart pointer that allows for multiple ownership of a single value. Usually a value can only have a single owner; with `rc T` however a value can be owned by _multiple_ locations, through the use of _reference-counting_.
 
 An `rc T` stores a reference count alongside the actual data. Copying an `rc T` increments that reference count by 1, and dropping an `rc T` decrements the reference count by 1. The inner value is dropped and the rc's heap memory is freed once the count reaches 0.
 
-`weak T` on the other hand is a _downgraded_ version of `rc T`, in that creating it does not increment the reference count of an `rc T`. This however means that the value pointed to by the `weak T` does not have to exist at the time of referencing it, so `if val` has to be used to unwrap it.
-
-The inner value of an `rc T` or `weak T` is immutable by default. `rc var T` and `weak var T` are alternatives that allow for mutating the inner value.
+tsuki's reference counting differs from most languages, in that increments and decrements of the reference count are optimized out by the compiler whenever possible. In fact, an `rc T` may even be downgraded into a plain stack or heap allocation, if the compiler can prove that copies of the `rc T` do not exit the scope in which the `rc T` was created.
 
 ```
 # The `rc{}` operator can be used to create an rc value.
@@ -1038,35 +1046,9 @@ val r = rc{1}
 
 # The mutable alternative to rc is rc var:
 val r = rc var{1}
-# Unlike rc, its value can be modified.
+# Unlike rc, its inner value can be modified.
 r = 3
 print(r^)  # 3
-
-# The Rc object houses some utilities for working with rc.
-# For instance, we can explicitly downgrade the rc var to a weak var:
-val w = Rc.downgrade_var(r)
-# We can also get the reference count:
-print(Rc.count(r))  # 1
-# In this case, it's 1, because only `r` owns a strong reference.
-
-# To read from the weak, we can use if val.
-if val v = w
-  print(v^)  # 3
-
-# Here's an example in which the weak does not store a valid reference:
-var w: weak Int32
-do
-  val r = rc{1}
-  w = r
-  # r's inner value is dropped here, because the strong reference count
-  # becomes 0.
-  # The rc's heap allocations is _not_ dropped because there are still
-  # weaks pointing to it.
-if val v = w
-  print("ain't happening")  # ...because the inner value was dropped.
-else
-  print("rc's dead, long live the weak")
-# The heap allocation is only freed here.
 ```
 
 ## Tuples
@@ -1272,24 +1254,6 @@ val c = Child { of init_parent(), y = 2 }
 ```
 `of` must appear at the very beginning of a constructor, before all the fields.
 
-### Reference counting
-
-Sometimes it's more convenient to specify an object as implicitly-`rc`.
-This can be done by using the `rc` keyword after the `object` keyword when declaring it.
-
-```
-object rc Test
-  val x: Int32
-
-# with inheritance
-
-object Parent of Root
-  val x: Int32
-
-object rc Child of Root
-  val y: Int32
-```
-
 ## Unions
 
 A union is a type, tagged with a _kind atom_, containing a single, dynamically-chosen value from a fixed set of possible variants. tsuki unions are akin to C unions, but with an extra type tag present.
@@ -1306,6 +1270,12 @@ A union can then be initialized using the union initialization syntax: the union
 
 ```
 var my_shape = Shape:rectangle(32, 32, 64, 64)
+```
+
+If the union type can be inferred trivially, it may be omitted:
+```
+fun make_rectangle(x, y, w, h: Float): Shape
+  return :rectangle(x, y, w, h)
 ```
 
 The [`match` expression](#match-expression) can be used to execute code blocks depending on union variants. See its section for more information.
@@ -1373,6 +1343,22 @@ impl type MathStuff
     x + 2
 
 print(MathStuff.add_two(2))  # 4
+```
+
+`impl` blocks can have generic types and constraints attached to them.
+```
+impl[T] Seq[T]
+where T: Add[T] + Zero
+  fun sum(): T
+    var accumulator = T.zero()
+    for i in .items()
+      accumulator += i
+    accumulator
+
+val ints = [1, 2, 3]
+print(ints.sum)  # 6
+val strings = ["a", "bc", "d"]
+# print(ints.sum)  # error: impl's generic constraint is not satisfied
 ```
 
 `impl` blocks are bound to modules, rather than types - if an `impl` block appears in a module different to where the type was declared, that module has to be imported alongside the module declaring the type for all functions to be available.
@@ -1496,6 +1482,17 @@ impl AutoGetSet
 ```
 The `getset` declaration will automatically generate getters and setters for the provided fields. A name without a `=` generates a getter, and a name with a `=` generates a setter. Note that setters cannot be created for `val` fields; this is (obviously) because `val` fields are read-only.
 
+By default, the fields `getset`-generated functions return are passed by copy, when a value implements that trait, of course. It's possible to pass a value by pointer by prefixing the `getset` element with a `^`:
+```
+object Container
+  val big: SomeBigObject
+  var bigger: SomeBiggerObject
+
+impl Container
+  # Setters can be generated in a similar fashion by suffixing them with `=`.
+  getset ^big, ^bigger, ^bigger=
+```
+
 ### `derive`
 
 The compiler allows for some trait implementations to be _derived_ automatically, only using a type implementation. This can be done using the `derive` declaration inside of an `impl` block.
@@ -1507,8 +1504,6 @@ object Copycat
 impl Copycat
   derive Dup, Copy
 ```
-
-
 
 ## Traits
 
@@ -1523,7 +1518,8 @@ The above code defines a trait `Animal` that requires the implementing type to h
 
 Traits can be used as generic constraints:
 ```
-fun make_it_speak[T: Animal](animal: ^T)
+fun make_it_speak[T](animal: ^T)
+where T: Animal
   animal.speak
 ```
 
@@ -1540,7 +1536,7 @@ trait DomesticAnimal of Animal
   fun var feed(food: Self.Food)
 ```
 
-It's also possible to create a type constraint that requires multiple traits to be implemented, using the `and` operator, like `T and U and V`.
+It's also possible to create a type constraint that requires multiple traits to be implemented, using the `+` operator, like `T + U + V`.
 
 Associated types can also be constrained by using the familiar `:` notation.
 
@@ -1555,7 +1551,8 @@ trait Animal
 
 When instantiating generic traits with associated types, the associated types are provided after generic types, using `K = V` syntax.
 ```
-fun add_two[T: Add[Int, Ret = Int]](x: T): Int
+fun add_two[T](x: T): Int
+where T: Add[Int, Ret = Int]
   x + 2
 ```
 
@@ -1583,7 +1580,7 @@ Several built-in traits exist that allow for overloading existing operators. Her
 | binary `<` | `Less` | `less` | ordered relation |
 | binary `<=` | `LessEqual` | `less_equal` | |
 | binary `in` | `Contains` | `contains` | presence in a list/set |
-| binary `[]` | `Index` | `at` | indexing (panic when out of bounds) |
+| binary `[]` | `Index`, `IndexVar` | `at` | indexing (panic when out of bounds) |
 | binary `{}` | `Get` | `get` | safe indexing (`nil` when out of bounds) |
 | binary `<-` | `Push` | `push` | insertion into a list/set |
 | binary `as` | `As` | `convert` | safe conversion to a different type |
@@ -1606,11 +1603,14 @@ trait Add[R]
 ```
 There are a few exceptions to this rule, though:
 ```
-# Index is supposed to return a potentially var pointer to the element,
-# such that it can be modified, and its address can be taken.
+# Index is supposed to return a non-var pointer to the element.
 trait Index[I]
   type Ret
   fun val at(index: I): ^Self.Ret
+
+# IndexVar is Index's sister trait for modifying data at a given index.
+trait IndexVar[I]
+  type Ret
   fun var at(index: I): ^var Self.Ret
 
 # Safe indexing returns an optional.
@@ -1674,16 +1674,19 @@ trait MyTrait[T]
 
 Normally, generic parameters can accept any type. For the sake of early type checking and error messages, such unconstrained generic types are pretty much opaque to the symbol that uses them; that is, no methods or operators are callable on the generic parameter in the symbol's implementation.
 
-To allow for calling functions on these symbols, the generic type has to be constrained using traits. Generic constraints look like regular type annotations:
+To allow for calling functions on these symbols, the generic type has to be constrained using traits. Generic constraints are specified after the declaration, before pragmas, using the `where` keyword:
 ```
-fun add_two[T: Add[Int]](x: T): T.Ret
+fun add_two[T](x: T): T.Ret
+where T: Add[Int]
   x + 2
 ```
 
-Generic parameters are subject to type propagation, similar to function parameters. However, in generics, this might pose a problem, as a generic type may not have any constraints put onto it; in this case, the semicolon `;` separator can be used:
+Calling a generic function or using a generic object with explicit types requires different syntax, so as not to conflict with the index operator `[]`.
 ```
-object ReversedTable[V; K: Hash]
+print(add_two.[Int64](2))  # 4
+val c = MyContainer.[Int] {}
 ```
+This syntax is also used to explicitly select functions from traits, except a function name is required after the `.[]`.
 
 # Modules
 
