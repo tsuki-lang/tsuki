@@ -1977,36 +1977,36 @@ tsuki exposes a set of integer types that correspond to platform-specific C type
 | `CLongLong` | `long long` |
 | `CULongLong` | `unsigned long long` |
 
-## `Ptr[T]`, `PtrVar[T]`, `PtrArray[T]`, and `PtrVarArray[T]`
+## `Ptr[T]`, `PtrVar[T]`, `PtrSlice[T]`, and `PtrVarSlice[T]`
 
 The `Ptr` type is used for creating and manipulating unmanaged pointers to data. Though it looks like a normal type, it's actually a magic type implemented in the compiler itself. `Ptr[T]` acts similarly to `^T`, and `PtrVar[T]` acts similar to `^var T`, but their lifetime is not managed by the compiler. They can be created freely by using their `to` functions, and they can be dereferenced just like regular pointers:
 
 ```
 var x = 1
-var p = Ptr.to(^x)
+var p = Ptr.to(x)
 print(p^)  # 1
 ```
 
-`Ptr.to`, `PtrVar.to`, `PtrArray.to`, and `PtrVarArray.to` take a (non-`var` or `var`) pointer as an argument, and convert it to the appropriate unmanaged pointer. `Var` unmanaged pointers require `^var T` pointers.
+`Ptr.to`, `PtrVar.to`, `PtrSlice.to`, and `PtrVarSlice.to` take a (non-`var` or `var`) pointer as an argument, and convert it to the appropriate unmanaged pointer. `Var` unmanaged pointers require `^var T` pointers.
 
 Reading from an unmanaged pointer that points to invalid memory (aka dangling pointer) is undefined behavior.
 ```
 var p: Ptr[Int]
 do
   var a = 1
-  p = Ptr.to(^a)
+  p = Ptr.to(a)
 # print(p^)  # undefined behavior, because `a` doesn't exist anymore!!!
 ```
 
-`PtrArray[T]` can be used to create pointers to slices. Its `to` function accepts a slice, and a starting index the pointer should point to. Note that `PtrArray` cannot be dereferenced using the usual `^` operator, but rather the index operator.
+`PtrSlice[T]` can be used to create pointers to slices. Its `to` function accepts a slice whose elements the pointer should point to. Note that `PtrSlice` is not dereferenced using the usual `^` operator, but rather the index operator.
 ```
 var s = [1, 2, 3]
-var a = PtrArray.to(s[..], 0)
+var a = PtrSlice.to(s[..])
 print(a[1])  # 2
 ```
-`PtrArray`s do not store the length alongside the pointer like slices do, so using them allows for unbounded access, which is undefined behavior.
+`PtrSlice`s do not store the length alongside the pointer like slices do, so using them allows for unbounded access, which is undefined behavior.
 
-`CString` is available as an alias to `PtrArray[CChar]`.
+`CString` is available as an alias to `PtrSlice[CChar]`.
 
 Idiomatic tsuki programs should avoid using these unmanaged pointers whenever possible. When interfacing with C, idiomatic wrappers should be provided if time allows, such that developers do not need to think about managing lifetimes.
 
