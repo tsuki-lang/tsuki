@@ -502,7 +502,7 @@ impl<'i> Lexer<'i> {
 
    /// Skips all characters, until the current character is `ch`.
    fn skip_chars_except(&mut self, ch: u8) {
-      while self.get() != ch {
+      while self.get() != ch && self.get() != Self::EOF_CHAR {
          self.advance();
       }
    }
