@@ -596,7 +596,7 @@ impl<'i> Lexer<'i> {
       let mut kind = LiteralKind::Decimal;
 
       let start = self.position;
-      if self.get() == b'0' && !matches!(self.get_ahead(1), b'0'..=b'9') {
+      if self.get() == b'0' && matches!(self.get_ahead(1), b'b' | b'o' | b'x') {
          self.advance(); // skip 0
          match self.get() {
             b'b' => kind = LiteralKind::Binary,
