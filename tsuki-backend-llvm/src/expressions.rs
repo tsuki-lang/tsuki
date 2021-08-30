@@ -30,6 +30,13 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
       }
    }
 
+   /// Generates code for a Bool literal.
+   fn generate_boolean_literal(&self, ir: &Ir, node: NodeHandle) -> IntValue<'c> {
+      let typ = self.context.bool_type();
+      let literal = (ir.ast.kind(node) == NodeKind::True) as u64;
+      typ.const_int(literal, false)
+   }
+
    /// Generates code for an integer literal.
    fn generate_integer_literal(&self, ir: &Ir, node: NodeHandle) -> IntValue<'c> {
       let typ = self.get_integer_type(&ir.types, ir.ast.type_id(node));
@@ -54,12 +61,22 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
       typ.const_float(ir.ast.extra(node).unwrap_float())
    }
 
+   fn generate_binary_operation(
+      &self,
+      ir: &Ir,
+      node: NodeHandle,
+   ) -> (BasicValueEnum<'c>, BasicValueEnum<'c>) {
+      (
+         self.generate_expression(ir, ir.ast.first_handle(node)),
+         self.generate_expression(ir, ir.ast.second_handle(node)),
+      )
+   }
+
    /// Generates code for integer math.
    fn generate_integer_math(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
       // TODO: Panic on overflow. This can be done using LLVM's arithmetic intrinsics that return
       // an aggregate {T, i1}, where the second field is a flag signifying whether overflow occured.
-      let left_value = self.generate_expression(ir, ir.ast.first_handle(node));
-      let right_value = self.generate_expression(ir, ir.ast.second_handle(node));
+      let (left_value, right_value) = self.generate_binary_operation(ir, node);
       let (left, right) = (left_value.into_int_value(), right_value.into_int_value());
       let math = match ir.ast.kind(node) {
          NodeKind::Plus => self.builder.build_int_add(left, right, "addtmp"),
@@ -79,8 +96,7 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
    }
 
    fn generate_float_math(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
-      let left_value = self.generate_expression(ir, ir.ast.first_handle(node));
-      let right_value = self.generate_expression(ir, ir.ast.second_handle(node));
+      let (left_value, right_value) = self.generate_binary_operation(ir, node);
       let (left, right) = (
          left_value.into_float_value(),
          right_value.into_float_value(),
@@ -120,10 +136,21 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
       .as_basic_value_enum()
    }
 
+   /// Generates code for a boolean comparison.
+   fn generate_boolean_comparison(&self, ir: &Ir, node: NodeHandle) -> IntValue<'c> {
+      let (left_value, right_value) = self.generate_binary_operation(ir, node);
+      let (left, right) = (left_value.into_int_value(), right_value.into_int_value());
+      let predicate = match ir.ast.kind(node) {
+         NodeKind::Equal => IntPredicate::EQ,
+         NodeKind::NotEqual => IntPredicate::NE,
+         _ => unreachable!(),
+      };
+      self.builder.build_int_compare(predicate, left, right, "boolcmp")
+   }
+
    /// Generates code for an integer comparison.
    fn generate_integer_comparison(&self, ir: &Ir, node: NodeHandle) -> IntValue<'c> {
-      let left_value = self.generate_expression(ir, ir.ast.first_handle(node));
-      let right_value = self.generate_expression(ir, ir.ast.second_handle(node));
+      let (left_value, right_value) = self.generate_binary_operation(ir, node);
       let (left, right) = (left_value.into_int_value(), right_value.into_int_value());
       let left_type = ir.ast.type_id(ir.ast.first_handle(node));
       let is_signed = ir.types.kind(left_type).unwrap_integer().is_signed();
@@ -149,6 +176,10 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
       let typ = ir.types.kind(ir.ast.type_id(left_node));
       if typ.is_integer() {
          self.generate_integer_comparison(ir, node)
+      } else if typ.is_float() {
+         todo!()
+      } else if typ.is_bool() {
+         self.generate_boolean_comparison(ir, node)
       } else {
          todo!()
       }
@@ -159,6 +190,7 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
    pub(crate) fn generate_expression(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
       match ir.ast.kind(node) {
          // Literals
+         NodeKind::True | NodeKind::False => self.generate_boolean_literal(ir, node).into(),
          | NodeKind::Uint8
          | NodeKind::Uint16
          | NodeKind::Uint32

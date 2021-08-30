@@ -19,7 +19,7 @@ val c =
 __intrin_print_int32(c)
 
 # test nested statements
-if a > 10
+if a > 10 == true
   if a + 2 == 12
     __intrin_print_int32(111)
   elif a + 6 == 17
