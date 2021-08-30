@@ -58,25 +58,6 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
       state
    }
 
-   /// Creates a code generation error.
-   fn error(&self, ast: &Ast, node: NodeHandle, message: String) -> Error {
-      Error {
-         filename: self.source.filename.clone(),
-         span: ast.span(node).clone(),
-         kind: ErrorKind::CodeGen(message),
-      }
-   }
-
-   /// Maps an LLVM error string to an Error.
-   fn map_llvm_error<T>(
-      &self,
-      ast: &Ast,
-      node: NodeHandle,
-      r: Result<T, LLVMString>,
-   ) -> Result<T, Error> {
-      r.map_err(|e| self.error(ast, node, format!("LLVM error: {}", e)))
-   }
-
    /// Generates code for an arbitrary node.
    pub fn generate_statement(&self, ir: &Ir, node: NodeHandle) {
       match ir.ast.kind(node) {
