@@ -1,4 +1,4 @@
-//! Code generation for block-like structures (statement lists and the like).
+//! Code generation for statement lists and control flow structures.
 
 use inkwell::basic_block::BasicBlock;
 use inkwell::values::{BasicValueEnum, IntValue};
