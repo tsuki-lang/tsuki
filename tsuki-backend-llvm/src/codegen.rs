@@ -7,11 +7,10 @@ use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::passes::PassManager;
-use inkwell::support::LLVMString;
 use inkwell::types::StructType;
 use inkwell::values::{BasicValue, FunctionValue};
-use tsuki_frontend::ast::{Ast, NodeHandle, NodeKind};
-use tsuki_frontend::common::{Error, ErrorKind, SourceFile};
+use tsuki_frontend::ast::{NodeHandle, NodeKind};
+use tsuki_frontend::common::SourceFile;
 use tsuki_frontend::sem::Ir;
 
 use crate::functions::Function;

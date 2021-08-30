@@ -1,7 +1,7 @@
 //! Code generation for block-like structures (statement lists and the like).
 
 use inkwell::basic_block::BasicBlock;
-use inkwell::values::{BasicValueEnum, InstructionValue, IntValue};
+use inkwell::values::{BasicValueEnum, IntValue};
 use smallvec::SmallVec;
 use tsuki_frontend::ast::{NodeHandle, NodeKind};
 use tsuki_frontend::sem::Ir;
