@@ -44,3 +44,14 @@ Stack traces should be compact and readable at a glance. We don't need to list _
 Everything after the module name should remain as-is, and the empty string previously containing only the module name should be replaced with `{module code}`.
 
 **UX above all else**.
+
+## Some deets on the stack trace's formatting
+
+The paths shown in the stack trace should never be full paths to the `src` directory. Instead, they should be `<package name>:<path to file inside of src>`. Not sure about this, but maybe the `.tsu` extension should also be dropped?
+
+The full format is the following:
+```
+Stack traceback:
+  <file> <line>:<column>        <short function name>
+  ...
+```
