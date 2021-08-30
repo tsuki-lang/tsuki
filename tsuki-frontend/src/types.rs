@@ -6,7 +6,7 @@
 use std::cmp::Ordering;
 use std::ops::Range;
 
-use crate::ast::{Ast, NodeHandle};
+use crate::ast::NodeHandle;
 
 /// Data-oriented type storage.
 pub struct Types {

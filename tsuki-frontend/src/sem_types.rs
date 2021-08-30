@@ -4,9 +4,7 @@ use crate::ast::{Ast, NodeData, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors};
 use crate::scope::{ScopeStack, Scopes, SymbolKind, Symbols, Variable, VariableKind};
 use crate::sem::{SemCommon, SemPass};
-use crate::types::{
-   BuiltinTypes, FloatSize, IntegerSize, TypeId, TypeKind, TypeLog, TypeLogEntry, Types,
-};
+use crate::types::{BuiltinTypes, FloatSize, IntegerSize, TypeId, TypeLog, TypeLogEntry, Types};
 
 pub(crate) struct SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
    common: &'c SemCommon,

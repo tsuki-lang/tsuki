@@ -1,5 +1,5 @@
 /// Code generation for variable declarations.
-use inkwell::values::{BasicValue, BasicValueEnum, PointerValue};
+use inkwell::values::{BasicValueEnum, PointerValue};
 use tsuki_frontend::ast::{NodeHandle, NodeKind};
 use tsuki_frontend::scope::SymbolId;
 use tsuki_frontend::sem::Ir;

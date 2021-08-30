@@ -6,7 +6,7 @@ use smallvec::SmallVec;
 
 use crate::ast::*;
 use crate::common::{Error, ErrorKind, Errors, Span};
-use crate::lexer::{Associativity, IndentLevel, Lexer, Token, TokenKind};
+use crate::lexer::{Associativity, Lexer, Token, TokenKind};
 
 /// The parser state.
 struct Parser<'l, 's> {
