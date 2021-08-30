@@ -60,19 +60,18 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
       struct Condition<'c> {
          block: BasicBlock<'c>,
          value: IntValue<'c>,
-         // The `br` instruction at the end of the instruction. This is initially `unreachable`,
-         // and is later replaced with a proper `br`.
-         br_instruction: InstructionValue<'c>,
+         // We store the ending block of the condition, because it may be different than the
+         // starting block.
+         end_block: BasicBlock<'c>,
       }
       // This local struct stores information about a single `if` branch: its condition, condition
       // block, and body block.
       struct Branch<'c> {
          condition: Option<Condition<'c>>,
          body: BasicBlock<'c>,
-         // The unconditional `br label %end` instruction at the end of a block.
-         // Just like a condition's `br`, this is initially `unreachable`, and is later backpatched
-         // into a proper `br`.
-         br_end_instruction: InstructionValue<'c>,
+         // Similarly to the condition, we store the ending block, because it may be different than
+         // the starting block, and it's where we must emit the final `br` instructions.
+         end_block: BasicBlock<'c>,
          result: Option<BasicValueEnum<'c>>,
       }
       let mut branches = SmallVec::<[Branch<'c>; 16]>::new();
@@ -107,12 +106,11 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
             };
             self.builder.position_at_end(condition_block);
             let condition_value = self.generate_expression(ir, ir.ast.first_handle(branch));
-            // We generate the (initially `unreachable`) conditional `br`.
-            let br_instruction = self.builder.build_unreachable();
+            let end_block = self.builder.get_insert_block().unwrap();
             condition = Some(Condition {
                block: condition_block,
                value: condition_value.into_int_value(),
-               br_instruction,
+               end_block,
             });
          }
          // Then we generate the body.
@@ -123,28 +121,26 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
             self.generate_statements(ir, branch);
             None
          };
-         // After the body, we generate the (again, initially `unreachable`) unconditional `br`.
-         let br_end_instruction = self.builder.build_unreachable();
+         let end_block = self.builder.get_insert_block().unwrap();
          branches.push(Branch {
             condition,
             body: body_block,
-            br_end_instruction,
+            end_block,
             result,
-         })
+         });
       }
-
       // Generate the terminating %end block. After a successfully executed branch, this block is
-      // branched to.
+      // branched to unconditionally, and is where control flow continues after the if statement
+      // ends.
       let end_block = self.context.append_basic_block(self.function.value, "end");
 
-      // Now that we have all the blocks, we're ready to backpatch our `unreachable`s into `br`s.
-      // We use a separate builder without a position to create the `br` instructions.
-      let builder = self.context.create_builder();
+      // Now that we have all the blocks, we're ready to backpatch some `br` instructions into
+      // the blocks.
       for (index, branch) in branches.iter().enumerate() {
          let &Branch {
             condition,
             body: body_block,
-            br_end_instruction,
+            end_block: branch_end_block,
             ..
          } = &branch;
          if let Some(condition) = condition {
@@ -160,13 +156,11 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
             } else {
                end_block
             };
-            builder.position_at(condition.block, &condition.br_instruction);
-            builder.build_conditional_branch(condition.value, *body_block, else_block);
-            condition.br_instruction.erase_from_basic_block();
+            self.builder.position_at_end(condition.end_block);
+            self.builder.build_conditional_branch(condition.value, *body_block, else_block);
          }
-         builder.position_at(*body_block, br_end_instruction);
-         builder.build_unconditional_branch(end_block);
-         br_end_instruction.erase_from_basic_block();
+         self.builder.position_at_end(*branch_end_block);
+         self.builder.build_unconditional_branch(end_block);
       }
 
       // Compilation is resumed normally at the %end block.
