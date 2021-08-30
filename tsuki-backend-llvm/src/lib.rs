@@ -3,7 +3,7 @@
 
 mod codegen;
 mod control_flow;
-mod expression;
+mod expressions;
 mod functions;
 mod libc;
 mod variables;
