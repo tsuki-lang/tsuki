@@ -61,6 +61,29 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
       typ.const_float(ir.ast.extra(node).unwrap_float())
    }
 
+   /// Generates code for boolean negation.
+   fn generate_boolean_negation(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
+      let right = self.generate_expression(ir, ir.ast.first_handle(node));
+      self.builder.build_not(right.into_int_value(), "nottmp").as_basic_value_enum()
+   }
+
+   /// Generates code for integer or float negation.
+   fn generate_number_negation(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
+      let right = self.generate_expression(ir, ir.ast.first_handle(node));
+      let typ = ir.ast.type_id(node);
+      let kind = ir.types.kind(typ);
+      if kind.is_integer() {
+         let typ = self.get_integer_type(&ir.types, typ);
+         let zero = typ.const_zero();
+         self.builder.build_int_sub(zero, right.into_int_value(), "negtmp").into()
+      } else if kind.is_float() {
+         self.builder.build_float_neg(right.into_float_value(), "fnegtmp").into()
+      } else {
+         unreachable!()
+      }
+   }
+
+   /// Generates the LHS and RHS of a binary operator.
    fn generate_binary_operation(
       &self,
       ir: &Ir,
@@ -205,6 +228,8 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
          NodeKind::Variable => self.generate_variable_reference(ir, node),
 
          // Operators
+         NodeKind::Not => self.generate_boolean_negation(ir, node),
+         NodeKind::Neg => self.generate_number_negation(ir, node),
          NodeKind::Plus | NodeKind::Minus | NodeKind::Mul | NodeKind::Div => {
             self.generate_math(ir, node)
          }

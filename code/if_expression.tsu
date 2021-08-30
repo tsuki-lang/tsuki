@@ -32,3 +32,9 @@ else
     if a == 5 -> 6
     else -> 7
   __intrin_print_int32(x)
+
+# test boolean operations
+val eq = true == true
+val ne = false != true
+val neg = not true
+val neg2 = not false
