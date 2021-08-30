@@ -7,5 +7,6 @@ edition = "2018"
 
 tsuki-frontend = { path = "../tsuki-frontend" }
 
+smallvec = "1.6.1"
 thiserror = "1.0.26"
 inkwell = { git = "https://github.com/TheDan64/inkwell", rev = "41857f9", features = ["llvm12-0"] }

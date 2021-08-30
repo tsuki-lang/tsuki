@@ -86,6 +86,9 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
          NodeKind::DoStatement => {
             let _ = self.generate_do(ir, node);
          }
+         NodeKind::IfStatement => {
+            let _ = self.generate_if(ir, node);
+         }
 
          // Declarations
          NodeKind::Val | NodeKind::Var => self.generate_variable_declaration(ir, node),

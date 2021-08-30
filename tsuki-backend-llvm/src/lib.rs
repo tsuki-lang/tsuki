@@ -1,8 +1,8 @@
 //! The root of the LLVM backend. This implements high-level functionality - compiling code into
 //! object files, and linking those object files into executables.
 
-mod blocks;
 mod codegen;
+mod control_flow;
 mod expression;
 mod functions;
 mod libc;
@@ -98,9 +98,6 @@ impl backend::Backend for LlvmBackend {
 
       // Set up the pass manager.
       let pm = PassManager::create(&module);
-
-      // Make sure that the code we generate makes sense.
-      pm.add_verifier_pass();
 
       if self.optimization_level >= OptimizationLevel::Essential {
          // Constant folding passes run twice: once at startup, and once after CFG simplicifation

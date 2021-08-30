@@ -2,6 +2,7 @@
 
 use inkwell::types::{FloatType, IntType};
 use inkwell::values::{BasicValue, BasicValueEnum, FloatValue, IntValue, StructValue};
+use inkwell::IntPredicate;
 use tsuki_frontend::ast::{Ast, NodeHandle, NodeKind};
 use tsuki_frontend::sem::Ir;
 use tsuki_frontend::types::{FloatSize, IntegerSize, TypeId, TypeKind, Types};
@@ -16,7 +17,7 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
    }
 
    /// Returns the integer type for the provided type, or panics if the type is not an integer type.
-   fn get_int_type(&self, types: &Types, typ: TypeId) -> IntType<'c> {
+   fn get_integer_type(&self, types: &Types, typ: TypeId) -> IntType<'c> {
       if let TypeKind::Integer(size) = types.kind(typ) {
          match size {
             IntegerSize::U8 | IntegerSize::S8 => self.context.i8_type(),
@@ -30,8 +31,8 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
    }
 
    /// Generates code for an integer literal.
-   fn generate_int_literal(&self, ir: &Ir, node: NodeHandle) -> IntValue<'c> {
-      let typ = self.get_int_type(&ir.types, ir.ast.type_id(node));
+   fn generate_integer_literal(&self, ir: &Ir, node: NodeHandle) -> IntValue<'c> {
+      let typ = self.get_integer_type(&ir.types, ir.ast.type_id(node));
       typ.const_int(ir.ast.extra(node).unwrap_uint(), false)
    }
 
@@ -54,7 +55,7 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
    }
 
    /// Generates code for integer math.
-   fn generate_int_math(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
+   fn generate_integer_math(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
       // TODO: Panic on overflow. This can be done using LLVM's arithmetic intrinsics that return
       // an aggregate {T, i1}, where the second field is a flag signifying whether overflow occured.
       let left_value = self.generate_expression(ir, ir.ast.first_handle(node));
@@ -98,7 +99,7 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
    fn generate_math(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
       let typ = ir.types.kind(ir.ast.type_id(node));
       if typ.is_integer() {
-         self.generate_int_math(ir, node)
+         self.generate_integer_math(ir, node)
       } else if typ.is_float() {
          self.generate_float_math(ir, node)
       } else {
@@ -107,14 +108,49 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
    }
 
    /// Generates code for an integer type conversion (`WidenUint` or `WidenInt`).
-   fn generate_int_conversion(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
+   fn generate_integer_conversion(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
       let inner = ir.ast.first_handle(node);
       let inner_value = self.generate_expression(ir, inner).into_int_value();
-      let dest_type = self.get_int_type(&ir.types, ir.ast.type_id(node));
+      let dest_type = self.get_integer_type(&ir.types, ir.ast.type_id(node));
       match ir.ast.kind(node) {
          NodeKind::WidenUint => self.builder.build_int_z_extend(inner_value, dest_type, "uwidened"),
          NodeKind::WidenInt => self.builder.build_int_s_extend(inner_value, dest_type, "swidened"),
          _ => unreachable!(),
+      }
+      .as_basic_value_enum()
+   }
+
+   /// Generates code for an integer comparison.
+   fn generate_integer_comparison(&self, ir: &Ir, node: NodeHandle) -> IntValue<'c> {
+      let left_value = self.generate_expression(ir, ir.ast.first_handle(node));
+      let right_value = self.generate_expression(ir, ir.ast.second_handle(node));
+      let (left, right) = (left_value.into_int_value(), right_value.into_int_value());
+      let left_type = ir.ast.type_id(ir.ast.first_handle(node));
+      let is_signed = ir.types.kind(left_type).unwrap_integer().is_signed();
+      let predicate = match ir.ast.kind(node) {
+         NodeKind::Equal => IntPredicate::EQ,
+         NodeKind::NotEqual => IntPredicate::NE,
+         NodeKind::Less if is_signed => IntPredicate::SLT,
+         NodeKind::LessEqual if is_signed => IntPredicate::SLE,
+         NodeKind::Greater if is_signed => IntPredicate::SGT,
+         NodeKind::GreaterEqual if is_signed => IntPredicate::SGE,
+         NodeKind::Less if !is_signed => IntPredicate::ULT,
+         NodeKind::LessEqual if !is_signed => IntPredicate::ULE,
+         NodeKind::Greater if !is_signed => IntPredicate::UGT,
+         NodeKind::GreaterEqual if !is_signed => IntPredicate::UGE,
+         _ => unreachable!(),
+      };
+      self.builder.build_int_compare(predicate, left, right, "intcmp")
+   }
+
+   /// Generates code for integer comparisons.
+   fn generate_comparison(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
+      let left_node = ir.ast.first_handle(node);
+      let typ = ir.types.kind(ir.ast.type_id(left_node));
+      if typ.is_integer() {
+         self.generate_integer_comparison(ir, node)
+      } else {
+         todo!()
       }
       .as_basic_value_enum()
    }
@@ -130,7 +166,7 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
          | NodeKind::Int8
          | NodeKind::Int16
          | NodeKind::Int32
-         | NodeKind::Int64 => self.generate_int_literal(ir, node).into(),
+         | NodeKind::Int64 => self.generate_integer_literal(ir, node).into(),
          NodeKind::Float32 | NodeKind::Float64 => self.generate_float_literal(ir, node).into(),
 
          // Variables
@@ -140,13 +176,20 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
          NodeKind::Plus | NodeKind::Minus | NodeKind::Mul | NodeKind::Div => {
             self.generate_math(ir, node)
          }
+         | NodeKind::Equal
+         | NodeKind::NotEqual
+         | NodeKind::Less
+         | NodeKind::LessEqual
+         | NodeKind::Greater
+         | NodeKind::GreaterEqual => self.generate_comparison(ir, node),
          NodeKind::Assign => self.generate_assignment(ir, node).unwrap(),
 
          // Control flow
          NodeKind::DoExpression => self.generate_do(ir, node).unwrap(),
+         NodeKind::IfExpression => self.generate_if(ir, node).unwrap(),
 
          // Intrinsics
-         NodeKind::WidenUint | NodeKind::WidenInt => self.generate_int_conversion(ir, node),
+         NodeKind::WidenUint | NodeKind::WidenInt => self.generate_integer_conversion(ir, node),
          NodeKind::PrintInt32 | NodeKind::PrintFloat32 => {
             self.generate_call_like_intrinsic(ir, node)
          }
