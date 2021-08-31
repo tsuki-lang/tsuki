@@ -6,6 +6,10 @@ My idea for a programming language that's actually fun to program in.
 
 # Lexis
 
+## Encoding
+
+tsuki source code is encoded in UTF-8, using LF (ASCII 0Ah) for line breaks. The Windows convention of CR (ASCII 0Dh) followed by LF is not supported. ASCII 20h is used as the whitespace character for indentation and separating tokens from one another.
+
 ## Comments
 
 Comments in tsuki start with `#` and end with the end of the line:
@@ -83,9 +87,9 @@ This is enforced by the compiler to keep a consistent coding style across variou
 
 The following identifiers are reserved as _keywords_:
 ```
-_ and as atom catch dependency derive do elif else for fun if impl import
-in is macro match move not object of or pub rc return try type uninit union
-where while val var
+_ and as atom catch dependency derive do elif else for fun getters if impl
+import in is macro match move not object of or pub rc return try type uninit
+union where while val var
 ```
 TODO: This list of keywords is constantly changing as the language spec is refined, and may currently be imprecise. It should be updated once the compiler is finished.
 
@@ -233,12 +237,12 @@ assert(p2 of Child)
 The `as` operator is used for converting types explicitly. It's syntax sugar for calling the `convert` method on a value's `As[T]` trait.
 
 ```
-val x = Int32.parse(stdin.read_line?)
+val x = Int32.parse(stdin.read_line()?)
 val y = x as Float32
 ```
 Is sugar for:
 ```
-val y = x.[As[Float32]].convert
+val y = x.[As[Float32]].convert()
 ```
 
 Unlike most other operators, `as` expects a type on the right-hand side, as opposed to another expression of lower precedence.
@@ -265,7 +269,7 @@ The `if..elif..else` expression evaluates a boolean condition, and if it's `true
 ```
 import @std.io
 
-val name = stdin.read_line?
+val name = stdin.read_line()?
 print(
   if name == "Mark"
     "Oh hi Mark"
@@ -298,8 +302,8 @@ if val n = num
 The above code expands to the following:
 ```
 val num: ?Int = nil
-if num.[Unwrap].has_value
-  val n = num.[Unwrap].unwrap
+if num.[Unwrap].has_value()
+  val n = num.[Unwrap].unwrap()
   do
     print("will not execute")
 ```
@@ -374,12 +378,12 @@ val rect = Shape:rectangle(32, 32, 64, 64)
 match rect
   :rectangle(x, y, width, height) ->
     print("Rectangle")
-    print("X: " ~ x.to_string ~ "  Y: " ~ y.to_string)
-    print(width.to_string ~ "x" ~ height.to_string)
+    print("X: " ~ x.to_string() ~ "  Y: " ~ y.to_string())
+    print(width.to_string() ~ "x" ~ height.to_string())
   :circle(x, y, radius) ->
     print("Circle")
-    print("X: " ~ x.to_string ~ "  Y: " ~ y.to_string)
-    print("radius: " ~ radius.to_string)
+    print("X: " ~ x.to_string() ~ "  Y: " ~ y.to_string())
+    print("radius: " ~ radius.to_string())
 ```
 `match` is the only way of retrieving the variant data from unions.
 
@@ -423,7 +427,7 @@ The `catch` block must return a default value for the resulting expression, so a
 Using the `?` operator on an error result in a `try` block will break out of the block, and the block's result value will be the error result.
 ```
 val a = try
-  val num_string = stdin.read_line?
+  val num_string = stdin.read_line()?
   val num = Int32.parse(num_string)?
   num + 2
 print(a)
@@ -527,15 +531,15 @@ while i < 10
 
 A `while` loop is also capable of iterating over a condition that produces optionals as its result. Enter `while val`:
 ```
-var bytes = "hello".bytes
-while val b = bytes.next
+var bytes = "hello".bytes()
+while val b = bytes.next()
   print(b)
 ```
 The above example is expanded to the following:
 ```
-var bytes = "hello".bytes
+var bytes = "hello".bytes()
 while true
-  if val b = bytes.next
+  if val b = bytes.next()
     print(b)
   else
     break
@@ -564,7 +568,7 @@ The `for` loop is then expanded to a regular `while` loop:
 ```
 do
   var <iterator> = iterator
-  while val <variables> = <iterator>.next
+  while val <variables> = <iterator>.[Iterator].next()
     <loop body>
 ```
 Note that all the variables within angle brackets `<>` are not actually visible anywhere, they exist here solely for visualization purposes.
@@ -580,9 +584,9 @@ import @std.parsing
 
 while true
   write("Enter a number: ")
-  val number_string = stdin.read_line?
+  val number_string = stdin.read_line()?
   write('\n')
-  if val number = number_string.parse_int
+  if val number = number_string.parse_int()
     print(number + 1)
   else
     break
@@ -632,7 +636,7 @@ The `return` expression allows for exiting from a function early. In functions r
 
 ```
 fun find[T: Equal](haystack: Seq[T], needle: T): Index
-  for i, element in haystack.items
+  for i, element in haystack.items()
     if element == needle
       return i
 ```
@@ -703,7 +707,7 @@ val y: Uint32 = 1_u16
 Narrowing conversions and conversions between unsigned and signed integers are not performed automatically, and must be done explicitly through the `to_*` family of functions:
 
 ```
-val x: Uint16 = 1_i8.to_u16 or 0
+val x: Uint16 = 1_i8.to_u16() or 0
 ```
 
 These functions return an optional wrapping the final type, which must be unwrapped using `unwrap` or `or`. The value returned is `nil` if overflow occurred. The `to_*_wrapping` and `to_*_saturating` variants can be used if different behavior is needed.
@@ -789,9 +793,9 @@ atom IoError in Error
 
 Error handling is described in greater detail in [Results](#results).
 
-Sometimes, the type system isn't able to infer the correct type for an atom; in this case, the type can be specified explicitly, before the atom itself.
+Sometimes, the type system isn't able to infer the correct type for an atom; in this case, the type can be specified explicitly, by using `as`.
 ```
-val err = Error:eaccess
+val err = :eaccess as Error
 assert(err is Error)
 ```
 
@@ -805,22 +809,22 @@ The `String` type is an immutable UTF-8 encoded string. It can be obtained throu
 
 Because all strings are UTF-8, `String` cannot be indexed directly. Instead, one of the available iterators has to be used:
 ```
-var iter = "cześć".chars
-print(iter.next)  # c
-print(iter.next)  # z
-print(iter.next)  # e
-print(iter.next)  # ś
-print(iter.next)  # ć
+var iter = "cześć".chars()
+print(iter.next())  # c
+print(iter.next())  # z
+print(iter.next())  # e
+print(iter.next())  # ś
+print(iter.next())  # ć
 
 # or, more concisely:
-for char in "cześć".chars
+for char in "cześć".chars()
   print(char)
 ```
 A `String` can also be used as a byte buffer, by using the `bytes` iterator:
 ```
-var iter = "\x00\xFF".bytes
-print(iter.next)  # 0
-print(iter.next)  # 255
+var iter = "\x00\xFF".bytes()
+print(iter.next())  # 0
+print(iter.next())  # 255
 ```
 The `byte` method can also be used to retrieve a single byte from the string:
 ```
@@ -849,16 +853,16 @@ The presence of a value can be queried using the `has_value` function, and the v
 if opt.has_value
   print("That ain't happening, sir")
 
-if correct.has_value
-  val ok = correct.unwrap
-  print("The unwrapped value is: " ~ ok.to_string)
+if correct.has_value()
+  val ok = correct.unwrap()
+  print("The unwrapped value is: " ~ ok.to_string())
 ```
 
 As mentioned previously in the "`if` expressions" section, there exists a shorthand for checking and unwrapping an optional, called `if val`:
 
 ```
 if val ok = correct
-  print("The unwrapped value is: " ~ ok.to_string)
+  print("The unwrapped value is: " ~ ok.to_string())
 ```
 
 ## Results
@@ -909,15 +913,13 @@ impl Example
 
 fun print_x_from(example: ^Example)
   # we can dereference the pointer manually...
-  # example^.print_x
+  # example^.print_x()
   # ...but we can also let the compiler dereference it for us
-  example.print_x
+  example.print_x()
 
 var example = Example { x = 1 }
 print_x_from(example)
 ```
-
-Usually using `^T` in arguments isn't necessary, because the compiler is smart enough to figure out which arguments are "big" for a given target, and pass them by pointer anyways.
 
 ## Ranges
 
@@ -941,10 +943,10 @@ val c = ..  # RangeFull
 For a `RangeExcl[T]`, if `T` implements `Ordinal`, the exclusive range may be converted to an inclusive range, using the `to_inclusive` function.
 ```
 val excl = 1..<5
-val incl = excl.to_inclusive
+val incl = excl.to_inclusive()
 print(incl)  # 1..4
 ```
-The `to_inclusive` function returns a range with the upper bound replaced with `.upper.[Ordinal].pred`.
+The `to_inclusive` function returns a range with the upper bound replaced with `.upper.[Ordinal].pred()`.
 
 ## Slices
 
@@ -973,27 +975,28 @@ Out of bounds access is checked at runtime and results in a panic.
 
 ## `Seq[T]`
 
+TODO: `Array[N, T]`.
+
 `Seq[T]`, or a _sequence_, is an _owned_ dynamic array type; it can be created using the `[]` prefix operator:
 ```
 val names = ["Jon", "John", "Josh"]
 ```
-A sequence is _owned_, because, contrary to a slice, everyone holding a sequence _owns_ a reference to the given data. Sequences have similar memory management semantics to `rc` objects.
 
 The usual slice operators may be used on sequences.
 
-Mutating a sequence results in all instances of the sequence being updated:
 ```
-var names = ["Jon", "John", "Josh"]
-var names2 = names
-names <- "Adam"  # push the string "Adam" to the end of the sequence
-print(names2[3])  # Adam
+print(names[0])     # Jon
+print(names[0..1])  # ^["Jon", "John"]
 ```
-To create a duplicate of the sequence, the `dup` method can be used:
+
+Sequences do not implement `Copy`, and implement `Dup` if `T` implements `Dup`. This means that copies of sequences have to be made explicitly:
 ```
-var names = ["Jon", "John", "Josh"]
-var names2 = names.dup
-names <- "Adam"
-print((names.len, names2.len))  # 4, 3
+# String implements Dup, so we can create a copy of `names`.
+var my_names = names.dup()
+```
+The "push" `<-` operator can be used to append items to a `var` sequence.
+```
+my_names <- "Johnny"
 ```
 
 ## `Table[K, V]`
@@ -1114,7 +1117,7 @@ object Counted
 val a = Counted {}
 val b = Counted {}
 val c = Counted {}
-print((a, b, c))  # (Counted { id = 0 }, Counted { id = 1 }, Counted { id = 2 })
+print((a, b, c))  # Counted { id = 0 }, Counted { id = 1 }, Counted { id = 2 }
 ```
 
 There's one more exception to the "all fields must be initialized" rule. That is, certain fields may remain uninitialized until they're actually used. These fields still have to be listed in the constructor, but instead of specifying a meaningful value, `uninit` has to be used.
@@ -1176,7 +1179,7 @@ impl DupExample
   derive Dup
 
 val a = DupExample { x = 1, y = 2 }
-var b = a.dup
+var b = a.dup()
 b.y = 3
 print(a)  # DupExample { x = 1, y = 2 }
 print(b)  # DupExample { x = 1, y = 3 }
@@ -1196,7 +1199,7 @@ print(d)  # CopyExample { x = 1, y = 3 }
 
 ### Dropping
 
-When an object instance goes out of scope, we say it's _dropped_. An object implementation may inject some extra code to the dropping process via the `Drop` trait.
+When an object instance goes out of scope, we say it's _dropped_. An object implementation may inject some extra code to the dropping procedure via the `Drop` trait.
 
 The trait is defined like so:
 ```
@@ -1217,7 +1220,7 @@ object Dropper
 
 impl Drop for Dropper
   fun drop()
-    print("Dropping " ~ .id.to_string)
+    print("Dropping " ~ .id.to_string())
 
 val d = Dropper {}
 val e = Dropper {}
@@ -1252,7 +1255,7 @@ fun init_parent(): Parent
 
 val c = Child { of init_parent(), y = 2 }
 ```
-`of` must appear at the very beginning of a constructor, before all the fields.
+`of` must appear at the very beginning of a constructor, before fields.
 
 ## Unions
 
@@ -1305,6 +1308,8 @@ The following implicit conversions are permitted:
   - Converting from `^var T` to `^T` is allowed, but not the other way around.
 - Conversions dropping slice mutability.
   - Converting from `[var T]` to `[T]` is allowed, but not the other way around.
+- Copying conversions.
+  - Converting from `^var T` or `^T` to `T` is allowed only when `T` implements `Copy`.
 
 Implicit conversions are performed in the following places:
 
@@ -1356,9 +1361,9 @@ where T: Add[T] + Zero
     accumulator
 
 val ints = [1, 2, 3]
-print(ints.sum)  # 6
+print(ints.sum())  # 6
 val strings = ["a", "bc", "d"]
-# print(ints.sum)  # error: impl's generic constraint is not satisfied
+# print(ints.sum())  # error: impl's generic constraint is not satisfied
 ```
 
 `impl` blocks are bound to modules, rather than types - if an `impl` block appears in a module different to where the type was declared, that module has to be imported alongside the module declaring the type for all functions to be available.
@@ -1375,24 +1380,7 @@ As already noted, `Self` is the only way of referring to associated types.
 
 Non-`type` blocks implement functions on _instances_ of a given type. This instance can be accessed, and optionally mutated inside of the function, by using the special, implicit `self` variable.
 
-Fields inside of the object can be accessed using the special `.field_name` notation. Note that fields can _only_ be accessed inside of the object, and can only be made public by using getters and setters (described later).
-
-```
-object Example
-  val x: Int
-  var y: Int
-
-impl Example
-  # getter for x
-  fun x(): Int
-    .x
-  # getter for y
-  fun y(): Int
-    .y
-  # setter for y
-  fun y=(val: Int)
-    .y = val
-```
+Fields in the current `self` can be accessed using the special `.field_name` notation. Likewise, functions can be called on the current `self` using `.function_name()`.
 
 This notation can also be used to invoke functions on `self`:
 
@@ -1409,9 +1397,7 @@ impl Example
     # self.inc_x()
 ```
 
-`self` cannot be used to access fields; it can only be used for invoking methods.
-
-Now, about `fun move`, `fun val` and `fun var`: these are annotations that let the compiler know whether `self` must be `var` or not for the function to be callable. This property is usually inferred automatically, depending on what a given function does.
+Now, about `fun val` and `fun var`: these are annotations that let the compiler know whether `self` must be `var` or not for the function to be callable. This property is usually inferred automatically, depending on what a given function does.
 
 - If a function modifies any field directly, then it's `var`.
 - If a function calls another instance function that's `var`, then it's `var`.
@@ -1443,55 +1429,31 @@ impl ProcessBuilder
 ```
 Once the `spawn` function is called, the builder is consumed and the arguments and environment variables of the process cannot be modified anymore.
 
-### Getters and setters
+### Getters
 
-tsuki has syntactic support for getters and setters.
+tsuki has syntactic support for getters. Getters are semantically different from functions, in that they return a _location_ in a value, rather than just a value. This means that one can take the address of a location returned by a getter, and pass it into a procedure as a pointer.
 
-If an instance function doesn't accept any parameters beyond `self`, the parentheses may be omitted when calling it. This is the preferred style of calling zero-argument instance functions.
-
-```
-var e = Example { x = 1, y = 2 }
-e.inc_x_twice
-```
-Note that this doesn't work with the shorthand `.func()` notation inside of implementations, to avoid confusing fields with instance functions.
-
-Instance functions may also be named with a trailing `=`. In this case, the function is a _setter_, and may only have a single parameter - the value that a given property should be set to.
+Getters are declared using a `getters` declaration inside of an `impl` block. This declaration defines what's called a _location alias_, that is, a different name for a location inside of an object. `getters` declarations can only appear in `impl` blocks declared in the same module as the original object was declared, because they require access to the object's fields.
 
 ```
-object SetterExample
-  var x: Int
+object Nested
+  var a: Int
 
-impl SetterExample
-  fun x=(val: Int)
-    print("Setting x to " ~ val.to_string)
-    .x = val
+object Example
+  val x: Int
+  var y: Int
+  var i: Nested
 
-var e = SetterExample { x = 1 }
-e.x = 2
+impl Example
+  getters
+    # an immutable getter can be defined by using `val`
+    val x -> .x
+    val a -> .i.a
+    # a mutable getter can be defined by using `var`
+    var y -> .y
 ```
 
-Because writing getters and setters can quickly get old, tsuki provides some syntax sugar for generating them automatically.
-
-```
-object AutoGetSet
-  var x, y: Int
-  val z: Int
-
-impl AutoGetSet
-  getset x, x=, y, y=, z
-```
-The `getset` declaration will automatically generate getters and setters for the provided fields. A name without a `=` generates a getter, and a name with a `=` generates a setter. Note that setters cannot be created for `val` fields; this is (obviously) because `val` fields are read-only.
-
-By default, the fields `getset`-generated functions return are passed by copy, when a value implements that trait, of course. It's possible to pass a value by pointer by prefixing the `getset` element with a `^`:
-```
-object Container
-  val big: SomeBigObject
-  var bigger: SomeBiggerObject
-
-impl Container
-  # Setters can be generated in a similar fashion by suffixing them with `=`.
-  getset ^big, ^bigger, ^bigger=
-```
+Note that a getter must not have any side effects. It can only return a single expression, and that expression must be a valid location (ie. something you can make a pointer to). If side effects are needed, a function should be used instead.
 
 ### `derive`
 
@@ -1520,13 +1482,13 @@ Traits can be used as generic constraints:
 ```
 fun make_it_speak[T](animal: ^T)
 where T: Animal
-  animal.speak
+  animal.speak()
 ```
 
 Traits can also be used like interfaces, where the actual type is determined at runtime, provided they're behind a pointer.
 ```
 fun make_it_speak_at_runtime(animal: ^Animal)
-  animal.speak
+  animal.speak()
 ```
 
 Traits can inherit from other traits by using the `of` keyword, similarly to objects.
@@ -1653,9 +1615,9 @@ impl ExampleB
     print("Called on ExampleB")
 
 val e = Example {}
-# e.my_method  # error: ambiguous call; resolves to more than one function
-e.[ExampleA].my_method  # Called on ExampleA
-e.[ExampleB].my_method  # Called on ExampleB
+# e.my_method()  # error: ambiguous call; resolves to more than one function
+e.[ExampleA].my_method()  # Called on ExampleA
+e.[ExampleB].my_method()  # Called on ExampleB
 ```
 
 # Generics
@@ -1794,16 +1756,17 @@ Package: adder, File: src/adder.tsu
 fun adding_abstraction(a, b: Int): Int
   a + b
 
-# objects have to be marked public
+# objects can be marked public
 pub object Adder
-  # object fields _cannot_ be public...
-  val increment: Int
+  # object fields can also be marked public
+  pub val increment: Int
 
 impl Adder
-  # ...but getters and setters can
-  pub getset increment
+  # getters can also be marked public, but in our case it's not really useful
+  pub getters
+    pub val incr -> .increment
 
-  # functions inside of `impl` also must be marked public
+  # functions inside of `impl` can also marked public
   pub fun add(to: Int): Int
     adding_abstraction(to, .increment)
 
@@ -1870,11 +1833,13 @@ fun adding_abstraction(a, b: Int): Int
 
 ## An adder adds a constant increment to a provided value.
 pub object Adder
-  val increment: Int
+  ## The increment of the adder. This is the value added to other values, when `add` is called.
+  pub val increment: Int
 
 impl Adder
-  ## Retrieves the increment of the adder.
-  pub getset increment
+  getters
+    ## Shorthand alias for retrieving the increment of the adder.
+    val incr -> .increment
 
   ## Adds the increment the adder was initialized with to `to`.
   ##
@@ -2060,7 +2025,7 @@ impl type Things
 impl Things
   fun var increment() :: c_import("things_increment")
 ```
-Instance functions imported from C with `var self` are assumed to accept `Self *` as the first argument, and functions with `val self` are assumed to accept `const Self *` as the first argument. Note that in case of functions imported from C the `var`-ness of `self` must be specified explicitly, as there is no body to infer it from.
+Instance functions imported from C with `var self` are assumed to accept `Self *` as the first argument, functions with `val self` are assumed to accept `const Self *` as the first argument, and functions with `move self` are assumed to accept `Self` as the first argument. Note that in case of functions imported from C the `var`-ness of `self` must be specified explicitly, as there is no body to infer it from.
 ```c
 struct things {
    int a, b, c;
