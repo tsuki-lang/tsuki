@@ -554,16 +554,44 @@ impl<'l, 's> Parser<'l, 's> {
       Ok(node)
    }
 
+   /// Parses a `while` loop.
+   fn parse_while_loop(&mut self) -> Result<NodeHandle, Error> {
+      let token = self.lexer.next()?;
+      let condition = self.parse_expression(0)?;
+      let node = self.create_node_with_handle(NodeKind::While, condition);
+      let mut statements = Vec::new();
+      if let Some(..) = self.match_token(TokenKind::Then)? {
+         statements.push(self.parse_expression(0)?);
+      } else {
+         self.parse_indented_block(
+            &mut statements,
+            &token,
+            |p| p.parse_statement(),
+            || ErrorKind::MissingLineBreakAfterStatement,
+         )?;
+      }
+      self.ast.set_span(
+         node,
+         Span::join(&token.span, &self.span_all_nodes(&statements)),
+      );
+      self.ast.set_extra(node, NodeData::NodeList(statements));
+      Ok(node)
+   }
+
    /// Parses a statement.
    fn parse_statement(&mut self) -> Result<NodeHandle, Error> {
       let token_kind = self.lexer.peek()?.kind.clone();
       let node = match token_kind {
          // Declarations
          TokenKind::Val | TokenKind::Var => self.parse_variable_declaration()?,
+
          // Control flow
          TokenKind::Underscore => self.parse_pass()?,
          TokenKind::Do => self.parse_do_expression(None)?,
          TokenKind::If => self.parse_if_expression(None)?,
+         TokenKind::While => self.parse_while_loop()?,
+
+         // Expression statements
          _ => self.parse_expression(0)?,
       };
       Ok(node)

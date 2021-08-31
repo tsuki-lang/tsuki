@@ -214,6 +214,8 @@ pub enum ErrorKind {
    CannotAssignImmutableLocation,
    #[error("`if` condition must be a Bool")]
    IfConditionMustBeBool,
+   #[error("`while` condition must be a Bool")]
+   WhileConditionMustBeBool,
 
    /*
     * Internal errors

@@ -419,6 +419,7 @@ pub enum NodeKind {
    If,
    IfBranch,   // if, elif
    ElseBranch, // else
+   While,
 
    /*
     * Post-sem'check

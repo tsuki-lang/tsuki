@@ -485,6 +485,7 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       log_entry
    }
 
+   /// Annotates an `if` expression or `if` statement.
    fn annotate_if(
       &mut self,
       ast: &mut Ast,
@@ -572,6 +573,18 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       self.annotate(ast, node, self.builtin.t_statement)
    }
 
+   /// Annotates a `while` loop.
+   fn annotate_while(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
+      let condition_node = ast.first_handle(node);
+      let condition_entry = self.annotate_node(ast, condition_node, NodeContext::Expression);
+      let condition_type = self.log.typ(condition_entry);
+      if !self.types.kind(condition_type).is_bool() {
+         return self.error(ast, condition_node, ErrorKind::WhileConditionMustBeBool);
+      }
+      let _ = self.annotate_statement_list(ast, node, NodeContext::Statement);
+      self.annotate(ast, node, self.builtin.t_statement)
+   }
+
    /// Annotates the given AST node.
    fn annotate_node(
       &mut self,
@@ -631,6 +644,7 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
          NodeKind::Pass => self.annotate_pass(ast, node),
          NodeKind::Do => self.annotate_do(ast, node, context),
          NodeKind::If => self.annotate_if(ast, node, context),
+         NodeKind::While => self.annotate_while(ast, node),
 
          // Declarations
          NodeKind::Val | NodeKind::Var => self.annotate_variable_declaration(ast, node),
