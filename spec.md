@@ -109,7 +109,7 @@ do
 
 The special identifier `_` may be used when a dummy no-op statement is needed, ala `pass` from Python.
 
-The standard indent size is 2 spaces, but a different amout may be used depending on the developer's preferences.
+The standard indent size is 2 spaces, but a different amount may be used depending on the developer's preferences.
 
 ## Operators
 
@@ -135,7 +135,7 @@ or
 
 Most of the listed operators are overloadable, see [Operator overloading](#operator-overloading).
 
-The token `->` appears inside the syntax, but is _not_ an operator - it's only used for punctuation. This token is the "then" arrow, used in `if` and `match` expressions to separate the condition from a single-line expression body.
+The token `->` appears inside the syntax, but is _not_ an operator - it's only used for punctuation. This token is the "then" arrow, used in control flow expressions to separate the condition from a single-line expression body.
 
 # Parsing
 
@@ -289,6 +289,26 @@ print(
   elif name == "Gabe" -> "How's that 3rd game going?"
   else -> "Hello, " ~ name ~ "!"
 )
+```
+
+In some cases the parser may get confused if the starting token of an `if` expression is an infix token:
+```
+val s =
+  if my_thing
+    (x + 2).sin()
+  else
+    0.0
+```
+Due to the rules of continuing expressions on other lines, this will be interpreted as `if my_thing(x + 2).sin()`, and not `if my_thing -> (x + 2).sin()`. In this case `->` can be used to separate the condition from the body.
+
+Multiline bodies with `->` can be achieved by using it together with `do`.
+```
+val s =
+  if my_thing -> do
+    print("abc")
+    (x + 2).sin()
+  else
+    0.0
 ```
 
 ### `if val`
@@ -527,6 +547,12 @@ while i < 10
   i += 1
 ```
 
+Similarly to an `if` statement, `->` may be used to create a single-line loop.
+```
+var i = 0
+while i < 10 -> i += 1
+```
+
 ### `while val`
 
 A `while` loop is also capable of iterating over a condition that produces optionals as its result. Enter `while val`:
@@ -572,6 +598,11 @@ do
     <loop body>
 ```
 Note that all the variables within angle brackets `<>` are not actually visible anywhere, they exist here solely for visualization purposes.
+
+As with all control flow blocks, the single-line `->` notation is supported.
+```
+for i in (1..10).countup() -> print(i)
+```
 
 ## `break` statement
 
