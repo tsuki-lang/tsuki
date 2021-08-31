@@ -147,7 +147,7 @@ Similar to scripting languages like Python, regular code may appear outside of a
 
 # Expressions
 
-Expressions in tsuki are made up of two types of operations: _prefix_, and _infix_. _prefixes_ begin an expression, and _infixes_ continue an already existing expression. Consider this very simple example:
+Expressions in tsuki are made up of two types of operations: _prefix_, and _infix_. _Prefixes_ begin an expression, and _infixes_ continue an already existing expression. Consider this very simple example:
 
 ```
 1 + 2
