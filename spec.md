@@ -2023,6 +2023,18 @@ fun hello_ffi(x: CInt) :: c_import("hello_ffi")
 ```
 Functions imported from C must not have a body.
 
+### Variadics
+
+Variadic functions like `printf` can be imported by using `c_varargs`.
+
+```
+fun c_printf(fmt: CString): CInt :: c_import("printf"), c_varargs
+
+c_printf("Hello, %s", "world")
+```
+
+Note that functions using C-like varargs cannot be created from tsuki, only imported from C. Other, safer forms of accepting a variable number of arguments should be preferred, such as accepting a length + `PtrArray[T]` pair.
+
 ## Exporting functions to C
 
 Functions can also be exported to C by using the `c_export` pragma. Similarly to `c_import`, it accepts a string that specifies the function name.
