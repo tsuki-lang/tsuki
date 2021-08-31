@@ -179,4 +179,44 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
          None
       }
    }
+
+   /// Generates code for a `while` loop.
+   pub(crate) fn generate_while(&self, ir: &Ir, node: NodeHandle) {
+      // Save the start block for generating the initial `br label %condition` instruction.
+      let start_block = self.builder.get_insert_block().unwrap();
+
+      // Generate the condition block and value.
+      let condition_block = self.context.append_basic_block(self.function.value, "while");
+      self.builder.position_at_end(condition_block);
+      let condition_value = self.generate_expression(ir, ir.ast.first_handle(node));
+      // Save the end of the condition value, in case it generates some extra blocks.
+      let condition_end_block = self.builder.get_insert_block().unwrap();
+
+      // Generate the loop body.
+      let body_block = self.context.append_basic_block(self.function.value, "do");
+      self.builder.position_at_end(body_block);
+      self.generate_statements(ir, node);
+      let body_end_block = self.builder.get_insert_block().unwrap();
+
+      // Generate the final %end block.
+      let end_block = self.context.append_basic_block(self.function.value, "end");
+
+      // Now, insert all the branch instructions.
+      // First we start with the unconditional branch to the condition block.
+      self.builder.position_at_end(start_block);
+      self.builder.build_unconditional_branch(condition_block);
+      // Then, we build the conditional branch at the end of the condition block.
+      self.builder.position_at_end(condition_end_block);
+      self.builder.build_conditional_branch(
+         condition_value.into_int_value(),
+         body_block,
+         end_block,
+      );
+      // Finally, we branch back to the condition at the end of the body.
+      self.builder.position_at_end(body_end_block);
+      self.builder.build_unconditional_branch(condition_block);
+
+      // Continue generating code at the end block.
+      self.builder.position_at_end(end_block);
+   }
 }
