@@ -1,0 +1,4 @@
+var i = 0
+while i < 10
+  __intrin_print_int32(i)
+  i = i + 1
