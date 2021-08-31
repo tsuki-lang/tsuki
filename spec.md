@@ -666,7 +666,7 @@ print(greeting("world"))
 The `return` expression allows for exiting from a function early. In functions returning non-`()`  types, `return` must also carry a value to return out of the function.
 
 ```
-fun find[T: Equal](haystack: Seq[T], needle: T): Index
+fun find[T: Equal](haystack: Seq[T], needle: T): Size
   for i, element in haystack.items()
     if element == needle
       return i
@@ -749,7 +749,7 @@ When choosing a bitsize and signedness of an integral type in a typical applicat
 
 The `Int` and `Uint` aliases exist as reasonable defaults with a default bitsize of 32 bits, which may be configured using a compiler switch.
 
-The `Index` alias is an integer that can be used as a valid index into a slice. The size of this type is platform-dependent; on 32-bit machines it's `Uint32`, on 64-bit machines it's `Uint64`.
+The `Size` alias is an unsigned integer that can be used as a valid size or index into a slice. The size of this type is platform-dependent; on 32-bit machines it's `Uint32`, on 64-bit machines it's `Uint64`.
 
 Smaller bit widths should be avoided whenever possible, unless dealing with a binary format, or conserving bytes for eg. network transmission.
 
@@ -1167,7 +1167,7 @@ It is a compile-time error to try to read from a field that's `uninit`. It is al
 An object can be marked as an error type by implementing the `Failure` trait.
 ```
 object CompileError
-  val line, column: Index
+  val line, column: Size
   val message: String
 
 impl Failure for CompileError
@@ -1649,6 +1649,55 @@ val e = Example {}
 # e.my_method()  # error: ambiguous call; resolves to more than one function
 e.[ExampleA].my_method()  # Called on ExampleA
 e.[ExampleB].my_method()  # Called on ExampleB
+```
+
+## `const T {V}`
+
+`const T {V}` is a special class of types that represents values known at compile-time. Each literal that is supported as `const` starts out with the type `const T {V}`, where `T` is the type of the literal, and `V` is the literal's value. A value whose type is `const T {V}` implicitly converts to `T`, without any runtime cost.
+
+Currently supported types for `T` include:
+- `Bool`
+- `Int`
+- `Index`
+- atoms (`Atom` and user-defined sets)
+
+While `const T {V}` is always a concrete type, `const T` on the other hand is a trait that all types from the `const T {V}` class satisfy.
+
+It might be hard to grasp the concept just by looking at these abstract words, so let's consider an example: creating a type-safe, two-dimensional, constant-sized `Seq[T]`.
+
+```
+object Array2D[W, H, T]
+  where
+    W: const Size,
+    H: const Size
+  val inner: Seq[T]
+
+impl[W, H, T] type Array2D[W, H, T]
+where T: Dup
+  fun new(default_value: T)
+    Self { inner = Seq.[T].filled_with(W * H, default_value) }
+
+  fun bounds_check(position: (Size, Size))
+    assert(position._0 < W and position._1 < H, ("index out of bounds: ", position))
+
+  fun flat_index(position: (Size, Size)): Size
+    position._0 + position._1 * W
+
+impl[W, H, T] Index[(Size, Size)] for Array2D[W, H, T]
+  type Ret = T
+  fun at(position: (Size, Size)): ^Ret
+    .bounds_check(position)
+    ^.inner[.flat_index(position)]
+
+impl[W, H, T] IndexVar[(Size, Size)] for Array2D[W, H, T]
+  type Ret = T
+  fun at(position: (Size, Size)): ^var Ret
+    .bounds_check(position)
+    ^.inner[.flat_index(position)]
+
+var image = Array2D.[10, 10, Uint8].new(0)
+print(image[(0, 0)])  # 0
+image[(5, 5)] = 255
 ```
 
 # Generics
