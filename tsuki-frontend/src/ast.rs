@@ -405,20 +405,17 @@ pub enum NodeKind {
    IndexAlt,
 
    // Declarations
-   Val,
-   Var,
-   Discard, // used as the name of a variable when `val _ = x` is used
+   Val,          // variable declaration
+   Var,          // same as `Val`, for when the `var` keyword is used
+   VariableType, // the `a: T` in `val a: T = x`
+   Discard,      // used as the name of a variable when `val _ = x` is used
 
    // Control flow
-   // ---
-   // *Expression kinds differ from *Statement kinds in that the last statement in the block must
-   // be an expression statement. The parser tries to assume the kind from context, but might fail.
-   // The kind can be corrected during sem'checking.
-   Pass,
+   Pass, // `_` statement
    Do,
    If,
-   IfBranch,   // if, elif
-   ElseBranch, // else
+   IfBranch,   // `if`, `elif` branches in a single `if` statement
+   ElseBranch, // the `else` branch in an `if` statement
    While,
 
    /*

@@ -24,6 +24,10 @@ struct Parser<'l, 's> {
 }
 
 impl<'l, 's> Parser<'l, 's> {
+   /*
+    * Common
+    */
+
    /// Creates a new parser from the given filename and source code string.
    fn new(lexer: &'l mut Lexer<'s>) -> Self {
       Self {
@@ -115,6 +119,7 @@ impl<'l, 's> Parser<'l, 's> {
       self.create_node_with(kind, range.start, range.end)
    }
 
+   /// Creates a span spanning all the nodes in the given slice.
    fn span_all_nodes(&self, nodes: &[NodeHandle]) -> Span {
       if nodes.len() >= 2 {
          Span::join(self.ast.span(nodes[0]), self.ast.span(nodes[1]))
@@ -123,23 +128,6 @@ impl<'l, 's> Parser<'l, 's> {
       } else {
          Span::new()
       }
-   }
-
-   /// Parses a literal token and returns the node corresponding to it.
-   fn parse_literal(&mut self, token: Token) -> NodeHandle {
-      let literal = match token.kind {
-         TokenKind::Nil => self.ast.create_node(NodeKind::Nil),
-         TokenKind::True => self.ast.create_node(NodeKind::True),
-         TokenKind::False => self.ast.create_node(NodeKind::False),
-         TokenKind::Integer(r) => self.create_node_with_range(NodeKind::Integer, r),
-         TokenKind::Float(r) => self.create_node_with_range(NodeKind::Float, r),
-         TokenKind::Atom(r) => self.create_node_with_range(NodeKind::Atom, r),
-         TokenKind::Character(c) => self.create_node_with(NodeKind::Character, c as usize, 0),
-         TokenKind::String(r) => self.create_node_with_range(NodeKind::String, r),
-         _ => unreachable!(),
-      };
-      self.ast.set_span(literal, token.span);
-      literal
    }
 
    /// Turns an identifier token into a node.
@@ -240,6 +228,27 @@ impl<'l, 's> Parser<'l, 's> {
          previous_line = line;
       }
       Ok(())
+   }
+
+   /*
+    * Expressions
+    */
+
+   /// Parses a literal token and returns the node corresponding to it.
+   fn parse_literal(&mut self, token: Token) -> NodeHandle {
+      let literal = match token.kind {
+         TokenKind::Nil => self.ast.create_node(NodeKind::Nil),
+         TokenKind::True => self.ast.create_node(NodeKind::True),
+         TokenKind::False => self.ast.create_node(NodeKind::False),
+         TokenKind::Integer(r) => self.create_node_with_range(NodeKind::Integer, r),
+         TokenKind::Float(r) => self.create_node_with_range(NodeKind::Float, r),
+         TokenKind::Atom(r) => self.create_node_with_range(NodeKind::Atom, r),
+         TokenKind::Character(c) => self.create_node_with(NodeKind::Character, c as usize, 0),
+         TokenKind::String(r) => self.create_node_with_range(NodeKind::String, r),
+         _ => unreachable!(),
+      };
+      self.ast.set_span(literal, token.span);
+      literal
    }
 
    /// Parses expressions in parentheses.
