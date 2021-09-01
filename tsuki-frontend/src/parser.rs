@@ -231,6 +231,19 @@ impl<'l, 's> Parser<'l, 's> {
    }
 
    /*
+    * Types
+    */
+
+   /// Parses a type.
+   fn parse_type(&mut self) -> Result<NodeHandle, Error> {
+      let token = self.lexer.next()?;
+      Ok(match token.kind {
+         TokenKind::Identifier(..) => self.create_identifier(token),
+         other => self.error(ErrorKind::UnexpectedTypeToken(other), token.span),
+      })
+   }
+
+   /*
     * Expressions
     */
 
@@ -544,21 +557,31 @@ impl<'l, 's> Parser<'l, 's> {
          TokenKind::Var => NodeKind::Var,
          _ => unreachable!(),
       };
+
       // TODO: Tuple destructuring, multiple assignment.
       // Similarly to a discarding assignment `val _ = x`, these should use a separate node kind for
       // the name node.
       let name_token = self.lexer.next()?;
-      let name = match name_token.kind {
+      let mut left = match name_token.kind {
          TokenKind::Underscore => self.ast.create_node(NodeKind::Discard),
          // Don't use create_identifier here, neither do we need to set the span, nor
          // error when the token is not an identifier.
          TokenKind::Identifier(range) => self.create_node_with_range(NodeKind::Identifier, range),
          _ => return Ok(self.error(ErrorKind::VarNameExpected, name_token.span)),
       };
-      self.ast.set_span(name, name_token.span);
+      self.ast.set_span(left, name_token.span);
+
+      // Optional type after `:`.
+      if let Some(..) = self.match_token(TokenKind::Colon)? {
+         let name = left;
+         let typ = self.parse_type()?;
+         left = self.create_node_with_handles(NodeKind::VariableType, name, typ);
+         self.ast.set_span(left, Span::join(self.ast.span(name), self.ast.span(typ)));
+      }
+
       self.expect_token(TokenKind::Assign, |t| ErrorKind::VarMissingEquals(t.kind))?;
       let value = self.parse_expression(0)?;
-      let node = self.create_node_with_handles(node_kind, name, value);
+      let node = self.create_node_with_handles(node_kind, left, value);
       self.ast.set_span(node, Span::join(&var_token.span, self.ast.span(value)));
       Ok(node)
    }

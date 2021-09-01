@@ -11,3 +11,5 @@ __intrin_print_int32(b)
 __intrin_print_int32(c)
 
 __intrin_print_int32(-c)
+
+var d: Int64 = 1

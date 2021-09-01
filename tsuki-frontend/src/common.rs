@@ -159,6 +159,8 @@ pub enum ErrorKind {
    UnexpectedPrefixToken(TokenKind),
    #[error("unexpected token in infix position: '{0}'")]
    UnexpectedInfixToken(TokenKind),
+   #[error("unexpected token in type position: '{0}'")]
+   UnexpectedTypeToken(TokenKind),
    #[error("missing '{0}' to close {1}")]
    MissingClosingToken(TokenKind, Token),
    #[error("expected comma ',' or '{0}' to close {1}")]
