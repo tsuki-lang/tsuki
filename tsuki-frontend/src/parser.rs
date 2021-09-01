@@ -1,4 +1,4 @@
-//! The tsuki parser.
+//! The parser. Reads tokens from the lexer and emits untyped AST.
 
 use std::ops::Range;
 

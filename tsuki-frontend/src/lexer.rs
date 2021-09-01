@@ -1,7 +1,4 @@
-//! The lexer.
-//!
-//! tsuki uses a flat data structure for storing tokens to avoid memory fragmentation and improve
-//! performance.
+//! The lexer, turns text into tokens.
 
 use std::fmt;
 use std::ops::Range;

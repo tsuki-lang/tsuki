@@ -1,4 +1,5 @@
 //! Semantic analyzer for literal kinds.
+//!
 //! This performs some basic initial analysis to convert literal kinds from generic `Integer` and
 //! `Float` to concrete types `Int8`, `Int16`, etc., including negation.
 //! Note that `SemTypes` may perform additional conversions later down the line.
