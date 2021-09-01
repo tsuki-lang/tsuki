@@ -1,3 +1,5 @@
+//! Type analysis for control flow constructs.
+
 use crate::ast::{Ast, NodeHandle, NodeKind};
 use crate::common::ErrorKind;
 use crate::sem::SemPass;

@@ -1,3 +1,5 @@
+//! Semantic analysis for operators and compiler intrinsics.
+
 use crate::ast::NodeKind;
 use crate::ast::{Ast, NodeHandle};
 use crate::common::ErrorKind;

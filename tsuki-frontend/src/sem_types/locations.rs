@@ -1,3 +1,5 @@
+//! Type analysis for variables, object fields, pointers, etc.
+
 use crate::ast::{Ast, NodeHandle, NodeKind};
 use crate::common::ErrorKind;
 use crate::scope::{SymbolKind, Variable, VariableKind};
@@ -70,13 +72,26 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       ast: &mut Ast,
       node: NodeHandle,
    ) -> TypeLogEntry {
-      let kind = if ast.kind(node) == NodeKind::Val {
-         VariableKind::Val
-      } else {
-         VariableKind::Var
+      let kind = match ast.kind(node) {
+         NodeKind::Val => VariableKind::Val,
+         NodeKind::Var => VariableKind::Var,
+         _ => unreachable!(),
       };
       let variable = Variable { kind };
-      let name_node = ast.first_handle(node);
+
+      // Figure out the name and expected type. This expected type can be `None`, and in that case,
+      // should be inferred from context.
+      let left_node = ast.first_handle(node);
+      let (name_node, expected_type) = match ast.kind(ast.first_handle(node)) {
+         NodeKind::VariableType => {
+            let name = ast.first_handle(left_node);
+            let typ = ast.second_handle(left_node);
+            (name, Some(self.lookup_type(ast, typ)))
+         }
+         _ => (left_node, None),
+      };
+
+      // Annotate the value.
       let value_node = ast.second_handle(node);
       let value_log = self.annotate_node(ast, value_node, NodeContext::Expression);
       let value_type = self.log.typ(value_log);

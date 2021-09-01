@@ -1,7 +1,7 @@
-use crate::{
-   ast::{Ast, NodeData, NodeHandle, NodeKind},
-   types::{FloatSize, IntegerSize, TypeId, TypeLogEntry},
-};
+//! Implicit conversions between types.
+
+use crate::ast::{Ast, NodeData, NodeHandle, NodeKind};
+use crate::types::{FloatSize, IntegerSize, TypeId, TypeLogEntry};
 
 use super::SemTypes;
 

@@ -96,6 +96,10 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       self.error(ast, node, kind)
    }
 
+   fn lookup_type(&mut self, ast: &Ast, node: NodeHandle) -> TypeLogEntry {
+      todo!()
+   }
+
    /// Annotates a literal with a concrete type.
    fn annotate_literal(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
       let typ = match ast.kind(node) {
