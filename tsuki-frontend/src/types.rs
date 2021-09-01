@@ -198,11 +198,11 @@ pub enum FloatSize {
    S64,
 }
 
-/// Configuration for "sensible default" types: `Int`, `Float`, and `Index`.
+/// Configuration for "sensible default" types: `Int`, `Float`, and `Size`.
 pub struct DefaultTypes {
-   pub int_size: IntegerSize,
-   pub float_size: FloatSize,
-   pub index_size: IntegerSize,
+   pub int_width: IntegerSize,
+   pub float_width: FloatSize,
+   pub size_width: IntegerSize,
 }
 
 /// A struct containing all the built-in types.
@@ -235,7 +235,7 @@ pub struct BuiltinTypes {
    // compiler switches.
    pub t_int: TypeId,
    pub t_float: TypeId,
-   pub t_index: TypeId,
+   pub t_size: TypeId,
 
    // Characters
    pub t_char: TypeId,
@@ -324,18 +324,18 @@ impl BuiltinTypes {
          t_float32,
          t_float64,
 
-         t_int: match default_types.int_size {
+         t_int: match default_types.int_width {
             IntegerSize::S8 => t_int8,
             IntegerSize::S16 => t_int16,
             IntegerSize::S32 => t_int32,
             IntegerSize::S64 => t_int64,
             _ => panic!("int_size must be signed"),
          },
-         t_float: match default_types.float_size {
+         t_float: match default_types.float_width {
             FloatSize::S32 => t_float32,
             FloatSize::S64 => t_float64,
          },
-         t_index: match default_types.index_size {
+         t_size: match default_types.size_width {
             IntegerSize::U8 => t_uint8,
             IntegerSize::U16 => t_uint16,
             IntegerSize::U32 => t_uint32,

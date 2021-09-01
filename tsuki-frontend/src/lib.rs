@@ -62,9 +62,9 @@ pub fn analyze(file: &SourceFile, debug: &DebugOptions) -> Result<Ir, Errors> {
       ast,
       root_node,
       default_types: DefaultTypes {
-         int_size: IntegerSize::S32,
-         float_size: FloatSize::S32,
-         index_size: IntegerSize::U64,
+         int_width: IntegerSize::S32,
+         float_width: FloatSize::S32,
+         size_width: IntegerSize::U64,
       },
    })?;
 

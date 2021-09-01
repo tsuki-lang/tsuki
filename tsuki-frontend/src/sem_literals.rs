@@ -217,13 +217,13 @@ impl<'c> SemLiterals<'c> {
    ) {
       match suffix {
          LiteralSuffix::None | LiteralSuffix::I => {
-            suffix = LiteralSuffix::from(self.common.default_types.int_size);
+            suffix = LiteralSuffix::from(self.common.default_types.int_width);
          }
          LiteralSuffix::U => {
-            suffix = LiteralSuffix::from(self.common.default_types.index_size);
+            suffix = LiteralSuffix::from(self.common.default_types.size_width);
          }
          LiteralSuffix::F => {
-            suffix = LiteralSuffix::from(self.common.default_types.float_size);
+            suffix = LiteralSuffix::from(self.common.default_types.float_width);
          }
          _ => (),
       }
@@ -341,7 +341,7 @@ impl<'c> SemLiterals<'c> {
    ) {
       match suffix {
          LiteralSuffix::None | LiteralSuffix::F => {
-            suffix = LiteralSuffix::from(self.common.default_types.float_size);
+            suffix = LiteralSuffix::from(self.common.default_types.float_width);
          }
          _ => (),
       }
