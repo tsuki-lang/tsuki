@@ -369,21 +369,17 @@ match name
   "Gabe" -> print("Am I really doing the same joke again?")
   else |n| -> print("Hello, " ~ n)
 ```
-Strings and Atoms cannot be used with ranges.
+Strings and Atoms cannot be used with ranges, because the interaction between the lower and upper bound doesn't make obvious sense.
 
 `match` combined with `catch` also allows for matching errors:
 ```
-atom Error
-  :oops
-  :not_found
-
 val err: !Int = :oops
 val int = err catch |err_atom|
   print(
     match err_atom
       :not_found -> "404"
       :oops -> "Somebody's gonna get fired"
-      else |ok| -> "Everything's fine: " ~ ok
+      else |ok| -> "Unknown error: " ~ ok
   )
   return
 ```
@@ -495,7 +491,7 @@ var x = 1
 x = 3
 print(x)  # 3
 ```
-Note that variables are also statically-typed, so trying to assign a value of a different type at this point is an error:
+Note that variables are also statically-typed, so trying to assign a value of a different type than the initial assignment is an error:
 ```
 var x = 1
 x = "Hello"  # error
@@ -785,49 +781,47 @@ atom Color
 ```
 The compiler will then ensure that each value of the type `Color` must be one of these four values. This is also known as `enum` in other languages.
 
-An atom subset may extend another subset:
+To initialize a value from an atom subset when the concrete type is not known, the notation `Subset:atom` can be used.
 ```
-atom Color
-
-atom Cmyk in Color
-  :cyan
-  :magenta
-  :yellow
-  :black
-
-atom Rgb in Color
-  # shorthand form, useful for big atom subsets
-  :red, :green, :blue
+print(Color:red)
 ```
-In this example, any `Cmyk` or `Rgb` value can be implicitly converted to a `Color` value, but not the other way around.
 
-An atom subset may also be extended after it's already declared:
+Atom subsets may define an integer representation explicitly, similar to enums in other languages.
 ```
-# continuing the previous example
-atom Color
-  :teal
-  :scarlet_red
-  :emerald_green
-```
-However, if an atom is extended in a module different from where the atom was declared, both modules have to be imported for all possible atoms to be visible.
-
-Atoms are also used as error sets for the result type described below. An atom can be tagged as an error set by extending `Error`:
-
-```
-atom IoError in Error
-  :eaccess
-  :eagain
-  :einval
-  :enoent
+atom Key :: int(Uint8)
+  0 :a
+  1 :b
+  2 :c
   # ...
 ```
-
-Error handling is described in greater detail in [Results](#results).
-
-Sometimes, the type system isn't able to infer the correct type for an atom; in this case, the type can be specified explicitly, by using `as`.
+The integer representation of a given atom is incremented automatically with each new value, and starts at 0, so the above example can be written simply as:
 ```
-val err = :eaccess as Error
-assert(err is Error)
+atom Key :: int(Uint8)
+  :a, :b, :c
+```
+
+Atom subsets may also define a pretty string representation.
+```
+atom Key
+  :a = "A"
+  :b = "B"
+  :c = "C"
+  :shift = "Shift"
+  :left = "←"
+```
+This pretty string representation can be accessed by using the `to_pretty()` function.
+```
+print((Key:left).to_pretty())  # ←
+```
+
+Pretty representations can be combined with integer representations.
+```
+atom Key :: int(Uint8)
+  0  :a = "A"
+  1  :b = "B"
+  2  :c = "C"
+  10 :shift = "Shift"
+  20 :left = "←"
 ```
 
 ## `Char`
@@ -900,15 +894,13 @@ if val ok = correct
 
 Results are the primary method of handling errors in tsuki. Whenever a function can fail, it can return a result type, whose value is either an error, or a value.
 
-A result type is written like `Err!Ok`, where `Err` is the error type, and `Ok` is the success type.
+A result type is written like `E!T`, where `E` is the error type, and `T` is the success type. For quick'n'dirty error handling the shorthand `!T` exists, which is the same as `Atom!T`.
 
-The built-in `Error` atom subset contains all possible error atoms defined throughout the program. `Error` and its subsets are the only allowed atom type in results. Objects and unions tagged with the `Failure` trait can also be used as valid error types. Other types are not permitted as error types.
+For a given result type `E!T`, both `E` and `T` are implicitly convertible to that result type.
 
-The shorthand `!T` may be used instead of `Error!T`.
+The type `E!T` desugars to the standard library type `Result[E, T]`, which is a union with two variants: `:ok(T)`, and `:error(E)`. Using it may be needed when the variant of the result cannot be inferred from the context, eg. when both `T` and `E` are the same type or when implicit conversion rules make this ambiguous. In most cases one should stay away from constructing such result types.
 
-For a given result type `Err!Ok`, both `Err` and `Ok` are implicitly convertible to that result type.
-
-Examples on handling errors can be found in the "`?` operator" and [`catch` expressions](#catch-expressions) sections of this document.
+Examples on handling errors can be found in the [`?` operator](#-operator) and [`catch` expressions](#catch-expressions) sections of this document.
 
 ## Pointers
 
