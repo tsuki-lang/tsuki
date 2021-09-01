@@ -1677,6 +1677,7 @@ where T: Dup
   fun new(default_value: T)
     Self { inner = Seq.[T].filled_with(W * H, default_value) }
 
+impl[W, H, T] Array2D[W, H, T]
   fun bounds_check(position: (Size, Size))
     assert(position._0 < W and position._1 < H, ("index out of bounds: ", position))
 
