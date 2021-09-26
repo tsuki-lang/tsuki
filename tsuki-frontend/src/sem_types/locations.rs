@@ -2,7 +2,7 @@
 
 use crate::ast::{Ast, NodeHandle, NodeKind};
 use crate::common::ErrorKind;
-use crate::scope::{SymbolKind, Variable, VariableKind};
+use crate::scope::{SymbolId, SymbolKind, Variable, VariableKind};
 use crate::types::TypeLogEntry;
 
 use super::{NodeContext, SemTypes};
@@ -12,19 +12,34 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
    pub(super) fn annotate_location(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
       match ast.kind(node) {
          NodeKind::Identifier => {
-            let name = self.common.get_source_range_from_node(ast, node);
-            if let Some(variable) = self.scope_stack.lookup(self.scopes, name) {
-               let typ = self.symbols.type_id(variable);
-               ast.convert_to_symbol(node, variable);
-               let log = self.annotate(ast, node, typ);
-               ast.wrap(node, NodeKind::Variable);
-               log
+            if let Some(symbol) = self.lookup_identifier(ast, node) {
+               self.annotate_location_symbol(ast, node, symbol)
             } else {
+               let name = self.common.get_source_range_from_node(ast, node);
                self.error(ast, node, ErrorKind::UndeclaredSymbol(name.into()))
             }
          }
          // TODO: Make this into a better error. This would require slicing the source string,
          // which we can't do because spans don't store direct byte indices to it at the moment.
+         _ => self.error(ast, node, ErrorKind::InvalidLhsOfAssignment),
+      }
+   }
+
+   /// Annotates a symbol that refers to a location.
+   fn annotate_location_symbol(
+      &mut self,
+      ast: &mut Ast,
+      node: NodeHandle,
+      symbol: SymbolId,
+   ) -> TypeLogEntry {
+      match self.symbols.kind(symbol) {
+         SymbolKind::Variable(variable) => {
+            let typ = self.symbols.type_id(symbol);
+            ast.convert_to_symbol(node, symbol);
+            let log = self.annotate(ast, node, typ);
+            ast.wrap(node, NodeKind::Variable);
+            log
+         }
          _ => self.error(ast, node, ErrorKind::InvalidLhsOfAssignment),
       }
    }
@@ -55,7 +70,7 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
             let variable = self.symbols.kind(ast.symbol_id(symbol)).unwrap_variable();
             variable.kind == VariableKind::Var
          }
-         _ => unreachable!(),
+         _ => false,
       };
       if !target_is_mutable {
          return self.error(ast, left, ErrorKind::CannotAssignImmutableLocation);
@@ -84,9 +99,10 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       let left_node = ast.first_handle(node);
       let (name_node, expected_type) = match ast.kind(ast.first_handle(node)) {
          NodeKind::VariableType => {
-            let name = ast.first_handle(left_node);
-            let typ = ast.second_handle(left_node);
-            (name, Some(self.lookup_type(ast, typ)))
+            let name_node = ast.first_handle(left_node);
+            let type_node = ast.second_handle(left_node);
+            let typ = todo!();
+            (name_node, Some(self.lookup_type(ast, typ)))
          }
          _ => (left_node, None),
       };

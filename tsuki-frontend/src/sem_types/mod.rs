@@ -7,7 +7,7 @@ mod operators;
 
 use crate::ast::{Ast, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors};
-use crate::scope::{ScopeStack, Scopes, Symbols};
+use crate::scope::{ScopeStack, Scopes, SymbolId, SymbolKind, Symbols};
 use crate::sem::{SemCommon, SemPass};
 use crate::types::{BuiltinTypes, TypeId, TypeLog, TypeLogEntry, Types};
 
@@ -96,8 +96,28 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       self.error(ast, node, kind)
    }
 
-   fn lookup_type(&mut self, ast: &Ast, node: NodeHandle) -> TypeLogEntry {
-      todo!()
+   fn lookup_identifier(&mut self, ast: &Ast, node: NodeHandle) -> Option<SymbolId> {
+      let name = self.common.get_source_range_from_node(ast, node);
+      self.scope_stack.lookup(&self.scopes, name)
+   }
+
+   fn lookup_type(&mut self, ast: &Ast, node: NodeHandle) -> Option<TypeId> {
+      match ast.kind(node) {
+         NodeKind::Identifier => {
+            let symbol = self.lookup_identifier(ast, node)?;
+            if let SymbolKind::Type(id) = self.symbols.kind(symbol) {
+               Some(*id)
+            } else {
+               let name = self.common.get_source_range_from_node(ast, node);
+               self.emit_error(
+                  ErrorKind::UndeclaredSymbol(name.into()),
+                  ast.span(node).clone(),
+               );
+               None
+            }
+         }
+         _ => unreachable!("invalid node kind for type"),
+      }
    }
 
    /// Annotates a literal with a concrete type.

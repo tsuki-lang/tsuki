@@ -355,6 +355,17 @@ impl BuiltinTypes {
 #[must_use]
 pub struct TypeLogEntry(usize);
 
+impl From<Result<TypeLogEntry, TypeLogEntry>> for TypeLogEntry {
+   /// Unwraps a successful or erroneous type log from a result.
+   ///
+   /// This is used to simplify returning from functions when analysis errors occur.
+   fn from(result: Result<TypeLogEntry, TypeLogEntry>) -> Self {
+      match result {
+         Ok(entry) | Err(entry) => entry,
+      }
+   }
+}
+
 /// A log storing the AST nodes from which different instances of types came from.
 pub struct TypeLog {
    types: Vec<TypeId>,

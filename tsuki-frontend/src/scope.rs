@@ -24,6 +24,8 @@ impl SymbolId {
 pub enum SymbolKind {
    /// A symbol that represents a variable.
    Variable(Variable),
+   /// A symbol that represents a type.
+   Type(TypeId),
 }
 
 impl SymbolKind {
