@@ -7,7 +7,7 @@ use crate::types::TypeLogEntry;
 
 use super::{NodeContext, SemTypes};
 
-impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
+impl<'s> SemTypes<'s> {
    // Currently, this does some rather simplistic analysis just to Make it Work™, but in the
    // future when operators will be lowered to trait instance function calls, this will be
    // replaced by much simpler logic and compiler intrinsics inside the stdlib.

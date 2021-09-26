@@ -7,7 +7,7 @@ use crate::types::TypeLogEntry;
 
 use super::{NodeContext, SemTypes};
 
-impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
+impl<'s> SemTypes<'s> {
    /// Annotates a "pass" (`_`) statement.
    pub(super) fn annotate_pass(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
       self.annotate(ast, node, self.builtin.t_statement)

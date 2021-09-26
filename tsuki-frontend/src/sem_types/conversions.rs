@@ -5,7 +5,7 @@ use crate::types::{FloatSize, IntegerSize, TypeId, TypeLogEntry};
 
 use super::SemTypes;
 
-impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
+impl<'s> SemTypes<'s> {
    /// Widens the given integer node to the provided size.
    ///
    /// For literal nodes, this converts the literal directly. For other nodes, this wraps the node
