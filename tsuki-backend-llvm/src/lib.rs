@@ -98,6 +98,7 @@ impl backend::Backend for LlvmBackend {
 
       // Set up the pass manager.
       let pm = PassManager::create(&module);
+      pm.add_verifier_pass();
 
       if self.optimization_level >= OptimizationLevel::Essential {
          // Constant folding passes run twice: once at startup, and once after CFG simplicifation
