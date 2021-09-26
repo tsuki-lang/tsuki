@@ -3,25 +3,21 @@
 use crate::ast::{Ast, NodeHandle, NodeKind};
 use crate::common::ErrorKind;
 use crate::scope::{SymbolId, SymbolKind, Variable, VariableKind};
-use crate::types::TypeLogEntry;
+use crate::types::{TypeLogEntry, TypeLogResult};
 
 use super::{NodeContext, SemTypes};
 
-impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
+impl<'s> SemTypes<'s> {
    /// Annotates a location expression, ie. variables `a`, members `.x`.
-   pub(super) fn annotate_location(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
+   pub(super) fn annotate_location(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogResult {
       match ast.kind(node) {
          NodeKind::Identifier => {
-            if let Some(symbol) = self.lookup_identifier(ast, node) {
-               self.annotate_location_symbol(ast, node, symbol)
-            } else {
-               let name = self.common.get_source_range_from_node(ast, node);
-               self.error(ast, node, ErrorKind::UndeclaredSymbol(name.into()))
-            }
+            let symbol = self.lookup_variable(ast, node)?;
+            Ok(self.annotate_location_symbol(ast, node, symbol))
          }
          // TODO: Make this into a better error. This would require slicing the source string,
          // which we can't do because spans don't store direct byte indices to it at the moment.
-         _ => self.error(ast, node, ErrorKind::InvalidLhsOfAssignment),
+         _ => Err(self.error(ast, node, ErrorKind::InvalidLocation)),
       }
    }
 
@@ -40,7 +36,7 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
             ast.wrap(node, NodeKind::Variable);
             log
          }
-         _ => self.error(ast, node, ErrorKind::InvalidLhsOfAssignment),
+         _ => self.error(ast, node, ErrorKind::InvalidLocation),
       }
    }
 
@@ -50,16 +46,16 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       ast: &mut Ast,
       node: NodeHandle,
       context: NodeContext,
-   ) -> TypeLogEntry {
+   ) -> TypeLogResult {
       // TODO: Pointers and assigning values to them.
       let (left, right) = (ast.first_handle(node), ast.second_handle(node));
-      let left_entry = self.annotate_location(ast, left);
+      let left_entry = self.annotate_location(ast, left)?;
       let left_type = self.log.typ(left_entry);
       let right_entry = self.annotate_node(ast, right, NodeContext::Expression);
       let right_type = self.log.typ(right_entry);
       // Check types.
       if right_type != left_type {
-         return self.type_mismatch(ast, node, left_type, right_type);
+         return Err(self.type_mismatch(ast, node, left_type, right_type));
       }
       // Check mutability.
       // TODO: This could maybe be moved into a different check, shoving this logic into assignments
@@ -73,12 +69,12 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
          _ => false,
       };
       if !target_is_mutable {
-         return self.error(ast, left, ErrorKind::CannotAssignImmutableLocation);
+         return Err(self.error(ast, left, ErrorKind::CannotAssignImmutableLocation));
       }
-      match context {
+      Ok(match context {
          NodeContext::Expression => self.annotate(ast, node, left_type),
          NodeContext::Statement => self.annotate(ast, node, self.builtin.t_statement),
-      }
+      })
    }
 
    /// Annotates a variable declaration.
@@ -86,7 +82,7 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       &mut self,
       ast: &mut Ast,
       node: NodeHandle,
-   ) -> TypeLogEntry {
+   ) -> TypeLogResult {
       let kind = match ast.kind(node) {
          NodeKind::Val => VariableKind::Val,
          NodeKind::Var => VariableKind::Var,
@@ -97,20 +93,42 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       // Figure out the name and expected type. This expected type can be `None`, and in that case,
       // should be inferred from context.
       let left_node = ast.first_handle(node);
-      let (name_node, expected_type) = match ast.kind(ast.first_handle(node)) {
+      let (name_node, expected_type) = match ast.kind(left_node) {
          NodeKind::VariableType => {
             let name_node = ast.first_handle(left_node);
             let type_node = ast.second_handle(left_node);
-            let typ = todo!();
-            (name_node, Some(self.lookup_type(ast, typ)))
+            let typ = self.lookup_type(ast, type_node)?;
+            (name_node, Some(typ))
          }
          _ => (left_node, None),
       };
+      // Normalize the LHS to the name only.
+      ast.set_first_handle(node, name_node);
 
       // Annotate the value.
       let value_node = ast.second_handle(node);
       let value_log = self.annotate_node(ast, value_node, NodeContext::Expression);
       let value_type = self.log.typ(value_log);
+
+      // Check if the type matches if an explicit type was provided.
+      let value_type = match expected_type {
+         Some(typ) => {
+            if let Some(log) = self.perform_implicit_conversion(ast, value_node, value_type, typ) {
+               self.log.typ(log)
+            } else {
+               let expected_name = self.types.name(typ).to_owned();
+               let value_name = self.types.name(value_type).to_owned();
+               return Err(self.error(
+                  ast,
+                  node,
+                  ErrorKind::TypeMismatch(expected_name, value_name),
+               ));
+            }
+         }
+         None => value_type,
+      };
+
+      // Add to scope.
       match ast.kind(name_node) {
          NodeKind::Discard => {
             // A discarding assignment is converted to an AssignDiscard node containing
@@ -133,6 +151,6 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
          }
          _ => unreachable!(),
       }
-      self.annotate(ast, node, self.builtin.t_statement)
+      Ok(self.annotate(ast, node, self.builtin.t_statement))
    }
 }

@@ -3,6 +3,7 @@
 mod control_flow;
 mod conversions;
 mod locations;
+mod lookups;
 mod operators;
 
 use crate::ast::{Ast, NodeHandle, NodeKind};
@@ -11,27 +12,27 @@ use crate::scope::{ScopeStack, Scopes, SymbolId, SymbolKind, Symbols};
 use crate::sem::{SemCommon, SemPass};
 use crate::types::{BuiltinTypes, TypeId, TypeLog, TypeLogEntry, Types};
 
-pub(crate) struct SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
-   common: &'c SemCommon,
+pub(crate) struct SemTypes<'s> {
+   common: &'s SemCommon,
    errors: Errors,
 
-   types: &'t mut Types,
-   log: &'tl mut TypeLog,
-   builtin: &'bt BuiltinTypes,
+   types: &'s mut Types,
+   log: &'s mut TypeLog,
+   builtin: &'s BuiltinTypes,
    scopes: &'s mut Scopes,
-   symbols: &'sy mut Symbols,
+   symbols: &'s mut Symbols,
 
    scope_stack: ScopeStack,
 }
 
 /// Values borrowed to `SemTypes`, used during its construction.
-pub(crate) struct SemTypesBorrows<'c, 't, 'tl, 'bt, 's, 'sy> {
-   pub(crate) common: &'c SemCommon,
-   pub(crate) types: &'t mut Types,
-   pub(crate) log: &'tl mut TypeLog,
-   pub(crate) builtin: &'bt BuiltinTypes,
+pub(crate) struct SemTypesBorrows<'s> {
+   pub(crate) common: &'s SemCommon,
+   pub(crate) types: &'s mut Types,
+   pub(crate) log: &'s mut TypeLog,
+   pub(crate) builtin: &'s BuiltinTypes,
    pub(crate) scopes: &'s mut Scopes,
-   pub(crate) symbols: &'sy mut Symbols,
+   pub(crate) symbols: &'s mut Symbols,
 }
 
 /// Specifies whether a node should be annotated in expression or statement context.
@@ -41,9 +42,9 @@ enum NodeContext {
    Statement,
 }
 
-impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
+impl<'s> SemTypes<'s> {
    /// Creates a new instance of the `SemTypes` analysis phase.
-   pub fn new(borrows: SemTypesBorrows<'c, 't, 'tl, 'bt, 's, 'sy>) -> Self {
+   pub fn new(borrows: SemTypesBorrows<'s>) -> Self {
       let SemTypesBorrows {
          common,
          types,
@@ -55,7 +56,8 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       let mut scope_stack = ScopeStack::new();
       // The scope stack is always initialized with a top-level module scope, such that there is
       // always a valid scope on top.
-      let _module_scope = scope_stack.push(scopes.create_scope());
+      let module_scope = scope_stack.push(scopes.create_scope());
+      builtin.register_in(scopes, symbols, module_scope);
       SemTypes {
          common,
          errors: Errors::new(),
@@ -94,30 +96,6 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
       let provided_name = self.types.name(got);
       let kind = ErrorKind::TypeMismatch(expected_name.to_owned(), provided_name.to_owned());
       self.error(ast, node, kind)
-   }
-
-   fn lookup_identifier(&mut self, ast: &Ast, node: NodeHandle) -> Option<SymbolId> {
-      let name = self.common.get_source_range_from_node(ast, node);
-      self.scope_stack.lookup(&self.scopes, name)
-   }
-
-   fn lookup_type(&mut self, ast: &Ast, node: NodeHandle) -> Option<TypeId> {
-      match ast.kind(node) {
-         NodeKind::Identifier => {
-            let symbol = self.lookup_identifier(ast, node)?;
-            if let SymbolKind::Type(id) = self.symbols.kind(symbol) {
-               Some(*id)
-            } else {
-               let name = self.common.get_source_range_from_node(ast, node);
-               self.emit_error(
-                  ErrorKind::UndeclaredSymbol(name.into()),
-                  ast.span(node).clone(),
-               );
-               None
-            }
-         }
-         _ => unreachable!("invalid node kind for type"),
-      }
    }
 
    /// Annotates a literal with a concrete type.
@@ -217,7 +195,7 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
          | NodeKind::Character => self.annotate_literal(ast, node),
 
          // Locations
-         NodeKind::Identifier => self.annotate_location(ast, node),
+         NodeKind::Identifier => self.annotate_location(ast, node).into(),
 
          // Unary operators
          // ---
@@ -244,7 +222,7 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
          | NodeKind::Greater
          | NodeKind::GreaterEqual => self.annotate_binary_operator(ast, node),
          NodeKind::Call => self.annotate_call(ast, node),
-         NodeKind::Assign => self.annotate_assignment(ast, node, context),
+         NodeKind::Assign => self.annotate_assignment(ast, node, context).into(),
          // Other operators are to be implemented later.
 
          // Control flow
@@ -255,7 +233,7 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
          NodeKind::While => self.annotate_while(ast, node),
 
          // Declarations
-         NodeKind::Val | NodeKind::Var => self.annotate_variable_declaration(ast, node),
+         NodeKind::Val | NodeKind::Var => self.annotate_variable_declaration(ast, node).into(),
 
          // Other nodes are invalid (or not implemented yet).
          other => self.error(ast, node, ErrorKind::SemTypesInvalidAstNode(other)),
@@ -263,7 +241,7 @@ impl<'c, 't, 'tl, 'bt, 's, 'sy> SemTypes<'c, 't, 'tl, 'bt, 's, 'sy> {
    }
 }
 
-impl SemPass for SemTypes<'_, '_, '_, '_, '_, '_> {
+impl SemPass for SemTypes<'_> {
    type Result = TypeLogEntry;
 
    /// Performs type analysis for the given AST node. This annotates the node with a concrete type.

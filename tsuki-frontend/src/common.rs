@@ -211,7 +211,9 @@ pub enum ErrorKind {
    #[error("result value of expression is unused; use `val _ = x` to discard it")]
    UnusedValue,
    #[error("invalid location (left hand side of assignment)")]
-   InvalidLhsOfAssignment,
+   InvalidLocation,
+   #[error("'{0}' is not a type")]
+   SymbolIsNotAType(String),
    #[error("the target is immutable and cannot be assigned to")]
    CannotAssignImmutableLocation,
    #[error("`if` condition must be a Bool")]

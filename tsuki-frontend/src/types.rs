@@ -7,6 +7,7 @@ use std::cmp::Ordering;
 use std::ops::Range;
 
 use crate::ast::NodeHandle;
+use crate::scope::{ScopeId, Scopes, SymbolKind, Symbols};
 
 /// Data-oriented type storage.
 pub struct Types {
@@ -86,6 +87,8 @@ pub enum TypeKind {
    Error,
    /// The statement type is assigned to AST nodes that do not return a value, such as loops.
    Statement,
+   /// `type` is the type of all type symbols. It can't be instantiated by user code.
+   Type,
    /// The unit type is a type with a single value `()`. It is the default return type for
    /// functions.
    Unit,
@@ -212,6 +215,7 @@ pub struct BuiltinTypes {
    pub t_unit: TypeId,
    pub t_noreturn: TypeId,
    pub t_statement: TypeId,
+   pub t_type: TypeId,
 
    // Boolean
    pub t_bool: TypeId,
@@ -309,6 +313,10 @@ impl BuiltinTypes {
             name: "statement",
             kind: TypeKind::Statement,
          }),
+         t_type: types.create_type(TypeInfo {
+            name: "type",
+            kind: TypeKind::Type,
+         }),
          t_bool: types.create_type(TypeInfo {
             name: "Bool",
             kind: TypeKind::Bool,
@@ -348,6 +356,37 @@ impl BuiltinTypes {
          }),
       }
    }
+
+   /// Registers named built-in types in the given scope.
+   ///
+   /// TODO: Remove this in favor of the stdlib declaring the types in the prelude.
+   pub(crate) fn register_in(&self, scopes: &mut Scopes, symbols: &mut Symbols, scope: ScopeId) {
+      macro_rules! add_type {
+         ($field:tt, $name:tt) => {
+            let symbol = symbols.create(
+               $name,
+               NodeHandle::null(),
+               self.t_type,
+               SymbolKind::Type(self.$field),
+            );
+            scopes.insert(scope, symbols.name(symbol), symbol);
+         };
+      }
+
+      add_type!(t_noreturn, "NoReturn");
+      add_type!(t_bool, "Bool");
+      add_type!(t_uint8, "Uint8");
+      add_type!(t_uint16, "Uint16");
+      add_type!(t_uint32, "Uint32");
+      add_type!(t_uint64, "Uint64");
+      add_type!(t_int8, "Int8");
+      add_type!(t_int16, "Int16");
+      add_type!(t_int32, "Int32");
+      add_type!(t_int64, "Int64");
+      add_type!(t_float32, "Float32");
+      add_type!(t_float64, "Float64");
+      add_type!(t_char, "Char");
+   }
 }
 
 /// A unique ID identifying an entry in the type log.
@@ -355,7 +394,10 @@ impl BuiltinTypes {
 #[must_use]
 pub struct TypeLogEntry(usize);
 
-impl From<Result<TypeLogEntry, TypeLogEntry>> for TypeLogEntry {
+/// An alias for a result storing a log for either a valid or an erroneous type usage.
+pub type TypeLogResult = Result<TypeLogEntry, TypeLogEntry>;
+
+impl From<TypeLogResult> for TypeLogEntry {
    /// Unwraps a successful or erroneous type log from a result.
    ///
    /// This is used to simplify returning from functions when analysis errors occur.
