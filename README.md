@@ -8,23 +8,42 @@ The compiler is still in its infancy, and it'll probably take me a while before 
 
 Right now compiling tsuki isn't exactly the most trivial of tasks, and Windows is not yet supported.
 
-**Step 0.** Install a C compiler.
+**Step 0.** Install a C (and C++) compiler.
 
-tsuki depends on libc and uses whatever C compiler is available on the system as `cc` to link executables. This can be overridden using the `$TSUKI_CC` or `$CC` environment variables, in that order of priority.
+tsuki depends on libc and uses whatever C compiler is available on the system as `cc` to link executables. This can be overridden using the `$TSUKI_CC` or `$CC` environment variables, in that order of priority. The C++ compiler is necessary to build LLVM.
 
-**Step 1.** Install LLVM 12.
+**Step 1.** Compile LLVM 12.
 
-This step is dependent on what Linux distribution you use. On Arch Linux (as of now) it's as simple as:
+The best way to get LLVM for tsuki is to build it manually. I had pretty bad experiences with using repository LLVM, with problems ranging from missing static libraries on Ubuntu, no `llvm-config` on Windows, to random SIGILLs after a month of hiatus on Arch.
 
+So here's uncle Liquid's method of obtaining LLVM:
+```shell
+# This is where we're going to install LLVM, so change this to some sensible path.
+# bash - in this case you also need to add this to .bashrc
+export LLVM_SYS_120_PREFIX=$HOME/llvm
+# fish
+set -Ux LLVM_SYS_120_PREFIX ~/llvm
+
+# Now it's time to get LLVM. We'll use their GitHub releases for that.
+mkdir -p ~/llvm
+wget https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.1/llvm-12.0.1.src.tar.xz
+tar xJf llvm-12.0.1.src.tar.xz
+
+# Now let's get the build going.
+cd llvm-12.0.1.src
+mkdir -p build
+cd build
+# If doing a release build, remove LLVM_ENABLE_ASSERTIONS, and set CMAKE_BUILD_TYPE to Release.
+cmake .. -DCMAKE_INSTALL_PREFIX=$LLVM_SYS_120_PREFIX -DLLVM_ENABLE_ASSERTIONS=1 -DCMAKE_BUILD_TYPE=Debug -G Ninja
+
+# IMPORTANT:
+# Open a task manager or system monitor. You're going to want to look after your memory usage.
+# If it starts growing rapidly, cancel the build and use --parallel 1.
+# Linking uses up a lot of memory, so it's better to let it run a single linker at a time.
+cmake --build . --target install --parallel 8
 ```
-pacman -S llvm
-```
 
-Problems may arise when LLVM 13 or newer is released, but I'll make sure this guide is up to date when that happens.
-
-Not all distributions include LLVM static libraries in their `llvm` package (looking at you, Ubuntu), so you might have to use LLVM's binaries that can be downloaded off of [their GitHub](https://github.com/llvm/llvm-project/releases). __Be sure to download LLVM 12.x.x, but not anything older or newer than that.__
-
-After downloading LLVM, the environment variable `$LLVM_SYS_120_PREFIX` has to be set. If you installed LLVM from the package manager, simply set it to `/`. Otherwise, set it to the root directory of the extracted archive (the directory with `bin`, `lib`, etc.)
+Maybe someday I'll make a dedicated script for this, but today is not that day.
 
 **Step 2.** Compile and run.
 
