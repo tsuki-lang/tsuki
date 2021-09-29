@@ -14,8 +14,8 @@ use crate::types::TypeId;
 pub struct NodeHandle(usize);
 
 impl NodeHandle {
-   /// Returns the null node handle. This handle always points to an error node and denotes the lack
-   /// of a usable node.
+   /// Returns the null node handle. This handle always points to the Empty node and denotes the
+   /// lack of a usable node.
    pub fn null() -> NodeHandle {
       NodeHandle(0)
    }
@@ -62,9 +62,9 @@ impl Ast {
          types: Vec::new(),
          scopes: Vec::new(),
       };
-      // Create a Nil node at ID 0 so that if some invalid AST node reference is dumped, it'll
-      // instead go to this Error node.
-      let _ = ast.create_node(NodeKind::Error);
+      // Create a Empty node at ID 0 so that if some invalid AST node reference is dumped, it'll
+      // instead go to this Empty node.
+      let _ = ast.create_node(NodeKind::Empty);
       ast
    }
 
@@ -332,6 +332,9 @@ pub enum NodeKind {
    /*
     * Pre-sem'check
     */
+   /// The empty node has only one instance (`NodeHandle::null()`), and is used to denote the
+   /// lack of a node in a place where one's optional.
+   Empty,
    /// The error node is used for returning a valid, unique node handle in case an error occurs
    /// during parsing.
    Error,
@@ -409,6 +412,23 @@ pub enum NodeKind {
    Var,          // same as `Val`, for when the `var` keyword is used
    VariableType, // the `a: T` in `val a: T = x`
    Discard,      // used as the name of a variable when `val _ = x` is used
+   // A function declaration.
+   // - first: the name, Identifier
+   // - second: Parameters
+   // - extra: the body
+   Fun,
+   // Parameters in a function declaration.
+   // - first: GenericParameters - may be the null node if not present
+   // - second: FormalParameters - always present
+   Parameters,
+   // Specifies formal parameters (the ones for passing values around at runtime).
+   // - first: the return type
+   // - extra: Parameter nodes
+   FormalParameters,
+   // Specifies parameter names followed by a single type.
+   // - first: the type of the parameters
+   // - extra: Identifier nodes, the names of the parameters
+   NamedParameters,
 
    // Control flow
    Pass, // `_` statement

@@ -177,6 +177,10 @@ pub enum ErrorKind {
    VarNameExpected,
    #[error("expected '=' after variable name, but got '{0}'")]
    VarMissingEquals(TokenKind),
+   #[error("expected comma ',' or colon ':' in parameter list, but got '{0}'")]
+   ExpectedCommaOrColon(TokenKind),
+   #[error("function parameter list expected, but got '{0}'")]
+   FunctionParametersExpected(TokenKind),
 
    /*
     * Sem'check errors

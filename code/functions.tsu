@@ -1,0 +1,10 @@
+fun add_two(x: Int): Int
+#  x + 2
+
+__intrin_print_int32(add_two(1))
+
+fun add_two_and_print(x: Int)
+#  val added = add_two(x)
+#  __intrin_print_int32(added)
+
+add_two_and_print(123)

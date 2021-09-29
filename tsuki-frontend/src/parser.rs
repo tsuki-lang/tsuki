@@ -55,7 +55,9 @@ impl<'l, 's> Parser<'l, 's> {
       self.ast.create_node(NodeKind::Error)
    }
 
-   /// Peeks at the next token and checks if its kind matches `kind`. If yes, returns `Some(token)`.
+   /// Peeks at the next token and checks if its kind matches `kind`.
+   ///
+   /// If yes, consumes the token and returns `Some(token)`.
    /// Otherwise returns `None`.
    fn match_token(&mut self, kind: TokenKind) -> Result<Option<Token>, Error> {
       let token = self.lexer.peek()?;
@@ -151,10 +153,14 @@ impl<'l, 's> Parser<'l, 's> {
    }
 
    /// Parses a list of comma-separated values.
+   ///
    /// `start` is the starting token, used for error reporting.
    /// `end` is the kind of ending token that should be matched against.
    /// `next` is the _parsing rule_ - a function that, when called, parses the next element to be
    /// added to `dest`.
+   ///
+   /// Returns the terminating token, which might _not_ be of `end` if erroneous input is
+   /// encountered.
    fn parse_comma_separated(
       &mut self,
       dest: &mut Vec<NodeHandle>,
@@ -549,6 +555,69 @@ impl<'l, 's> Parser<'l, 's> {
       Ok(node)
    }
 
+   /// Parses a `while` loop.
+   fn parse_while_loop(&mut self) -> Result<NodeHandle, Error> {
+      let token = self.lexer.next()?;
+      let condition = self.parse_expression(0)?;
+      let node = self.create_node_with_handle(NodeKind::While, condition);
+      let mut statements = Vec::new();
+      if let Some(..) = self.match_token(TokenKind::Then)? {
+         statements.push(self.parse_expression(0)?);
+      } else {
+         self.parse_indented_block(
+            &mut statements,
+            &token,
+            |p| p.parse_statement(),
+            || ErrorKind::MissingLineBreakAfterStatement,
+         )?;
+      }
+      self.ast.set_span(
+         node,
+         Span::join(&token.span, &self.span_all_nodes(&statements)),
+      );
+      self.ast.set_extra(node, NodeData::NodeList(statements));
+      Ok(node)
+   }
+
+   /// Parses a comma-separated parameter list, like `(a: Int, b: Int, c, d: Int)`.
+   fn parse_parameter_list(
+      &mut self,
+      dest: &mut Vec<NodeHandle>,
+      start: &Token,
+      end: TokenKind,
+   ) -> Result<Token, Error> {
+      self.parse_comma_separated(dest, start, end, |p| {
+         let mut list = Vec::new();
+         let type_node;
+         loop {
+            let name_token = p.lexer.next()?;
+            let name = p.create_identifier(name_token);
+            list.push(name);
+            let next_token = p.lexer.next()?;
+            match next_token.kind {
+               TokenKind::Comma => {
+                  // Continue the loop and parse another parameter name.
+               }
+               TokenKind::Colon => {
+                  type_node = p.parse_type()?;
+                  break;
+               }
+               other => {
+                  return Ok(p.error(ErrorKind::ExpectedCommaOrColon(other), next_token.span));
+               }
+            }
+         }
+         let node = p.ast.create_node(NodeKind::NamedParameters);
+         p.ast.set_span(
+            node,
+            Span::join(&p.span_all_nodes(&list), p.ast.span(type_node)),
+         );
+         p.ast.set_first_handle(node, type_node);
+         p.ast.set_extra(node, NodeData::NodeList(list));
+         Ok(node)
+      })
+   }
+
    /// Parses a `val` or `var` declaration.
    fn parse_variable_declaration(&mut self) -> Result<NodeHandle, Error> {
       let var_token = self.lexer.next()?;
@@ -586,28 +655,56 @@ impl<'l, 's> Parser<'l, 's> {
       Ok(node)
    }
 
-   /// Parses a `while` loop.
-   fn parse_while_loop(&mut self) -> Result<NodeHandle, Error> {
+   /// Parses a function declaration.
+   fn parse_function_declaration(&mut self) -> Result<NodeHandle, Error> {
+      // TODO: anonymous functions.
+      // Those are not in the spec yet, as I'm not sure how I want closures to be implemented.
+
       let token = self.lexer.next()?;
-      let condition = self.parse_expression(0)?;
-      let node = self.create_node_with_handle(NodeKind::While, condition);
-      let mut statements = Vec::new();
-      if let Some(..) = self.match_token(TokenKind::Then)? {
-         statements.push(self.parse_expression(0)?);
-      } else {
-         self.parse_indented_block(
-            &mut statements,
-            &token,
-            |p| p.parse_statement(),
-            || ErrorKind::MissingLineBreakAfterStatement,
-         )?;
+      let name_token = self.lexer.next()?;
+      let name = self.create_identifier(name_token);
+
+      // Parse the formal parameter list.
+      let left_paren = match self.expect_token(TokenKind::LeftParen, |token| {
+         ErrorKind::FunctionParametersExpected(token.kind)
+      })? {
+         Some(left_paren) => left_paren,
+         // We have already emitted an error, so we only return an error node.
+         None => return Ok(self.ast.create_node(NodeKind::Error)),
+      };
+      let mut formal_param_list = Vec::new();
+      let right_paren =
+         self.parse_parameter_list(&mut formal_param_list, &left_paren, TokenKind::RightParen)?;
+
+      // Handle the optional return type.
+      let mut return_type = NodeHandle::null();
+      if let Some(..) = self.match_token(TokenKind::Colon)? {
+         return_type = self.parse_type()?;
       }
+
+      // Construct the AST.
+      let generic_params = NodeHandle::null(); // TODO: generic parameters
+      let formal_params = self.ast.create_node(NodeKind::FormalParameters);
       self.ast.set_span(
-         node,
-         Span::join(&token.span, &self.span_all_nodes(&statements)),
+         formal_params,
+         Span::join(&left_paren.span, &right_paren.span),
       );
-      self.ast.set_extra(node, NodeData::NodeList(statements));
-      Ok(node)
+      self.ast.set_first_handle(formal_params, return_type);
+      self.ast.set_extra(formal_params, NodeData::NodeList(formal_param_list));
+
+      let params =
+         self.create_node_with_handles(NodeKind::Parameters, generic_params, formal_params);
+      let params_span = if generic_params != NodeHandle::null() {
+         Span::join(self.ast.span(generic_params), self.ast.span(formal_params))
+      } else {
+         self.ast.span(formal_params).clone()
+      };
+      self.ast.set_span(params, params_span);
+
+      let fun = self.create_node_with_handles(NodeKind::Fun, name, params);
+      self.ast.set_span(fun, Span::join(&token.span, self.ast.span(params)));
+
+      Ok(fun)
    }
 
    /// Parses a statement.
@@ -616,6 +713,7 @@ impl<'l, 's> Parser<'l, 's> {
       let node = match token_kind {
          // Declarations
          TokenKind::Val | TokenKind::Var => self.parse_variable_declaration()?,
+         TokenKind::Fun => self.parse_function_declaration()?,
 
          // Control flow
          TokenKind::Underscore => self.parse_pass()?,

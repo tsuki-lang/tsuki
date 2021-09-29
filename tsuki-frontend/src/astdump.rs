@@ -11,6 +11,12 @@ enum Prefix {
    Fun,
    Cond,
    X,
+   Name,
+   Params,
+   Generic,
+   Formal,
+   Return,
+   Type,
 }
 
 fn print_indentation(depth: usize) {
@@ -119,6 +125,16 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
          dump_node(s, left, depth + 1, Some(Prefix::L));
          dump_node(s, right, depth + 1, Some(Prefix::R));
       }
+      NodeKind::Fun => {
+         let (left, right) = (ast.first_handle(node), ast.second_handle(node));
+         dump_node(s, left, depth + 1, Some(Prefix::Name));
+         dump_node(s, right, depth + 1, Some(Prefix::Params));
+      }
+      NodeKind::Parameters => {
+         let (left, right) = (ast.first_handle(node), ast.second_handle(node));
+         dump_node(s, left, depth + 1, Some(Prefix::Generic));
+         dump_node(s, right, depth + 1, Some(Prefix::Formal));
+      }
       | NodeKind::Check
       | NodeKind::Unwrap
       | NodeKind::Deref
@@ -130,6 +146,8 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
       | NodeKind::Ref
       | NodeKind::IfBranch
       | NodeKind::While
+      | NodeKind::FormalParameters
+      | NodeKind::NamedParameters
       | NodeKind::Variable
       | NodeKind::WidenInt
       | NodeKind::WidenUint
@@ -148,6 +166,8 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
                | NodeKind::Ref => Prefix::R,
                NodeKind::Call => Prefix::Fun,
                NodeKind::IfBranch | NodeKind::While => Prefix::Cond,
+               NodeKind::FormalParameters => Prefix::Return,
+               NodeKind::NamedParameters => Prefix::Type,
                | NodeKind::Variable
                | NodeKind::WidenInt
                | NodeKind::WidenUint
