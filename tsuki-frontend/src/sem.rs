@@ -1,7 +1,9 @@
 //! The root of semantic analysis.
 
+use std::path::Path;
+
 use crate::ast::{Ast, NodeHandle};
-use crate::common::{Error, ErrorKind, Errors, Span};
+use crate::common::{Error, ErrorKind, Errors, SourceFile, Span};
 use crate::scope::{Scopes, Symbols};
 pub use crate::types::DefaultTypes;
 use crate::types::{BuiltinTypes, TypeLog, Types};
@@ -17,7 +19,7 @@ pub(crate) trait SemPass {
    fn analyze(&mut self, ast: Ast, root_node: NodeHandle) -> Ast;
 
    /// Returns the filename string.
-   fn filename(&self) -> &str;
+   fn filename(&self) -> &Path;
    /// Returns a reference to the list of errors.
    fn errors(&self) -> &Errors;
    /// Returns a mutable reference to the list of errors.
@@ -56,17 +58,16 @@ impl Analyzer {
 }
 
 /// Common information shared by the semantic pass.
-pub(crate) struct SemCommon {
-   pub filename: String,
-   pub source: String,
+pub(crate) struct SemCommon<'s> {
+   pub file: &'s SourceFile,
    pub default_types: DefaultTypes,
 }
 
-impl SemCommon {
+impl<'s> SemCommon<'s> {
    /// Returns the source code substring pointed to by the node's `first..second`.
    pub fn get_source_range_from_node(&self, ast: &Ast, node: NodeHandle) -> &str {
       let source_range = ast.first(node)..ast.second(node);
-      &self.source[source_range]
+      &self.file.source[source_range]
    }
 }
 
@@ -80,9 +81,8 @@ pub struct Ir {
 }
 
 /// The options passed to `analyze`.
-pub struct AnalyzeOptions<'f, 's> {
-   pub filename: &'f str,
-   pub source: &'s str,
+pub struct AnalyzeOptions<'s> {
+   pub file: &'s SourceFile,
    pub ast: Ast,
    pub root_node: NodeHandle,
    pub default_types: DefaultTypes,
@@ -91,8 +91,7 @@ pub struct AnalyzeOptions<'f, 's> {
 /// Analyzes and lowers the AST to a representation ready to be used by the backend.
 pub fn analyze(options: AnalyzeOptions) -> Result<Ir, Errors> {
    let AnalyzeOptions {
-      filename,
-      source,
+      file,
       ast,
       root_node,
       default_types,
@@ -100,8 +99,7 @@ pub fn analyze(options: AnalyzeOptions) -> Result<Ir, Errors> {
    let mut state = Analyzer { ast, root_node };
 
    let common = SemCommon {
-      filename: filename.into(),
-      source: source.into(),
+      file,
       default_types,
    };
    let mut types = Types::new();

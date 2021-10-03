@@ -5,6 +5,7 @@
 //! Note that `SemTypes` may perform additional conversions later down the line.
 
 use std::convert::{TryFrom, TryInto};
+use std::path::Path;
 
 use smallvec::SmallVec;
 
@@ -15,7 +16,7 @@ use crate::types::{FloatSize, IntegerSize};
 
 /// State for the `SemLiterals` analysis phase.
 pub(crate) struct SemLiterals<'c> {
-   common: &'c SemCommon,
+   common: &'c SemCommon<'c>,
    errors: Errors,
 }
 
@@ -80,14 +81,14 @@ static SUFFIXES: phf::Map<&'static str, LiteralSuffix> = phf::phf_map! {
 
 impl<'c> SemLiterals<'c> {
    /// Creates a new instance of the `SemTypes` analysis phase.
-   pub fn new(common: &'c SemCommon) -> Self {
+   pub fn new(common: &'c SemCommon<'c>) -> Self {
       SemLiterals {
          common,
          errors: Errors::new(),
       }
    }
 
-   fn split_number<'s>(&mut self, source: &'s str, span: &Span) -> (&'s str, LiteralSuffix) {
+   fn split_number<'n>(&mut self, source: &'n str, span: &Span) -> (&'n str, LiteralSuffix) {
       if let Some(underscore) = source.rfind('_') {
          // Check if the index is at least the character before the last character,
          // and the character after it is an identifier character.
@@ -413,8 +414,8 @@ impl SemPass for SemLiterals<'_> {
       ast
    }
 
-   fn filename(&self) -> &str {
-      &self.common.filename
+   fn filename(&self) -> &Path {
+      &self.common.file.filename
    }
 
    fn errors(&self) -> &Errors {

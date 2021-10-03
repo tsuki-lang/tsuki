@@ -1,7 +1,7 @@
 //! AST pretty printer.
 
 use crate::ast::*;
-use crate::lexer::Lexer;
+use crate::common::SourceFile;
 use crate::types::Types;
 
 #[derive(Debug)]
@@ -25,22 +25,22 @@ fn print_indentation(depth: usize) {
    }
 }
 
-fn print_source_range(lexer: &Lexer, start: usize, end: usize) {
-   eprint!("{}", &lexer.input()[start..end]);
+fn print_source_range(file: &SourceFile, start: usize, end: usize) {
+   eprint!("{}", &file.source[start..end]);
 }
 
-fn print_string_range(lexer: &Lexer, start: usize, end: usize) {
-   eprint!("{}", &lexer.string_data()[start..end]);
+fn print_string_range(file: &SourceFile, start: usize, end: usize) {
+   eprint!("{}", &file.source[start..end]);
 }
 
-struct State<'l, 'll, 'a, 't> {
-   lexer: &'l Lexer<'ll>,
+struct State<'s, 'a, 't> {
+   file: &'s SourceFile,
    ast: &'a Ast,
    types: Option<&'t Types>,
 }
 
 fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) {
-   let State { lexer, ast, types } = s;
+   let State { file, ast, types } = s;
    print_indentation(depth);
 
    let kind = ast.kind(node);
@@ -56,11 +56,11 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
    match kind {
       NodeKind::Integer | NodeKind::Float | NodeKind::Atom | NodeKind::Identifier => {
          let (start, end) = (ast.first(node), ast.second(node));
-         print_source_range(lexer, start, end);
+         print_source_range(file, start, end);
       }
       NodeKind::String | NodeKind::DocComment => {
          let (start, end) = (ast.first(node), ast.second(node));
-         print_string_range(lexer, start, end);
+         print_string_range(file, start, end);
       }
       NodeKind::Character => eprint!("{:?}", char::from_u32(ast.first(node) as u32)),
       NodeKind::Symbol => eprint!("{:?}", ast.first(node)),
@@ -191,6 +191,6 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
 }
 
 /// Prints the AST to stdout, starting from the given root node.
-pub fn dump_ast(lexer: &Lexer, ast: &Ast, types: Option<&Types>, root_node: NodeHandle) {
-   dump_node(&State { lexer, ast, types }, root_node, 0, None);
+pub fn dump_ast(file: &SourceFile, ast: &Ast, types: Option<&Types>, root_node: NodeHandle) {
+   dump_node(&State { file, ast, types }, root_node, 0, None);
 }

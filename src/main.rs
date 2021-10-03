@@ -39,7 +39,7 @@ struct Options {
 
    /// The root source file.
    #[structopt(name = "main file")]
-   main_file: String,
+   main_file: PathBuf,
 }
 
 const EXIT_COMPILE: i32 = 1;

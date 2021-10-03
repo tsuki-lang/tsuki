@@ -9,11 +9,9 @@ use crate::common::{Error, ErrorKind, Errors, Span};
 use crate::lexer::{Associativity, Lexer, Token, TokenKind};
 
 /// The parser state.
-struct Parser<'l, 's> {
-   filename: String,
-
+struct Parser<'s> {
+   lexer: Lexer<'s>,
    ast: Ast,
-   lexer: &'l mut Lexer<'s>,
 
    /// Parsing errors are accumulated into this list of errors. If an error occurs, it's saved
    /// in this vector, and the function that encountered the error creates and returns an error
@@ -23,17 +21,16 @@ struct Parser<'l, 's> {
    errors: Errors,
 }
 
-impl<'l, 's> Parser<'l, 's> {
+impl<'s> Parser<'s> {
    /*
     * Common
     */
 
    /// Creates a new parser from the given filename and source code string.
-   fn new(lexer: &'l mut Lexer<'s>) -> Self {
+   fn new(lexer: Lexer<'s>) -> Self {
       Self {
-         filename: lexer.filename().to_owned(),
-         ast: Ast::new(),
          lexer,
+         ast: Ast::new(),
          errors: SmallVec::new(),
       }
    }
@@ -42,7 +39,7 @@ impl<'l, 's> Parser<'l, 's> {
    fn emit_error(&mut self, kind: ErrorKind, span: Span) {
       self.errors.push(Error {
          // A bit inefficient wrt allocations, but errors don't occur very often.
-         filename: self.filename.clone(),
+         filename: self.lexer.file().filename.clone(),
          span,
          kind,
       });
@@ -767,7 +764,7 @@ impl<'l, 's> Parser<'l, 's> {
 
 /// Parses a source file with the given filename and source code. On success, returns the AST and
 /// the handle to the root node. On failure, returns a list of errors.
-pub fn parse(lexer: &mut Lexer) -> Result<(Ast, NodeHandle), Errors> {
+pub fn parse(lexer: Lexer) -> Result<(Ast, NodeHandle), Errors> {
    let mut parser = Parser::new(lexer);
    let root_node = match parser.parse_module() {
       Ok(node) => node,

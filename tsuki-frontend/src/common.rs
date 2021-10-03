@@ -1,18 +1,22 @@
 //! Common functionality.
 
 use std::fmt;
+use std::path::PathBuf;
 
 use smallvec::SmallVec;
 
-use crate::{
-   ast::NodeKind,
-   lexer::{IndentLevel, Token, TokenKind},
-};
+use crate::ast::NodeKind;
+use crate::lexer::{IndentLevel, Token, TokenKind};
 
 /// Represents a source file.
 pub struct SourceFile {
-   pub filename: String,
+   pub filename: PathBuf,
    pub source: String,
+}
+
+impl SourceFile {
+   // Extracts the module name from the filename.
+   // pub fn module_name(&self) -> &str {}
 }
 
 /// Represents a span of text in a source file.
@@ -245,7 +249,7 @@ pub enum ErrorKind {
 pub struct Error {
    // The filename is owned because errors don't occur very often, so allocations are fine here,
    // and using an owned String here simplifies a bunch of code.
-   pub filename: String,
+   pub filename: PathBuf,
    pub span: Span,
    pub kind: ErrorKind,
 }
@@ -254,10 +258,11 @@ impl fmt::Display for Error {
    /// The alternate format syntax `{:#}` can be used to display the full span of where the error
    /// occured, instead of its starting position only.
    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+      let filename = self.filename.to_str().unwrap();
       if f.alternate() {
-         write!(f, "{}:{:#}: {}", self.filename, self.span, self.kind)?;
+         write!(f, "{}:{:#}: {}", filename, self.span, self.kind)?;
       } else {
-         write!(f, "{}:{}: {}", self.filename, self.span, self.kind)?;
+         write!(f, "{}:{}: {}", filename, self.span, self.kind)?;
       }
       Ok(())
    }

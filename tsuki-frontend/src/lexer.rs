@@ -3,7 +3,7 @@
 use std::fmt;
 use std::ops::Range;
 
-use crate::common::{Error, ErrorKind, Span};
+use crate::common::{Error, ErrorKind, SourceFile, Span};
 
 /// The kind of a token, along with some extra metadata for some token types.
 #[allow(unused)]
@@ -363,7 +363,7 @@ impl fmt::Display for Token {
 /// Lexer state. This struct stores all the data needed for lexing, emitting tokens, and reporting
 /// errors.
 pub struct Lexer<'i> {
-   filename: Option<String>,
+   file: &'i SourceFile,
 
    input: &'i [u8],
    position: usize,
@@ -385,10 +385,10 @@ impl<'i> Lexer<'i> {
 
    /// Creates a new lexer with the given filename and input string. The filename is used for error
    /// reporting.
-   pub fn new(filename: &str, input: &'i str) -> Self {
+   pub fn new(file: &'i SourceFile) -> Self {
       Self {
-         filename: Some(filename.to_owned()),
-         input: input.as_bytes(),
+         file,
+         input: file.source.as_bytes(),
          position: 0,
          span: Span::new(),
          indent_level: 0,
@@ -397,9 +397,9 @@ impl<'i> Lexer<'i> {
       }
    }
 
-   /// Clones the filename out of the lexer. Panics if the filename was taken out by an error.
-   pub fn filename(&self) -> &str {
-      self.filename.as_ref().unwrap()
+   /// Returns the lexer's source file.
+   pub fn file(&self) -> &SourceFile {
+      &self.file
    }
 
    /// Returns the lexer's input string.
@@ -471,10 +471,7 @@ impl<'i> Lexer<'i> {
    /// panic. This means once the lexer throws an error, all lexis must be aborted.
    fn error(&mut self, kind: ErrorKind) -> Error {
       Error {
-         filename: self
-            .filename
-            .take()
-            .expect("an error may only be thrown once and all lexing must stop afterwards"),
+         filename: self.file.filename.to_owned(),
          span: self.span.clone(),
          kind,
       }

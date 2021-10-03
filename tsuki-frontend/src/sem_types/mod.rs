@@ -6,14 +6,16 @@ mod locations;
 mod lookups;
 mod operators;
 
+use std::path::Path;
+
 use crate::ast::{Ast, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors};
-use crate::scope::{ScopeStack, Scopes, SymbolId, SymbolKind, Symbols};
+use crate::scope::{ScopeStack, Scopes, Symbols};
 use crate::sem::{SemCommon, SemPass};
 use crate::types::{BuiltinTypes, TypeId, TypeLog, TypeLogEntry, Types};
 
 pub(crate) struct SemTypes<'s> {
-   common: &'s SemCommon,
+   common: &'s SemCommon<'s>,
    errors: Errors,
 
    types: &'s mut Types,
@@ -27,7 +29,7 @@ pub(crate) struct SemTypes<'s> {
 
 /// Values borrowed to `SemTypes`, used during its construction.
 pub(crate) struct SemTypesBorrows<'s> {
-   pub(crate) common: &'s SemCommon,
+   pub(crate) common: &'s SemCommon<'s>,
    pub(crate) types: &'s mut Types,
    pub(crate) log: &'s mut TypeLog,
    pub(crate) builtin: &'s BuiltinTypes,
@@ -250,8 +252,8 @@ impl SemPass for SemTypes<'_> {
       ast
    }
 
-   fn filename(&self) -> &str {
-      &self.common.filename
+   fn filename(&self) -> &Path {
+      &self.common.file.filename
    }
 
    fn errors(&self) -> &Errors {
