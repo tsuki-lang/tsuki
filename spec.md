@@ -1026,7 +1026,7 @@ my_names <- "Johnny"
 
 `Table[K, V]`, or a _table_, is an associative array type. It maps arbitrarily-typed keys to arbitrarily-typed values. Other languages also call this type `Dictionary`, `Map`, `HashMap`.
 
-A table can be initialized using the `{}` prefix operator. `=` is used for separating keys from values.
+A table can be initialized using the `{}` prefix. `=` is used for separating keys from values.
 ```
 val numbers = {
   # here we create a mapping from Strings to Floats
@@ -1065,13 +1065,13 @@ An `rc T` stores a reference count alongside the actual data. Copying an `rc T` 
 tsuki's reference counting differs from most languages, in that increments and decrements of the reference count are optimized out by the compiler whenever possible. In fact, an `rc T` may even be downgraded into a plain stack or heap allocation, if the compiler can prove that copies of the `rc T` do not exit the scope in which the `rc T` was created.
 
 ```
-# The `rc{}` operator can be used to create an rc value.
-val r = rc{1}
+# The `rc` operator can be used to create an rc value.
+val r = rc 1
 # An rc's inner value is immutable by default.
 # r = 2  # error: rc cannot be implicitly converted to ^var T
 
 # The mutable alternative to rc is rc var:
-val r = rc var{1}
+val r = rc var 1
 # Unlike rc, its inner value can be modified.
 r = 3
 print(r^)  # 3
