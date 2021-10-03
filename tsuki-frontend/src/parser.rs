@@ -200,8 +200,8 @@ impl<'l, 's> Parser<'l, 's> {
    ///
    /// Each node parsed by a rule must be separated by a line break.
    ///
-   /// `parent_indent_level` specifies which indent level the tokens in the block must exceed to be
-   /// in the block.
+   /// `parent_token` specifies which token from which the indent level the tokens in the block must
+   /// exceed should be taken from.
    fn parse_indented_block(
       &mut self,
       dest: &mut Vec<NodeHandle>,
@@ -682,6 +682,15 @@ impl<'l, 's> Parser<'l, 's> {
          return_type = self.parse_type()?;
       }
 
+      // Parse the body.
+      let mut body = Vec::new();
+      self.parse_indented_block(
+         &mut body,
+         &token,
+         |p| p.parse_statement(),
+         || ErrorKind::MissingLineBreakAfterStatement,
+      )?;
+
       // Construct the AST.
       let generic_params = NodeHandle::null(); // TODO: generic parameters
       let formal_params = self.ast.create_node(NodeKind::FormalParameters);
@@ -703,6 +712,7 @@ impl<'l, 's> Parser<'l, 's> {
 
       let fun = self.create_node_with_handles(NodeKind::Fun, name, params);
       self.ast.set_span(fun, Span::join(&token.span, self.ast.span(params)));
+      self.ast.set_extra(fun, NodeData::NodeList(body));
 
       Ok(fun)
    }
