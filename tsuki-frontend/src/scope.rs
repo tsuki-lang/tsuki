@@ -1,8 +1,10 @@
 //! Scoping and symbols.
 
-use std::{collections::HashMap, num::NonZeroUsize};
+use std::collections::HashMap;
+use std::num::NonZeroUsize;
 
-use crate::{ast::NodeHandle, types::TypeId};
+use crate::ast::NodeHandle;
+use crate::types::TypeId;
 
 /// An ID uniquely identifying a symbol.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

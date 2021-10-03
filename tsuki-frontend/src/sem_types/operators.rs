@@ -1,7 +1,6 @@
 //! Semantic analysis for operators and compiler intrinsics.
 
-use crate::ast::NodeKind;
-use crate::ast::{Ast, NodeHandle};
+use crate::ast::{Ast, NodeHandle, NodeKind};
 use crate::common::ErrorKind;
 use crate::types::TypeLogEntry;
 
