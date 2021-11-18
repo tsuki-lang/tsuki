@@ -10,6 +10,8 @@ My idea for a programming language that's actually fun to program in.
 
 tsuki source code is encoded in UTF-8, using LF (ASCII 0Ah) for line breaks. The Windows convention of CR (ASCII 0Dh) followed by LF is not supported. ASCII 20h is used as the whitespace character for indentation and separating tokens from one another.
 
+The standard extension for tsuki files is `.tsu`, case-sensitive. Using other extensions is an error.
+
 ## Comments
 
 Comments in tsuki start with `#` and end with the end of the line:
@@ -40,9 +42,9 @@ true false  # booleans
 
 123         # integers; the appropriate size is inferred depending on context
 123_u8      # the size can be enforced by appending _<size>, where size is one of:
-  # u8, u16, u32, u64
-  # i8, i16, i32, i64
-  # the underscore before the size is mandated for readability purposes.
+            # u8, u16, u32, u64
+            # i8, i16, i32, i64
+            # the underscore before the size is mandated for readability purposes.
 1_000_000   # underscores may be used between digits for clarity
 0b000111000 # binary literals
 0o1234567   # octal literals
@@ -59,17 +61,17 @@ true false  # booleans
 "hello"     # short string literals
 """hello
 world"""    # multiline string literals
-  # the following escape sequences may be used:
-  # \n  line feed
-  # \r  carriage return
-  # \t  tabulator
-  # \'  the character '
-  # \"  the character "
-  # other single-line escapes aren't as common, and thus are not supported by
-  # the syntax, but they may be substituted with the following generic escape
-  # sequence:
-  # \xXX      the byte with the hex code XX
-  # where X is a hex digit from the set [0-9a-f]
+            # the following escape sequences may be used:
+            # \n  line feed
+            # \r  carriage return
+            # \t  tabulator
+            # \'  the character '
+            # \"  the character "
+            # other single-line escapes aren't as common, and thus are not supported by
+            # the syntax, but they may be substituted with the following generic escape
+            # sequence:
+            # \xXX      the byte with the hex code XX
+            # where X is a hex digit from the set [0-9a-f]
 ```
 
 ## Identifiers
@@ -93,7 +95,7 @@ union where while val var
 ```
 TODO: This list of keywords is constantly changing as the language spec is refined, and may currently be imprecise. It should be updated once the compiler is finished.
 
-The identifier `_` is special; it's an identifier that is used for ignoring things. Declaring a variable with the name `_` discards its value, and the identifier cannot be used as a valid function or object name. Additionally, when used as a statement, it's a no-op, and can be used to create empty blocks.
+The identifier `_` is special; it's an identifier that is used for ignoring things. Declaring a variable with the name `_` discards its value, and the identifier cannot be used as a valid item name. Additionally, when used as a statement, it's a no-op, and can be used to create empty blocks.
 
 ## Blocks
 
@@ -104,12 +106,12 @@ Each leading whitespace character ` ` adds 1 to the indentation level of tokens 
 The most simple block is the _do-block_:
 ```
 do
-  _ # statements go here
+   _ # statements go here
 ```
 
 The special identifier `_` may be used when a dummy no-op statement is needed, ala `pass` from Python.
 
-The standard indent size is 2 spaces, but a different amount may be used depending on the developer's preferences.
+The standard indent size is 3 spaces, but a different amount may be used depending on the developer's preferences.
 
 ## Operators
 
@@ -159,12 +161,12 @@ This is also where precedence comes in: if it's part of a statement, an expressi
 Infix tokens that continue a line must have an indentation level greater than the first token of the expression:
 ```
 val test = "hello" ~ " world "
-  ~ "this" ~ " is " ~ "a "
-  ~ "test"
+   ~ "this" ~ " is " ~ "a "
+   ~ "test"
 # or
 val test = "hello" ~ " world " ~
-  "this" ~ " is " ~ "a " ~
-  "test"
+   "this" ~ " is " ~ "a " ~
+   "test"
 ```
 
 ## Prefixes
@@ -255,8 +257,8 @@ The `do` expression evaluates a block of code and returns the result of the last
 
 ```
 print(do
-  val x = 1
-  x + 2
+   val x = 1
+   x + 2
 )  # 3
 ```
 
@@ -271,11 +273,11 @@ import @std.io
 
 val name = stdin.read_line()?
 print(
-  if name == "Mark"
+   if name == "Mark"
     "Oh hi Mark"
-  elif name == "Gabe"
+   elif name == "Gabe"
     "How's that 3rd game going?"
-  else
+   else
     "Hello, " ~ name ~ "!"
 )
 ```
@@ -285,18 +287,18 @@ Just like with `do`, the last statement in each arm must be an expression statem
 An `if` expression can be written in a shorthand way by using `->` after the condition.
 ```
 print(
-  if name == "Mark" -> "Oh hi Mark"
-  elif name == "Gabe" -> "How's that 3rd game going?"
-  else -> "Hello, " ~ name ~ "!"
+   if name == "Mark" -> "Oh hi Mark"
+   elif name == "Gabe" -> "How's that 3rd game going?"
+   else -> "Hello, " ~ name ~ "!"
 )
 ```
 
 In some cases the parser may get confused if the starting token of an `if` expression is an infix token:
 ```
 val s =
-  if my_thing
+   if my_thing
     (x + 2).sin()
-  else
+   else
     0.0
 ```
 Due to the rules of continuing expressions on other lines, this will be interpreted as `if my_thing(x + 2).sin()`, and not `if my_thing -> (x + 2).sin()`. In this case `->` can be used to separate the condition from the body.
@@ -304,10 +306,10 @@ Due to the rules of continuing expressions on other lines, this will be interpre
 Multiline bodies with `->` can be achieved by using it together with `do`.
 ```
 val s =
-  if my_thing -> do
+   if my_thing -> do
     print("abc")
     (x + 2).sin()
-  else
+   else
     0.0
 ```
 
@@ -317,14 +319,14 @@ It is possible to use an optional's presence as a condition for an `if` expressi
 ```
 val num: ?Int = nil
 if val n = num
-  print("will not execute")
+   print("will not execute")
 ```
 The above code expands to the following:
 ```
 val num: ?Int = nil
 if num.[Unwrap].has_value()
-  val n = num.[Unwrap].unwrap()
-  do
+   val n = num.[Unwrap].unwrap()
+   do
     print("will not execute")
 ```
 
@@ -332,7 +334,7 @@ It's possible to chain multiple `if val`s in one if statement, by separating the
 
 ```
 if val address = user.home_address, val city = address.city
-  print("Hello, " ~ city ~ "!")
+   print("Hello, " ~ city ~ "!")
 ```
 
 As can be seen on the example above, subsequent `val` declarations may depend on previous ones. If at least one declaration fails, the entire arm is considered `false` and the next `elif` or `else` arm (or no arm) is executed.
@@ -345,29 +347,29 @@ The most basic `match`ing subject is a number:
 ```
 val n = 10
 match n
-  1 -> print("JEDEN.")
-  2..=4 ->  # 2..=4 is an inclusive range
+   1 -> print("JEDEN.")
+   2..=4 ->  # 2..=4 is an inclusive range
     val x = n + 2
     print(x)
-  # the matched value can be captured using ||
-  5..10 |val| -> print(val)
-  else -> print("something else")
+   # the matched value can be captured using ||
+   5..10 |val| -> print(val)
+   else -> print("something else")
 ```
 
 It's also possible to match other primitive subjects, such as Strings or Atoms:
 ```
 val a = :apple
 match a
-  :orange -> print("The purpose of the columns")
-  :apple -> print("One a day keeps the doctor away")
-  :banana -> print("slamma")
-  else -> _
+   :orange -> print("The purpose of the columns")
+   :apple -> print("One a day keeps the doctor away")
+   :banana -> print("slamma")
+   else -> _
 
 val name = "John"
 match name
-  "Mark" -> print("Oh, hi Mark")
-  "Gabe" -> print("Am I really doing the same joke again?")
-  else |n| -> print("Hello, " ~ n)
+   "Mark" -> print("Oh, hi Mark")
+   "Gabe" -> print("Am I really doing the same joke again?")
+   else |n| -> print("Hello, " ~ n)
 ```
 Strings and Atoms cannot be used with ranges, because the interaction between the lower and upper bound doesn't make obvious sense.
 
@@ -375,28 +377,28 @@ Strings and Atoms cannot be used with ranges, because the interaction between th
 ```
 val err: !Int = :oops
 val int = err catch |err_atom|
-  print(
+   print(
     match err_atom
       :not_found -> "404"
       :oops -> "Somebody's gonna get fired"
       else |ok| -> "Unknown error: " ~ ok
-  )
-  return
+   )
+   return
 ```
 
 A more advanced use case for `match` would be unpacking unions. Unions carry extra data with them, and this data can be captured using `||`, just like shown previously with `else` and ranges.
 ```
 union Shape
-  :rectangle(Float, Float, Float, Float)
-  :circle(Float, Float, Float)
+   :rectangle(Float, Float, Float, Float)
+   :circle(Float, Float, Float)
 
 val rect = Shape:rectangle(32, 32, 64, 64)
 match rect
-  :rectangle(x, y, width, height) ->
+   :rectangle(x, y, width, height) ->
     print("Rectangle")
     print("X: " ~ x.to_string() ~ "  Y: " ~ y.to_string())
     print(width.to_string() ~ "x" ~ height.to_string())
-  :circle(x, y, radius) ->
+   :circle(x, y, radius) ->
     print("Circle")
     print("X: " ~ x.to_string() ~ "  Y: " ~ y.to_string())
     print("radius: " ~ radius.to_string())
@@ -411,13 +413,13 @@ The `?` operator is only allowed in [`try` blocks](#try-expressions). Functions 
 
 ```
 fun fallible(x: Int): !Int
-  if x == 0 -> :zero
-  elif x == 3 -> :gabe
-  else -> x + 4
+   if x == 0 -> :zero
+   elif x == 3 -> :gabe
+   else -> x + 4
 
 fun try_example(): !()
-  var x = fallible(2)?
-  print(x)  # 6
+   var x = fallible(2)?
+   print(x)  # 6
 ```
 
 ## `catch` expressions
@@ -426,7 +428,7 @@ As an alternative to `?`, it's possible to unwrap an error while still preservin
 
 ```
 fun catch_example()
-  var x = fallible(2) catch |err|
+   var x = fallible(2) catch |err|
     if err == :zero -> print("Zero was passed to fallible()")
     elif err == :gabe -> print("Gabe isn't gonna be very happy about this")
     return
@@ -443,15 +445,15 @@ The `catch` block must return a default value for the resulting expression, so a
 Using the `?` operator on an error result in a `try` block will break out of the block, and the block's result value will be the error result.
 ```
 val a = try
-  val num_string = stdin.read_line()?
-  val num = Int32.parse(num_string)?
-  num + 2
+   val num_string = stdin.read_line()?
+   val num = Int32.parse(num_string)?
+   num + 2
 print(a)
 ```
 In cases where the compiler has trouble figuring out what the error result's type is supposed to be, the `try` can be assigned to a variable with an explicit type specified.
 ```
 val a: IoError!() = try
-  _  # do stuff
+   _  # do stuff
 ```
 
 Note that `try` cannot be used as a statement. This has a few effects:
@@ -516,11 +518,11 @@ A given symbol (resolved identifier) is only accessible in the scope in which it
 ```
 val x = 1  # global; visible everywhere
 do
-  val y = 2  # only visible inside of this `do` block
-  do
+   val y = 2  # only visible inside of this `do` block
+   do
     val z = 3
     print((x, y, z))
-  print((x, y))
+   print((x, y))
 print(x)
 # print(y)  # error
 ```
@@ -539,8 +541,8 @@ A `while` loop runs its block until the provided condition is `false`.
 ```
 var i = 0
 while i < 10
-  print(i)
-  i += 1
+   print(i)
+   i += 1
 ```
 
 Similarly to an `if` statement, `->` may be used to create a single-line loop.
@@ -555,15 +557,15 @@ A `while` loop is also capable of iterating over a condition that produces optio
 ```
 var bytes = "hello".bytes()
 while val b = bytes.next()
-  print(b)
+   print(b)
 ```
 The above example is expanded to the following:
 ```
 var bytes = "hello".bytes()
 while true
-  if val b = bytes.next()
+   if val b = bytes.next()
     print(b)
-  else
+   else
     break
 ```
 
@@ -574,23 +576,23 @@ Similarly to `if val`, `while val` can be chained by separating the `val` declar
 A `for` loop is syntactic sugar over a `while` loop. The syntax of a `for` loop looks like this:
 ```
 for x in iterator
-  _
+   _
 for (x, y, z) in iterator
-  _
+   _
 ```
 where `x, y, z` are the _loop variables_, and `iterator` is the _iterator_ the loop should use.
 
 The iterator must implement the `Iterator` trait, which is defined like so:
 ```
 trait Iterator[T]
-  fun var next(): ?T
+   fun var next(): ?T
 ```
 
 The `for` loop is then expanded to a regular `while` loop:
 ```
 do
-  var <iterator> = iterator
-  while val <variables> = <iterator>.[Iterator].next()
+   var <iterator> = iterator
+   while val <variables> = <iterator>.[Iterator].next()
     <loop body>
 ```
 Note that all the variables within angle brackets `<>` are not actually visible anywhere, they exist here solely for visualization purposes.
@@ -610,12 +612,12 @@ import @std.io
 import @std.parsing
 
 while true
-  write("Enter a number: ")
-  val number_string = stdin.read_line()?
-  write('\n')
-  if val number = number_string.parse_int()
+   write("Enter a number: ")
+   val number_string = stdin.read_line()?
+   write('\n')
+   if val number = number_string.parse_int()
     print(number + 1)
-  else
+   else
     break
 ```
 
@@ -629,15 +631,15 @@ Functions in tsuki are declared with the `fun` keyword, followed by the function
 ```
 # without any parameters, returning ()
 fun hello_world()
-  print("Hello, world!")
+   print("Hello, world!")
 
 # with a single parameter, returning ()
 fun greet(whom: String)
-  print("Hello, " ~ whom)
+   print("Hello, " ~ whom)
 
 # with a single parameter, returning a String
 fun greeting(target: String): String
-  "Hello, " ~ target ~ "!"
+   "Hello, " ~ target ~ "!"
 ```
 
 Note how functions return the last expression in their body by default. Every function with a non-`()` return type must return an expression. This is ensured at compile-time by performing control flow analysis over all branches that the function takes.
@@ -645,7 +647,7 @@ Note how functions return the last expression in their body by default. Every fu
 It is also possible to define multiple parameters of the same type without repeating the type over and over again.
 ```
 fun do_math(a, b, c, d, e, f: Float): Float
-  a + b * c - d / e * f
+   a + b * c - d / e * f
 ```
 
 tsuki does not allow for defining two distinct functions of the same name within the current scope, aka overloading by parameter types. However, it _does_ have resolution mechanisms for overloaded functions, in case two different modules are imported that declare two functions with the same name.
@@ -663,7 +665,7 @@ The `return` expression allows for exiting from a function early. In functions r
 
 ```
 fun find[T: Equal](haystack: Seq[T], needle: T): Size
-  for i, element in haystack.items()
+   for i, element in haystack.items()
     if element == needle
       return i
 ```
@@ -677,7 +679,7 @@ A panic can be triggered using the built-in `panic()` function:
 ```
 val x = 1
 if x != 1
-  panic("oh my")
+   panic("oh my")
 ```
 
 The `panic()` function's return type is `NoReturn`, because control flow does not return to the calling function.
@@ -697,11 +699,11 @@ The `NoReturn` type is used when an expression does not have a return value. An 
 This type can be automatically converted into any other type. Thanks to this property, `return` or `panic` can be used when unwrapping options and results using `or`, for easy error handling:
 ```
 atom Error
-  :nil_option
+   :nil_option
 
 fun some_or_error[T](opt: ?T) !T
-  val v = opt or return :nil_option
-  v
+   val v = opt or return :nil_option
+   v
 ```
 
 ## `Bool`
@@ -774,10 +776,10 @@ print(:hi == :hello)     # false
 Subsets of atoms may be defined using the `atom` construction:
 ```
 atom Color
-  :red
-  :green
-  :blue
-  :yellow
+   :red
+   :green
+   :blue
+   :yellow
 ```
 The compiler will then ensure that each value of the type `Color` must be one of these four values. This is also known as `enum` in other languages.
 
@@ -789,25 +791,25 @@ print(Color:red)
 Atom subsets may define an integer representation explicitly, similar to enums in other languages.
 ```
 atom Key :: int(Uint8)
-  0 :a
-  1 :b
-  2 :c
-  # ...
+   0 :a
+   1 :b
+   2 :c
+   # ...
 ```
 The integer representation of a given atom is incremented automatically with each new value, and starts at 0, so the above example can be written simply as:
 ```
 atom Key :: int(Uint8)
-  :a, :b, :c
+   :a, :b, :c
 ```
 
 Atom subsets may also define a pretty string representation.
 ```
 atom Key
-  :a = "A"
-  :b = "B"
-  :c = "C"
-  :shift = "Shift"
-  :left = "←"
+   :a = "A"
+   :b = "B"
+   :c = "C"
+   :shift = "Shift"
+   :left = "←"
 ```
 This pretty string representation can be accessed by using the `to_pretty()` function.
 ```
@@ -817,11 +819,11 @@ print((Key:left).to_pretty())  # ←
 Pretty representations can be combined with integer representations.
 ```
 atom Key :: int(Uint8)
-  0  :a = "A"
-  1  :b = "B"
-  2  :c = "C"
-  10 :shift = "Shift"
-  20 :left = "←"
+   0  :a = "A"
+   1  :b = "B"
+   2  :c = "C"
+   10 :shift = "Shift"
+   20 :left = "←"
 ```
 
 ## `Char`
@@ -843,7 +845,7 @@ print(iter.next())  # ć
 
 # or, more concisely:
 for char in "cześć".chars()
-  print(char)
+   print(char)
 ```
 A `String` can also be used as a byte buffer, by using the `bytes` iterator:
 ```
@@ -876,18 +878,18 @@ val correct: ?Int = 3
 The presence of a value can be queried using the `has_value` function, and the value can later be read using the `unwrap` function.
 ```
 if opt.has_value
-  print("That ain't happening, sir")
+   print("That ain't happening, sir")
 
 if correct.has_value()
-  val ok = correct.unwrap()
-  print("The unwrapped value is: " ~ ok.to_string())
+   val ok = correct.unwrap()
+   print("The unwrapped value is: " ~ ok.to_string())
 ```
 
 As mentioned previously in the "`if` expressions" section, there exists a shorthand for checking and unwrapping an optional, called `if val`:
 
 ```
 if val ok = correct
-  print("The unwrapped value is: " ~ ok.to_string())
+   print("The unwrapped value is: " ~ ok.to_string())
 ```
 
 ## Results
@@ -913,9 +915,9 @@ Pointers can only appear inside of procedure parameter lists, to allow a procedu
 A simple example showcasing mutable pointers would incrementing an integer variable by passing its address to a procedure.
 ```
 fun inc(x: ^var Int)
-  # Assignment operators automatically dereference pointers on the
-  # left-hand side.
-  x += 1
+   # Assignment operators automatically dereference pointers on the
+   # left-hand side.
+   x += 1
 
 var x = 0
 inc(^x)
@@ -928,17 +930,17 @@ It's also possible to create pointers to other things, such as object fields, an
 Pointers are also subject to automatic dereferencing when calling instance functions, using operators, and performing assignments. Consider this example:
 ```
 object Example
-  val x: Int
+   val x: Int
 
 impl Example
-  fun print_x()
+   fun print_x()
     print(.x)
 
 fun print_x_from(example: ^Example)
-  # we can dereference the pointer manually...
-  # example^.print_x()
-  # ...but we can also let the compiler dereference it for us
-  example.print_x()
+   # we can dereference the pointer manually...
+   # example^.print_x()
+   # ...but we can also let the compiler dereference it for us
+   example.print_x()
 
 var example = Example { x = 1 }
 print_x_from(example)
@@ -982,7 +984,7 @@ Slices are usually initialized from an owned `Seq[T]`.
 val elems = [1, 2, 3]
 
 fun do_stuff(slice: [Int])
-  _
+   _
 do_stuff(elems[..])  # slice all the elements
 ```
 Because the slice was created from a `val Seq[Int]`, the slice itself is `[Int]`. If the source sequence was `var`, the slice would be `[var Int]`.
@@ -1029,10 +1031,10 @@ my_names <- "Johnny"
 A table can be initialized using the `{}` prefix. `=` is used for separating keys from values.
 ```
 val numbers = {
-  # here we create a mapping from Strings to Floats
-  "pi" = 3.141592654,
-  "tau" = 6.283185307,
-  "e" = 2.718281828,
+   # here we create a mapping from Strings to Floats
+   "pi" = 3.141592654,
+   "tau" = 6.283185307,
+   "e" = 2.718281828,
 }
 assert(numbers is Table[String, Float])
 ```
@@ -1040,8 +1042,8 @@ Note that the `=` in a table constructor does not correspond to the assignment o
 ```
 var a = 1
 val table = {
-  (a = 2) = 3,
-  a = 4,
+   (a = 2) = 3,
+   a = 4,
 }
 ```
 "Clever" code like this should be avoided though, because it hinders readability.
@@ -1109,10 +1111,10 @@ val (x, _, z, _) = (1, 2, 3, 4)
 An object is a named type containing user-defined fields. An object is declared like so:
 ```
 object Example  # the name of the object
-  # its fields
-  var x: Int
-  val y: Int       # a field can be marked as immutable
-  var z, w: Float
+   # its fields
+   var x: Int
+   val y: Int       # a field can be marked as immutable
+   var z, w: Float
 ```
 The object can then be instantiated using the following construction syntax:
 ```
@@ -1121,21 +1123,21 @@ val e = Example { x = 1, y = 2, z = 3, w = 4 }
 Normally, all fields must be initialized. However, default expressions can be provided in the object declaration:
 ```
 object Defaults
-  var a: Int = 2
-  var b: Int = 4
-  var c: ?Int = nil
+   var a: Int = 2
+   var b: Int = 4
+   var c: ?Int = nil
 val d = Defaults {}
 ```
 A default value can be any expression. The expressions are evaluated every time the object is constructed. This means that expressions with visible side effects may influence the construction of different object instances:
 ```
 var counter = 0
 fun inc_counter(): Int
-  val id = counter
-  counter += 1
-  id
+   val id = counter
+   counter += 1
+   id
 
 object Counted
-  val id: Int = inc_counter()
+   val id: Int = inc_counter()
 
 val a = Counted {}
 val b = Counted {}
@@ -1146,10 +1148,10 @@ print((a, b, c))  # Counted { id = 0 }, Counted { id = 1 }, Counted { id = 2 }
 There's one more exception to the "all fields must be initialized" rule. That is, certain fields may remain uninitialized until they're actually used. These fields still have to be listed in the constructor, but instead of specifying a meaningful value, `uninit` has to be used.
 ```
 object UninitExample
-  # note that the field must be var in this case, otherwise we wouldn't be
-  # able to set it
-  val x: Int
-  var y: Int
+   # note that the field must be var in this case, otherwise we wouldn't be
+   # able to set it
+   val x: Int
+   var y: Int
 
 var u = UninitExample { x = 1, y = uninit }
 u.y = u.x + 2
@@ -1159,15 +1161,15 @@ It is a compile-time error to try to read from a field that's `uninit`. It is al
 An object can be marked as an error type by implementing the `Failure` trait.
 ```
 object CompileError
-  val line, column: Size
-  val message: String
+   val line, column: Size
+   val message: String
 
 impl Failure for CompileError
-  # Failure is a "marker" trait, it doesn't require any types or functions.
+   # Failure is a "marker" trait, it doesn't require any types or functions.
 
 val e: CompileError!Int = CompileError {
-  line = 3, column = 1,
-  message = "My god, what are you doing?",
+   line = 3, column = 1,
+   message = "My god, what are you doing?",
 }
 ```
 Custom error types are better described in [Results](#results).
@@ -1180,7 +1182,7 @@ When an object in a location (a variable or object field) is referenced by value
 
 ```
 object Example
-  val a: Int32 = 1
+   val a: Int32 = 1
 
 val e = Example {}
 val f = e
@@ -1196,10 +1198,10 @@ To enable implicit copying of the object, the `Dup` and `Copy` traits have to be
 Both traits are `derive`able, so there's no need to write the boilerplate yourself.
 ```
 object DupExample
-  var x, y: Int
+   var x, y: Int
 
 impl DupExample
-  derive Dup
+   derive Dup
 
 val a = DupExample { x = 1, y = 2 }
 var b = a.dup()
@@ -1208,10 +1210,10 @@ print(a)  # DupExample { x = 1, y = 2 }
 print(b)  # DupExample { x = 1, y = 3 }
 
 object CopyExample
-  var x, y: Int
+   var x, y: Int
 
 impl CopyExample
-  derive Dup, Copy
+   derive Dup, Copy
 
 val c = CopyExample { x = 1, y = 2 }
 var d = c
@@ -1227,22 +1229,22 @@ When an object instance goes out of scope, we say it's _dropped_. An object impl
 The trait is defined like so:
 ```
 trait Drop
-  fun var drop()
+   fun var drop()
 ```
 
 Here's an example implementation of the trait:
 ```
 var id_count = 0
 fun next_id(): Int
-  val id = id_count
-  id_count += 1
-  id
+   val id = id_count
+   id_count += 1
+   id
 
 object Dropper
-  val id: Int = next_id()
+   val id: Int = next_id()
 
 impl Drop for Dropper
-  fun drop()
+   fun drop()
     print("Dropping " ~ .id.to_string())
 
 val d = Dropper {}
@@ -1263,10 +1265,10 @@ An object that inherits from a parent inherits all of the parent's fields, funct
 An object can inherit from another object using the `of` keyword. Objects that do not inherit from anything _also_ cannot be inherited from; each object that should be inheritable should inherit from the `Root` object:
 ```
 object Parent of Root
-  val x: Int
+   val x: Int
 
 object Child of Parent
-  val y: Int
+   val y: Int
 
 val c = Child { x = 1, y = 2 }
 ```
@@ -1274,7 +1276,7 @@ val c = Child { x = 1, y = 2 }
 Object initialization can be _chained_ by using the `of` operator inside of a constructor:
 ```
 fun init_parent(): Parent
-  Parent { x = 1 }
+   Parent { x = 1 }
 
 val c = Child { of init_parent(), y = 2 }
 ```
@@ -1288,8 +1290,8 @@ A union is declared using the `union` keyword, followed by the name of the union
 
 ```
 union Shape
-  :rectangle(Float, Float, Float, Float)  # x, y, width, height
-  :circle(Float, Float, Float)  # x, y, radius
+   :rectangle(Float, Float, Float, Float)  # x, y, width, height
+   :circle(Float, Float, Float)  # x, y, radius
 ```
 
 A union can then be initialized using the union initialization syntax: the union type, followed by the an atom literal specifying the variant, followed by the variant values in parentheses.
@@ -1301,7 +1303,7 @@ var my_shape = Shape:rectangle(32, 32, 64, 64)
 If the union type can be inferred trivially, it may be omitted:
 ```
 fun make_rectangle(x, y, w, h: Float): Shape
-  return :rectangle(x, y, w, h)
+   return :rectangle(x, y, w, h)
 ```
 
 The [`match` expression](#match-expression) can be used to execute code blocks depending on union variants. See its section for more information.
@@ -1323,21 +1325,21 @@ Certain types can be automatically converted to other types. This process is cal
 The following implicit conversions are permitted:
 - The identity conversion, ie. a type `T` can be implicitly converted to itself.
 - Widening conversions for integers that do not change signedness.
-  - For example, `Int8` can be converted to `Int16`, but not the other way around.
-  - Conversions between integers of different signedness are not permitted, eg. converting from `Uint8` to `Int8` is illegal. This is the case even when the conversion is known to be safe, but this restriction will be relaxed in the future.
+   - For example, `Int8` can be converted to `Int16`, but not the other way around.
+   - Conversions between integers of different signedness are not permitted, eg. converting from `Uint8` to `Int8` is illegal. This is the case even when the conversion is known to be safe, but this restriction will be relaxed in the future.
 - Widening conversions between floating point types.
-  - Converting from `Float32` to `Float64` is allowed, but not the other way around.
+   - Converting from `Float32` to `Float64` is allowed, but not the other way around.
 - Conversions dropping pointer mutability.
-  - Converting from `^var T` to `^T` is allowed, but not the other way around.
+   - Converting from `^var T` to `^T` is allowed, but not the other way around.
 - Conversions dropping slice mutability.
-  - Converting from `[var T]` to `[T]` is allowed, but not the other way around.
+   - Converting from `[var T]` to `[T]` is allowed, but not the other way around.
 - Copying conversions.
-  - Converting from `^var T` or `^T` to `T` is allowed only when `T` implements `Copy`.
+   - Converting from `^var T` or `^T` to `T` is allowed only when `T` implements `Copy`.
 
 Implicit conversions are performed in the following places:
 
 - The right-hand side of arithmetic and relational operators is converted to the left-hand side whenever possible.
-  - **Note:** This type of conversion will be removed once operator overloading is implemented.
+   - **Note:** This type of conversion will be removed once operator overloading is implemented.
 - The right-hand side of assignment is converted to the type of the assignment target whenever possible.
 - Function arguments are converted to the expected type whenever possible.
 
@@ -1367,7 +1369,7 @@ Types defined both on types and instances of types are referred to as _associate
 object MathStuff
 
 impl type MathStuff
-  fun add_two(x: Int): Int
+   fun add_two(x: Int): Int
     x + 2
 
 print(MathStuff.add_two(2))  # 4
@@ -1377,7 +1379,7 @@ print(MathStuff.add_two(2))  # 4
 ```
 impl[T] Seq[T]
 where T: Add[T] + Zero
-  fun sum(): T
+   fun sum(): T
     var accumulator = T.zero()
     for i in .items()
       accumulator += i
@@ -1409,10 +1411,10 @@ This notation can also be used to invoke functions on `self`:
 
 ```
 impl Example
-  fun inc_x()
+   fun inc_x()
     .x += 2
 
-  fun inc_x_twice()
+   fun inc_x_twice()
     .inc_x()
     .inc_x()
     # syntax sugar for
@@ -1432,22 +1434,22 @@ Now, about `fun val` and `fun var`: these are annotations that let the compiler 
 `fun move` on the other hand is always explicit, and specifies that calling a function _consumes_ the original object, moving it out of the original location into `self`. This can be used to implement the _typestate_ pattern, where an object's compile-time type specifies the runtime state of an object. An example of this is `std.process.ProcessBuilder`:
 ```
 object ProcessBuilder
-  # internal
+   # internal
 
 impl type ProcessBuilder
-  fun new(executable: OsString): Self
+   fun new(executable: OsString): Self
     _  # internal
 
 impl ProcessBuilder
-  # This function has an implicitly `var self`, because it modifies `self`,
-  # albeit that's not visible in this example.
-  fun argument(arg: OsString): ^var Self
+   # This function has an implicitly `var self`, because it modifies `self`,
+   # albeit that's not visible in this example.
+   fun argument(arg: OsString): ^var Self
     # ...
     self
 
-  # ... other functions
+   # ... other functions
 
-  fun move spawn(): Process
+   fun move spawn(): Process
     _  # internal
 ```
 Once the `spawn` function is called, the builder is consumed and the arguments and environment variables of the process cannot be modified anymore.
@@ -1460,15 +1462,15 @@ Getters are declared using a `getters` declaration inside of an `impl` block. Th
 
 ```
 object Nested
-  var a: Int
+   var a: Int
 
 object Example
-  val x: Int
-  var y: Int
-  var i: Nested
+   val x: Int
+   var y: Int
+   var i: Nested
 
 impl Example
-  getters
+   getters
     # an immutable getter can be defined by using `val`
     val x -> .x
     val a -> .i.a
@@ -1484,10 +1486,10 @@ The compiler allows for some trait implementations to be _derived_ automatically
 
 ```
 object Copycat
-  val x: Int
+   val x: Int
 
 impl Copycat
-  derive Dup, Copy
+   derive Dup, Copy
 ```
 
 ## Traits
@@ -1496,8 +1498,8 @@ Traits allow for creating constraints on what functions and associated types a t
 
 ```
 trait Animal
-  type Food
-  fun val speak()
+   type Food
+   fun val speak()
 ```
 The above code defines a trait `Animal` that requires the implementing type to have a `Food` type and a `speak()` function, where `self` is a `val`.
 
@@ -1505,20 +1507,20 @@ Traits can be used as generic constraints:
 ```
 fun make_it_speak[T](animal: ^T)
 where T: Animal
-  animal.speak()
+   animal.speak()
 ```
 
 Traits can also be used like interfaces, where the actual type is determined at runtime, provided they're behind a pointer.
 ```
 fun make_it_speak_at_runtime(animal: ^Animal)
-  animal.speak()
+   animal.speak()
 ```
 
 Traits can inherit from other traits by using the `of` keyword, similarly to objects.
 
 ```
 trait DomesticAnimal of Animal
-  fun var feed(food: Self.Food)
+   fun var feed(food: Self.Food)
 ```
 
 It's also possible to create a type constraint that requires multiple traits to be implemented, using the `+` operator, like `T + U + V`.
@@ -1527,18 +1529,18 @@ Associated types can also be constrained by using the familiar `:` notation.
 
 ```
 trait AnimalFood
-  fun var feed(animal: ^Animal)
+   fun var feed(animal: ^Animal)
 
 trait Animal
-  type Food: AnimalFood
-  fun val speak()
+   type Food: AnimalFood
+   fun val speak()
 ```
 
 When instantiating generic traits with associated types, the associated types are provided after generic types, using `K = V` syntax.
 ```
 fun add_two[T](x: T): Int
 where T: Add[Int, Ret = Int]
-  x + 2
+   x + 2
 ```
 
 ### Operator overloading
@@ -1575,37 +1577,37 @@ Other operators are not user-overloadable (such as `and`, `or`, `?`), or derived
 Unary operator traits have a single associated type `Ret`, which signifies the result type of the operator. These traits are defined like so (example based on unary `not`):
 ```
 trait Not
-  type Ret
-  fun val unot(): Self.Ret
+   type Ret
+   fun val unot(): Self.Ret
 ```
 The only exception here is `Check`, whose `Ret` argument is always `Bool`.
 
 Binary operator traits have a single generic argument `R`, and an associated type `Ret`. `R` specifies the right-hand side of the operation, and `Ret` is the result of the operation. The traits are defined like so (example based on binary `Add`):
 ```
 trait Add[R]
-  type Ret
-  fun val add(rhs: R): Self.Ret
+   type Ret
+   fun val add(rhs: R): Self.Ret
 ```
 There are a few exceptions to this rule, though:
 ```
 # Index is supposed to return a non-var pointer to the element.
 trait Index[I]
-  type Ret
-  fun val at(index: I): ^Self.Ret
+   type Ret
+   fun val at(index: I): ^Self.Ret
 
 # IndexVar is Index's sister trait for modifying data at a given index.
 trait IndexVar[I]
-  type Ret
-  fun var at(index: I): ^var Self.Ret
+   type Ret
+   fun var at(index: I): ^var Self.Ret
 
 # Safe indexing returns an optional.
 trait Get[I]
-  type Ret
-  fun val get(index: I): ?Self.Ret
+   type Ret
+   fun val get(index: I): ?Self.Ret
 
 # Push accepts a `var self` and does not return anything.
 trait Push[T]
-  fun var push(value: T)
+   fun var push(value: T)
 ```
 
 #### The `Unwrap` trait
@@ -1613,9 +1615,9 @@ trait Push[T]
 The `Unwrap` trait is used to overload `if val` declarations. It's defined like so:
 ```
 trait Unwrap
-  type Inner
-  fun val has_value(): bool
-  fun val unwrap(): Inner
+   type Inner
+   fun val has_value(): bool
+   fun val unwrap(): Inner
 ```
 
 ### Calling functions from specific traits
@@ -1624,17 +1626,17 @@ Sometimes, two functions from different traits can share the same name. In these
 
 ```
 trait ExampleA
-  fun my_method()
+   fun my_method()
 
 trait ExampleB
-  fun my_method()
+   fun my_method()
 
 object Example
 impl ExampleA
-  fun my_method()
+   fun my_method()
     print("Called on ExampleA")
 impl ExampleB
-  fun my_method()
+   fun my_method()
     print("Called on ExampleB")
 
 val e = Example {}
@@ -1659,32 +1661,32 @@ It might be hard to grasp the concept just by looking at these abstract words, s
 
 ```
 object Array2D[W, H, T]
-  where
+   where
     W: const Size,
     H: const Size
-  val inner: Seq[T]
+   val inner: Seq[T]
 
 impl[W, H, T] type Array2D[W, H, T]
 where T: Dup
-  fun new(default_value: T)
+   fun new(default_value: T)
     Self { inner = Seq.[T].filled_with(W * H, default_value) }
 
 impl[W, H, T] Array2D[W, H, T]
-  fun bounds_check(position: (Size, Size))
+   fun bounds_check(position: (Size, Size))
     assert(position._0 < W and position._1 < H, ("index out of bounds: ", position))
 
-  fun flat_index(position: (Size, Size)): Size
+   fun flat_index(position: (Size, Size)): Size
     position._0 + position._1 * W
 
 impl[W, H, T] Index[(Size, Size)] for Array2D[W, H, T]
-  type Ret = T
-  fun at(position: (Size, Size)): ^Ret
+   type Ret = T
+   fun at(position: (Size, Size)): ^Ret
     .bounds_check(position)
     ^.inner[.flat_index(position)]
 
 impl[W, H, T] IndexVar[(Size, Size)] for Array2D[W, H, T]
-  type Ret = T
-  fun at(position: (Size, Size)): ^var Ret
+   type Ret = T
+   fun at(position: (Size, Size)): ^var Ret
     .bounds_check(position)
     ^.inner[.flat_index(position)]
 
@@ -1713,7 +1715,7 @@ To allow for calling functions on these symbols, the generic type has to be cons
 ```
 fun add_two[T](x: T): T.Ret
 where T: Add[Int]
-  x + 2
+   x + 2
 ```
 
 Calling a generic function or using a generic object with explicit types requires different syntax, so as not to conflict with the index operator `[]`.
@@ -1732,7 +1734,7 @@ In tsuki, a single file always represents a single module. Modules can _import_ 
 File: b.tsu
 ```
 fun add_two(a: Int): Int
-  a + 2
+   a + 2
 ```
 File: a.tsu
 ```
@@ -1790,7 +1792,7 @@ package
 └── src
     ├── main.tsu
     └── tools
-        └── utility.tsu
+         └── utility.tsu
 ```
 
 The file `main.tsu` wants to import the file `tools/utility.tsu`. To do that, the following import statement can be used:
@@ -1827,24 +1829,24 @@ Package: adder, File: src/adder.tsu
 # this function isn't marked public, so it's not accessible from
 # other packages
 fun adding_abstraction(a, b: Int): Int
-  a + b
+   a + b
 
 # objects can be marked public
 pub object Adder
-  # object fields can also be marked public
-  pub val increment: Int
+   # object fields can also be marked public
+   pub val increment: Int
 
 impl Adder
-  # getters can also be marked public, but in our case it's not really useful
-  pub getters
+   # getters can also be marked public, but in our case it's not really useful
+   pub getters
     pub val incr -> .increment
 
-  # functions inside of `impl` can also marked public
-  pub fun add(to: Int): Int
+   # functions inside of `impl` can also marked public
+   pub fun add(to: Int): Int
     adding_abstraction(to, .increment)
 
 impl type Adder
-  pub fun init(increment: Int): Self
+   pub fun init(increment: Int): Self
     Self { increment = increment }
 ```
 
@@ -1902,35 +1904,35 @@ tsukipng	/home/liquid/.packages/git/github.com/liquidev/tsukipng/tags/0.1.0/src
 Documentation in tsuki is similar to that in Rust, with a flavor of Javadoc. Doc comments may appear before symbol declarations, and use GitHub Flavored Markdown for text. Let's take the previous example with the `Adder` object and document it:
 ```
 fun adding_abstraction(a, b: Int): Int
-  a + b
+   a + b
 
 ## An adder adds a constant increment to a provided value.
 pub object Adder
-  ## The increment of the adder. This is the value added to other values, when `add` is called.
-  pub val increment: Int
+   ## The increment of the adder. This is the value added to other values, when `add` is called.
+   pub val increment: Int
 
 impl Adder
-  getters
+   getters
     ## Shorthand alias for retrieving the increment of the adder.
     val incr -> .increment
 
-  ## Adds the increment the adder was initialized with to `to`.
-  ##
-  ## @param to  The value to increment.
-  ## @return    The incremented value.
-  ##
-  ## @see Adder.init
-  pub fun add(to: Int): Int
+   ## Adds the increment the adder was initialized with to `to`.
+   ##
+   ## @param to  The value to increment.
+   ## @return    The incremented value.
+   ##
+   ## @see Adder.init
+   pub fun add(to: Int): Int
     adding_abstraction(to, .increment)
 
 impl type Adder
-  ## Initializes a new adder with the given increment and returns it.
-  ##
-  ## @param increment  The increment to initialize the adder with.
-  ## @return           The freshly initialized adder.
-  ##
-  ## @see Adder#add
-  pub fun init(increment: Int): Self
+   ## Initializes a new adder with the given increment and returns it.
+   ##
+   ## @param increment  The increment to initialize the adder with.
+   ## @return           The freshly initialized adder.
+   ##
+   ## @see Adder#add
+   pub fun init(increment: Int): Self
     Self { increment = increment }
 ```
 
@@ -2031,8 +2033,8 @@ Reading from an unmanaged pointer that points to invalid memory (aka dangling po
 ```
 var p: Ptr[Int]
 do
-  var a = 1
-  p = Ptr.to(a)
+   var a = 1
+   p = Ptr.to(a)
 # print(p^)  # undefined behavior, because `a` doesn't exist anymore!!!
 ```
 
@@ -2082,7 +2084,7 @@ Note that functions using C-like varargs cannot be created from tsuki, only impo
 Functions can also be exported to C by using the `c_export` pragma. Similarly to `c_import`, it accepts a string that specifies the function name.
 ```
 fun add_three(a, b, c: CInt): CInt :: c_export("add_three")
-  a + b + c
+   a + b + c
 ```
 ```c
 #include <stdio.h>
@@ -2101,14 +2103,14 @@ int main(void)
 tsuki allows for defining objects that are compatible with the C ABI. For that, the `c_struct` pragma can be used.
 ```
 object Things :: c_struct
-  val a, b, c: Int
+   val a, b, c: Int
 
 impl type Things
-  # C structs can also have associated and instance functions.
-  fun init(): Self :: c_import("things_init")
+   # C structs can also have associated and instance functions.
+   fun init(): Self :: c_import("things_init")
 
 impl Things
-  fun var increment() :: c_import("things_increment")
+   fun var increment() :: c_import("things_increment")
 ```
 Instance functions imported from C with `var self` are assumed to accept `Self *` as the first argument, functions with `val self` are assumed to accept `const Self *` as the first argument, and functions with `move self` are assumed to accept `Self` as the first argument. Note that in case of functions imported from C the `var`-ness of `self` must be specified explicitly, as there is no body to infer it from.
 ```c
@@ -2125,8 +2127,8 @@ void things_increment(struct things *);
 tsuki unions are never ABI-compatible with C unions. However, tsuki exposes a mechanism for declaring C unions, via the `c_union` pragma attachable to objects.
 ```
 object Caster :: c_union
-  var x: Float32
-  var y: Int32
+   var x: Float32
+   var y: Int32
 ```
 Uninitialized fields from C unions can always be read from, to mimic C bitcasting behavior. In most cases the `bitcast` function should be used for the purposes of bitcasting, rather than dealing with C unions directly.
 
