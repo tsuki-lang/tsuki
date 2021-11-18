@@ -544,7 +544,7 @@ The `for` loop is then expanded to a regular `while` loop:
 ```
 do
    var <iterator> = iterator
-   while val <variables> = <iterator>[Iterator].next()
+   while val <variables> = (<iterator> as Iterator).next()
       <loop body>
 ```
 Note that all the variables within angle brackets `<>` are not actually visible anywhere, they exist here solely for visualization purposes.
