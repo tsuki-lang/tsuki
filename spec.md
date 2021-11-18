@@ -176,8 +176,7 @@ Prefixes include:
 - identifiers
 - prefix operators
 - grouping/tuple construction `()`
-- sequence literals `[]`
-- table literals `{}`
+- array literals `[]`
 - `do`, `if`, and `match` expressions
 - `try` expressions
 
