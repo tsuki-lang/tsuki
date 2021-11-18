@@ -1336,7 +1336,7 @@ where
    N: const Size,
    T: Add[T] + Zero
 
-   fun sum(^self): T
+   fun sum(self): T
       var accumulator = T.zero()
       for i in .items()
          accumulator += i
@@ -2030,7 +2030,7 @@ object Things :: c_struct
 impl Things
    # C structs can also have associated and instance functions.
    fun init(): Self :: c_import("things_init")
-   fun increment(self: ^Self) :: c_import("things_increment")
+   fun increment(self: ^var Self) :: c_import("things_increment")
 ```
 Instance functions imported from C with `self: ^var Self` are assumed to accept `Self *` as the first argument, functions with `self: ^Self` are assumed to accept `const Self *` as the first argument, and functions with `self: Self` are assumed to accept `Self` as the first argument. Note that in case of functions imported from C the type of `self` must be specified explicitly, as there is no body to infer it from.
 ```c
@@ -2039,7 +2039,7 @@ struct things {
 };
 
 struct things things_init();
-void things_increment(const struct things *);
+void things_increment(struct things *);
 ```
 
 ## C unions
