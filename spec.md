@@ -119,12 +119,12 @@ tsuki defines a few standard operators.
 
 The following prefix operators are available:
 ```
-not ~ - () [] {} . ^ ..
+not ~ - () [] . ^ ..
 ```
 
 The following infix operators are available. The list is sorted by precedence, where top is biggest precedence, and bottom is lowest precedence. Lines with more than one operator contain operators of equal precedence.
 ```
-() {} [] . ^ ? as
+() [] . ^ ? as
 **
 * / << >> & | ^^
 + - ~
