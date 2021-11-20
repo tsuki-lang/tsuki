@@ -4,6 +4,7 @@ use std::path::Path;
 
 use crate::ast::{Ast, NodeHandle};
 use crate::common::{Error, ErrorKind, Errors, SourceFile, Span};
+use crate::functions::Functions;
 use crate::scope::{Scopes, Symbols};
 pub use crate::types::DefaultTypes;
 use crate::types::{BuiltinTypes, TypeLog, Types};
@@ -78,6 +79,7 @@ pub struct Ir {
    pub root_node: NodeHandle,
    pub types: Types,
    pub symbols: Symbols,
+   pub functions: Functions,
 }
 
 /// The options passed to `analyze`.
@@ -107,6 +109,7 @@ pub fn analyze(options: AnalyzeOptions) -> Result<Ir, Errors> {
    let builtin_types = BuiltinTypes::add_to(&mut types, &common.default_types);
    let mut scopes = Scopes::new();
    let mut symbols = Symbols::new();
+   let mut functions = Functions::new();
 
    // NOTE: Maybe split errors into normal and fatal?
    // Normal errors would be accumulated into the existing error list, but would not halt the
@@ -121,6 +124,7 @@ pub fn analyze(options: AnalyzeOptions) -> Result<Ir, Errors> {
       builtin: &builtin_types,
       scopes: &mut scopes,
       symbols: &mut symbols,
+      functions: &mut functions,
    }))?;
 
    Ok(Ir {
@@ -128,5 +132,6 @@ pub fn analyze(options: AnalyzeOptions) -> Result<Ir, Errors> {
       root_node,
       types,
       symbols,
+      functions,
    })
 }

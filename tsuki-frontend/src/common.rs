@@ -28,13 +28,16 @@ impl SourceFile {
 /// Represents a span of text in a source file.
 #[derive(Clone, Debug)]
 pub struct Span {
+   pub byte_start: usize,
    pub line_start: usize,
    pub column_start: usize,
+   pub byte_end: usize,
    pub line_end: usize,
    pub column_end: usize,
 }
 
 impl Span {
+   pub const FIRST_BYTE: usize = 0;
    pub const FIRST_LINE: usize = 1;
    pub const FIRST_COLUMN: usize = 1;
 
@@ -45,8 +48,10 @@ impl Span {
    pub fn new() -> Self {
       // The first possible position is 1:1..1:1.
       Self {
+         byte_start: Self::FIRST_BYTE,
          line_start: Self::FIRST_LINE,
          column_start: Self::FIRST_COLUMN,
+         byte_end: Self::FIRST_BYTE,
          line_end: Self::FIRST_LINE,
          column_end: Self::FIRST_COLUMN,
       }
@@ -60,11 +65,13 @@ impl Span {
 
    /// Increments the ending column by `n`.
    pub fn advance_column_by(&mut self, n: usize) {
+      self.byte_end += n;
       self.column_end += n;
    }
 
    /// Increments the ending line and resets the ending column to the first column.
    pub fn advance_line(&mut self) {
+      self.byte_end += 1;
       self.line_end += 1;
       self.column_end = Self::FIRST_COLUMN;
    }
@@ -82,6 +89,10 @@ impl Span {
    pub fn join(a: &Span, b: &Span) -> Span {
       // We want to find the minimal and maximal lines and columns. Note that `a` is always at an
       // earlier position than `b`.
+      // There's probably a simpler way of doing this.
+
+      let byte_start = a.byte_start.min(b.byte_start);
+      let byte_end = a.byte_end.max(b.byte_end);
 
       // In the first check, we use <=, because if the starting lines are equal, we want to pick the
       // column number from `a`.
@@ -101,8 +112,10 @@ impl Span {
 
       // Then we just join those into a final span.
       Span {
+         byte_start,
          line_start,
          column_start,
+         byte_end,
          line_end,
          column_end,
       }
@@ -128,8 +141,10 @@ impl Default for Span {
    /// Initializes a span at a default, _invalid_ position. This is _not_ the same as [`Span::new`]!
    fn default() -> Self {
       Self {
+         byte_start: Self::FIRST_BYTE,
          line_start: Self::INVALID_LINE,
          column_start: Self::INVALID_COLUMN,
+         byte_end: Self::FIRST_BYTE,
          line_end: Self::INVALID_LINE,
          column_end: Self::INVALID_COLUMN,
       }
@@ -210,15 +225,13 @@ pub enum ErrorKind {
    InvalidFloatSuffix,
 
    // SemTypes
-   #[error("'{0}' is not declared")]
+   #[error("'{0}' is not declared in this scope")]
    UndeclaredSymbol(String),
    #[error("invalid unary operator for {0}")]
    InvalidUnaryOperator(String),
    #[error("type mismatch: expected {0}, but got {1}")]
    TypeMismatch(String, String),
-   #[error("only intrinsic \"function\" calls are supported right now")]
-   NonIntrinCall,
-   #[error("{0} arguments expected, got {1}")]
+   #[error("{0} arguments expected, but got {1}")]
    NArgumentsExpected(usize, usize),
    #[error("missing result value in expression")]
    MissingResult,
@@ -234,6 +247,8 @@ pub enum ErrorKind {
    IfConditionMustBeBool,
    #[error("`while` condition must be a Bool")]
    WhileConditionMustBeBool,
+   #[error("expression cannot be called; make sure it is a function")]
+   ExpressionCannotBeCalled,
 
    /*
     * Internal errors

@@ -2,6 +2,7 @@
 
 use crate::ast::{Ast, NodeHandle, NodeKind};
 use crate::common::ErrorKind;
+use crate::functions::FunctionId;
 use crate::scope::{SymbolId, SymbolKind};
 use crate::types::{TypeId, TypeLogEntry};
 
@@ -30,7 +31,7 @@ impl<'s> SemTypes<'s> {
    /// Finds the variable symbol referred to by the given identifier node.
    pub(super) fn lookup_variable(
       &mut self,
-      ast: &mut Ast,
+      ast: &Ast,
       node: NodeHandle,
    ) -> Result<SymbolId, TypeLogEntry> {
       let symbol = self.lookup_identifier(ast, node)?;
@@ -39,6 +40,20 @@ impl<'s> SemTypes<'s> {
       } else {
          // TODO: Make this error not suck.
          Err(self.error(ast, node, ErrorKind::InvalidLocation))
+      }
+   }
+
+   /// Finds the function referred to by the given identifier node.
+   pub(super) fn lookup_function(
+      &mut self,
+      ast: &Ast,
+      node: NodeHandle,
+   ) -> Result<FunctionId, TypeLogEntry> {
+      let symbol = self.lookup_identifier(ast, node)?;
+      if let &SymbolKind::Function(id) = self.symbols.kind(symbol) {
+         Ok(id)
+      } else {
+         Err(self.error(ast, node, ErrorKind::ExpressionCannotBeCalled))
       }
    }
 

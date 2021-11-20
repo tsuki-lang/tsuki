@@ -458,7 +458,7 @@ impl<'i> Lexer<'i> {
    }
 
    /// Constructs a new token of the given kind, using the current span stored in the lexer.
-   fn token<'s>(&self, kind: TokenKind) -> Token {
+   fn token(&self, kind: TokenKind) -> Token {
       Token {
          kind,
          span: self.span.clone(),

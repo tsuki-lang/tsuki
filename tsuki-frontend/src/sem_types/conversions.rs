@@ -102,7 +102,7 @@ impl<'s> SemTypes<'s> {
       )
    }
 
-   /// Attempts to convert the type `from` to type `tp`. If an implicit conversion is not possible,
+   /// Attempts to convert the type `from` to type `to`. If an implicit conversion is not possible,
    /// returns `None`. Otherwise returns the converted type ID.
    pub(super) fn perform_implicit_conversion(
       &mut self,

@@ -11,6 +11,7 @@ use std::path::Path;
 
 use crate::ast::{Ast, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors};
+use crate::functions::{register_intrinsics, Functions};
 use crate::scope::{ScopeStack, Scopes, Symbols};
 use crate::sem::{SemCommon, SemPass};
 use crate::types::{BuiltinTypes, TypeId, TypeLog, TypeLogEntry, Types};
@@ -24,6 +25,7 @@ pub(crate) struct SemTypes<'s> {
    builtin: &'s BuiltinTypes,
    scopes: &'s mut Scopes,
    symbols: &'s mut Symbols,
+   functions: &'s mut Functions,
 
    scope_stack: ScopeStack,
 }
@@ -36,6 +38,7 @@ pub(crate) struct SemTypesBorrows<'s> {
    pub(crate) builtin: &'s BuiltinTypes,
    pub(crate) scopes: &'s mut Scopes,
    pub(crate) symbols: &'s mut Symbols,
+   pub(crate) functions: &'s mut Functions,
 }
 
 /// Specifies whether a node should be annotated in expression or statement context.
@@ -55,12 +58,14 @@ impl<'s> SemTypes<'s> {
          builtin,
          scopes,
          symbols,
+         functions,
       } = borrows;
       let mut scope_stack = ScopeStack::new();
       // The scope stack is always initialized with a top-level module scope, such that there is
       // always a valid scope on top.
       let module_scope = scope_stack.push(scopes.create_scope());
       builtin.register_in(scopes, symbols, module_scope);
+      register_intrinsics(builtin, scopes, symbols, module_scope, functions);
       SemTypes {
          common,
          errors: Errors::new(),
@@ -70,6 +75,7 @@ impl<'s> SemTypes<'s> {
          builtin,
          scopes,
          symbols,
+         functions,
 
          scope_stack,
       }
@@ -224,7 +230,7 @@ impl<'s> SemTypes<'s> {
          | NodeKind::LessEqual
          | NodeKind::Greater
          | NodeKind::GreaterEqual => self.annotate_binary_operator(ast, node),
-         NodeKind::Call => self.annotate_call(ast, node),
+         NodeKind::Call => self.annotate_call(ast, node).into(),
          NodeKind::Assign => self.annotate_assignment(ast, node, context).into(),
          // Other operators are to be implemented later.
 

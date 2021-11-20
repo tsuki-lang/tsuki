@@ -4,7 +4,8 @@ use smallvec::SmallVec;
 
 use crate::ast::{Ast, NodeHandle, NodeKind};
 use crate::common::ErrorKind;
-use crate::scope::{Function, FunctionKind, SymbolKind, Variable, VariableKind};
+use crate::functions::{FunctionKind, Intrinsic, Parameters};
+use crate::scope::{SymbolKind, Variable, VariableKind};
 use crate::types::{TypeKind, TypeLogEntry, TypeLogResult};
 
 use super::{NodeContext, SemTypes};
@@ -34,10 +35,11 @@ impl<'s> SemTypes<'s> {
 
       // Slurp all the parameters up into a vector.
       let mut parameters = SmallVec::new();
-      for &named_parameters in ast.extra(formal_parameters_node).unwrap_node_list() {
+      for i in 0..ast.extra(formal_parameters_node).unwrap_node_list().len() {
+         let named_parameters = ast.extra(formal_parameters_node).unwrap_node_list()[i];
          let type_node = ast.first_handle(named_parameters);
          let typ = self.lookup_type(ast, type_node)?;
-         for &name_node in ast.extra(named_parameters).unwrap_node_list() {
+         ast.walk_node_list_mut(named_parameters, |ast, _, name_node| {
             let name = self.common.get_source_range_from_node(ast, name_node);
             parameters.push((name.to_owned(), typ));
             // Also, make each parameter have its own identifier in the function body.
@@ -50,8 +52,9 @@ impl<'s> SemTypes<'s> {
                   kind: VariableKind::Val,
                }),
             );
+            ast.convert_to_symbol(name_node, symbol);
             self.add_to_scope(name, symbol);
-         }
+         });
       }
 
       // Look up what the return type should be.
@@ -83,12 +86,17 @@ impl<'s> SemTypes<'s> {
       // After all is done, pop the function's scope off.
       self.scope_stack.pop();
 
-      let symbol_kind = SymbolKind::Function(Function {
+      // Register the function in the registry and add it to scope.
+      let function_id = self.functions.create(
+         name.to_owned(),
          mangled_name,
-         parameters,
-         return_type,
-         kind: FunctionKind::Local,
-      });
+         Parameters {
+            formal: parameters,
+            return_type,
+         },
+         FunctionKind::Local,
+      );
+      let symbol_kind = SymbolKind::Function(function_id);
       // TODO: Function/closure types. Right now we treat function symbols as having the
       // 'statement' type, which isn't exactly correct.
       let symbol = self.symbols.create(name, node, self.builtin.t_statement, symbol_kind);
@@ -98,37 +106,61 @@ impl<'s> SemTypes<'s> {
    }
 
    /// Annotates a function call.
-   pub(super) fn annotate_call(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
-      // Because function calls aren't really supported yet, the function call syntax is reused
-      // for backend intrinsics. This will someday be replaced by a `compiler_intrinsic` pragma.
-      let callee = ast.first_handle(node);
-      if ast.kind(callee) != NodeKind::Identifier {
-         return self.error(ast, node, ErrorKind::NonIntrinCall);
+   pub(super) fn annotate_call(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogResult {
+      // Extract what is being called.
+      let callee_node = ast.first_handle(node);
+      // TODO: Method calls.
+      if ast.kind(callee_node) != NodeKind::Identifier {
+         return Ok(self.error(ast, callee_node, ErrorKind::ExpressionCannotBeCalled));
       }
-      let name = self.common.get_source_range_from_node(ast, callee);
-      let expected_argument_count;
-      match name {
-         "__intrin_print_int32" => {
-            expected_argument_count = 1;
-            ast.convert_preserve(node, NodeKind::PrintInt32);
+      let function = self.lookup_function(ast, callee_node)?;
+
+      // Check if we have the right amount of arguments.
+      let given_parameter_count = ast.extra(node).unwrap_node_list().len();
+      let declared_parameter_count = self.functions.parameters(function).formal.len();
+      if given_parameter_count != declared_parameter_count {
+         return Ok(self.error(
+            ast,
+            node,
+            ErrorKind::NArgumentsExpected(declared_parameter_count, given_parameter_count),
+         ));
+      }
+      // Check if all the arguments are of the correct type.
+      // We don't immediately return after we error, so as to collect as many type mismatch
+      // messages as we can.
+      let mut last_error = None;
+      ast.walk_node_list_mut(node, |ast, index, argument| {
+         let parameters = self.functions.parameters(function);
+         let expected_type = parameters.formal[index].1;
+
+         let argument_log = self.annotate_node(ast, argument, NodeContext::Expression);
+         let provided_type = self.log.typ(argument_log);
+
+         // Perform implicit conversions on arguments.
+         let argument_log = self
+            .perform_implicit_conversion(ast, node, provided_type, expected_type)
+            .unwrap_or(argument_log);
+         // If there's a mismatch after the conversion, error.
+         let provided_type = self.log.typ(argument_log);
+         if provided_type != expected_type {
+            last_error = Some(self.type_mismatch(ast, argument, expected_type, provided_type));
          }
-         "__intrin_print_float32" => {
-            expected_argument_count = 1;
-            ast.convert_preserve(node, NodeKind::PrintFloat32);
-         }
-         _ => return self.error(ast, node, ErrorKind::NonIntrinCall),
+      });
+      if let Some(error) = last_error {
+         return Ok(error);
       }
-      let arguments = ast.extra(node).unwrap_node_list();
-      if arguments.len() != expected_argument_count {
-         let kind = ErrorKind::NArgumentsExpected(expected_argument_count, arguments.len());
-         return self.error(ast, node, kind);
+
+      if let &FunctionKind::Intrinsic(intrinsic) = self.functions.kind(function) {
+         // Intrinsic calls have some transformation magic going on.
+         self.annotate_intrinsic_call(ast, node, intrinsic);
       }
-      // I don't like that I have to use normal indices. Give me back my inline iterators :(
-      for i in 0..arguments.len() {
-         // TODO: Argument type checking.
-         let argument = ast.extra(node).unwrap_node_list()[i];
-         let _ = self.annotate_node(ast, argument, NodeContext::Expression);
-      }
-      self.annotate(ast, node, self.builtin.t_unit)
+
+      let return_type = self.functions.parameters(function).return_type;
+      Ok(self.annotate(ast, node, return_type))
+   }
+
+   /// Annotates an intrinsic function call.
+   fn annotate_intrinsic_call(&mut self, ast: &mut Ast, node: NodeHandle, intrinsic: Intrinsic) {
+      ast.convert_preserve(node, NodeKind::from(intrinsic));
    }
 }

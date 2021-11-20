@@ -2,6 +2,7 @@ pub mod ast;
 pub mod astdump;
 pub mod backend;
 pub mod common;
+pub mod functions;
 pub mod lexer;
 pub mod parser;
 pub mod scope;
