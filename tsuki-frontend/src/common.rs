@@ -15,8 +15,14 @@ pub struct SourceFile {
 }
 
 impl SourceFile {
-   // Extracts the module name from the filename.
-   // pub fn module_name(&self) -> &str {}
+   /// Extracts the module name from the filename.
+   pub fn module_name(&self) -> &str {
+      // NOTE (for mangling): the package's path should be separated out at the start of the
+      // compilation, and should be kept separated from the filename inside the actual root path.
+      // This way mangling the module name would be as simple as stripping away the .tsu extension
+      // and replacing all path separators with dots.
+      self.filename.file_stem().unwrap().to_str().expect("invalid UTF-8 in filename")
+   }
 }
 
 /// Represents a span of text in a source file.

@@ -3,6 +3,8 @@
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
 
+use smallvec::SmallVec;
+
 use crate::ast::NodeHandle;
 use crate::types::TypeId;
 
@@ -28,6 +30,8 @@ pub enum SymbolKind {
    Variable(Variable),
    /// A symbol that represents a type.
    Type(TypeId),
+   /// A symbol that represents a function, be it free or associated.
+   Function(Function),
 }
 
 impl SymbolKind {
@@ -53,6 +57,29 @@ pub enum VariableKind {
 /// Symbol data for a variable declaration.
 pub struct Variable {
    pub kind: VariableKind,
+}
+
+/// The kind of a function.
+pub enum FunctionKind {
+   /// This function was declared in the current module.
+   Local,
+   /// This function was declared in a different module or package.
+   External,
+   /// This function is imported from C.
+   ImportC { is_varargs: bool },
+}
+
+/// Symbol data for a function.
+pub struct Function {
+   /// The mangled name of the function. See `docs/mangling.md` in the repository root for more
+   /// info on how tsuki mangles function names.
+   pub mangled_name: String,
+   /// The names and types of parameters this function accepts.
+   pub parameters: SmallVec<[(String, TypeId); 8]>,
+   /// The return type of the function.
+   pub return_type: TypeId,
+   /// The kind of the function.
+   pub kind: FunctionKind,
 }
 
 /// Symbol storage. Symbols are looked up identifiers.

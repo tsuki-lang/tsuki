@@ -29,7 +29,7 @@ impl<'s> SemTypes<'s> {
       symbol: SymbolId,
    ) -> TypeLogEntry {
       match self.symbols.kind(symbol) {
-         SymbolKind::Variable(variable) => {
+         SymbolKind::Variable(_variable) => {
             let typ = self.symbols.type_id(symbol);
             ast.convert_to_symbol(node, symbol);
             let log = self.annotate(ast, node, typ);
@@ -137,12 +137,12 @@ impl<'s> SemTypes<'s> {
             ast.set_first_handle(node, value_node);
          }
          NodeKind::Identifier => {
+            // A simple symbol-binding assignment is converted into a Symbol node.
             let name = self.common.get_source_range_from_node(ast, name_node);
             let symbol =
                self.symbols.create(name, node, value_type, SymbolKind::Variable(variable));
             ast.convert_to_symbol(name_node, symbol);
-            let scope = self.scope_stack.top();
-            self.scopes.insert(scope, name, symbol);
+            self.add_to_scope(name, symbol);
             // The variable type annotation is less relevant to error reporting than the fact that
             // it's a statement. This sounds counterintuitive at first, but note that we're
             // requested to annotate the Val/Var node, not the variable name node, so the calling

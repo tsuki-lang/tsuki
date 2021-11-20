@@ -109,6 +109,11 @@ impl TypeKind {
       matches!(self, TypeKind::Missing | TypeKind::Error)
    }
 
+   /// Returns whether the type kind is the unit type.
+   pub fn is_unit(&self) -> bool {
+      matches!(self, TypeKind::Unit)
+   }
+
    /// Returns whether the type kind represents the `Bool` type.
    pub fn is_bool(&self) -> bool {
       matches!(self, TypeKind::Bool)
@@ -386,6 +391,10 @@ impl BuiltinTypes {
       add_type!(t_float32, "Float32");
       add_type!(t_float64, "Float64");
       add_type!(t_char, "Char");
+
+      add_type!(t_int, "Int");
+      add_type!(t_float, "Float");
+      add_type!(t_size, "Size");
    }
 }
 

@@ -2,6 +2,7 @@
 
 mod control_flow;
 mod conversions;
+mod functions;
 mod locations;
 mod lookups;
 mod operators;
@@ -236,6 +237,7 @@ impl<'s> SemTypes<'s> {
 
          // Declarations
          NodeKind::Val | NodeKind::Var => self.annotate_variable_declaration(ast, node).into(),
+         NodeKind::Fun => self.annotate_function_declaration(ast, node).into(),
 
          // Other nodes are invalid (or not implemented yet).
          other => self.error(ast, node, ErrorKind::SemTypesInvalidAstNode(other)),

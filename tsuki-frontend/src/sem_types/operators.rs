@@ -78,39 +78,4 @@ impl<'s> SemTypes<'s> {
       };
       self.annotate(ast, node, typ)
    }
-
-   /// Annotates a function call.
-   pub(super) fn annotate_call(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
-      // Because function calls aren't really supported yet, the function call syntax is reused
-      // for backend intrinsics. This will someday be replaced by a `compiler_intrinsic` pragma.
-      let callee = ast.first_handle(node);
-      if ast.kind(callee) != NodeKind::Identifier {
-         return self.error(ast, node, ErrorKind::NonIntrinCall);
-      }
-      let name = self.common.get_source_range_from_node(ast, callee);
-      let expected_argument_count;
-      match name {
-         "__intrin_print_int32" => {
-            expected_argument_count = 1;
-            ast.convert_preserve(node, NodeKind::PrintInt32);
-         }
-         "__intrin_print_float32" => {
-            expected_argument_count = 1;
-            ast.convert_preserve(node, NodeKind::PrintFloat32);
-         }
-         _ => return self.error(ast, node, ErrorKind::NonIntrinCall),
-      }
-      let arguments = ast.extra(node).unwrap_node_list();
-      if arguments.len() != expected_argument_count {
-         let kind = ErrorKind::NArgumentsExpected(expected_argument_count, arguments.len());
-         return self.error(ast, node, kind);
-      }
-      // I don't like that I have to use normal indices. Give me back my inline iterators :(
-      for i in 0..arguments.len() {
-         // TODO: Argument type checking.
-         let argument = ast.extra(node).unwrap_node_list()[i];
-         let _ = self.annotate_node(ast, argument, NodeContext::Expression);
-      }
-      self.annotate(ast, node, self.builtin.t_unit)
-   }
 }

@@ -61,7 +61,15 @@ impl<'s> SemTypes<'s> {
                Err(self.error(ast, node, ErrorKind::SymbolIsNotAType(name)))
             }
          }
-         _ => unreachable!("invalid node kind for type"),
+         _ => {
+            unreachable!("invalid node kind for type")
+         }
       }
+   }
+
+   /// Adds a symbol to the current scope.
+   pub(super) fn add_to_scope(&mut self, name: &str, symbol: SymbolId) {
+      let scope = self.scope_stack.top();
+      self.scopes.insert(scope, name, symbol);
    }
 }
