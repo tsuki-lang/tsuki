@@ -10,15 +10,22 @@ Specifics:
 - LLVM functions can be called whatever we want, there's no limit on which characters we can or cannot use.
 - Rust strings must be valid UTF-8.
 
-This leads to the following scheme:
-- `module`, `module.<path>`, or `package.module.<path>`
+The following scheme shall be used in the LLVM backend:
+- `<package>:<module>.<path>`
   - where `<path>` is one of the following:
     - `<fun>` - eg. `function_name`, `blah1` - a valid function name (in `snake_case`)
-    - `<type>.<fun>` - eg. `MyObject.function` - an instance function in a type
-    - `type:<type>.<fun>` - eg. `type:MyObject.new` - an associated function
+    - `<type>.<fun>` - eg. `MyObject.function` - an associated function
     - `<type>.[<trait>].<fun>` - eg. `MyObject.[As[Int]].convert` - a function associated with a trait
     - `{<integer>}` - eg. `{0}` - anonymous functions, eg. closures and do-blocks
   - Paths may nest freely. `module.function.local_function` is a perfectly valid path, specifying a locally-scoped function `local_function` inside the function `function` inside the module `module`.
+
+Examples:
+- `std:panics.panic` - function `panic` in module `panics` of package `std`
+- `std:float32.Float32.sin` - function `sin` for the type `Float32` in module `float32` of package `std`
+- `std:int32.Int32.[Dup].dup` - function `dup` from the implementation of `Dup` for the type `Int32` in module `int32` of package `std`
+- `std_tests:results{12}` - 12th anonymous function in the module `results` of package `std`
+
+Other backends may use mangling schemes different to this one; after all, different targets have different requirements.
 
 # Stack traces
 
@@ -27,7 +34,7 @@ Function names mangled using this scheme should _never_ appear in stack traces, 
 For instance, if we have a stack trace for package `test`, module `hello`, this stack trace:
 ```
 Stack traceback:
-  std:panics.tsu 234:4         std.panics.panic
+  std:panics.tsu 234:4         std:panics.panic
   test:hello.tsu 4:2           test.hello.my_fallible_function
   test:hello.tsu 6:1           test.hello
 ```
