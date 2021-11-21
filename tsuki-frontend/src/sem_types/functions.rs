@@ -5,8 +5,8 @@ use smallvec::SmallVec;
 use crate::ast::{Ast, NodeHandle, NodeKind};
 use crate::common::ErrorKind;
 use crate::functions::{FunctionKind, Intrinsic, Parameters};
-use crate::scope::{SymbolKind, Variable, VariableKind};
-use crate::types::{TypeKind, TypeLogEntry, TypeLogResult};
+use crate::scope::{Mutability, SymbolKind, Variable};
+use crate::types::TypeLogResult;
 
 use super::{NodeContext, SemTypes};
 
@@ -40,18 +40,19 @@ impl<'s> SemTypes<'s> {
          let type_node = ast.first_handle(named_parameters);
          let typ = self.lookup_type(ast, type_node)?;
          ast.walk_node_list_mut(named_parameters, |ast, _, name_node| {
+            // Make each parameter have its own identifier in the function body.
+            // Semantically, function parameters are just variables, introduced by some
+            // external scope.
             let name = self.common.get_source_range_from_node(ast, name_node);
-            parameters.push((name.to_owned(), typ));
-            // Also, make each parameter have its own identifier in the function body.
-            // Function parameters are just variables, introduced by some external scope.
             let symbol = self.symbols.create(
                name,
                name_node,
                typ,
                SymbolKind::Variable(Variable {
-                  kind: VariableKind::Val,
+                  mutability: Mutability::Val,
                }),
             );
+            parameters.push(symbol);
             ast.convert_to_symbol(name_node, symbol);
             self.add_to_scope(name, symbol);
          });
@@ -101,6 +102,7 @@ impl<'s> SemTypes<'s> {
       // 'statement' type, which isn't exactly correct.
       let symbol = self.symbols.create(name, node, self.builtin.t_statement, symbol_kind);
       self.add_to_scope(name, symbol);
+      ast.convert_to_symbol(name_node, symbol);
 
       Ok(self.annotate(ast, node, self.builtin.t_statement))
    }
@@ -131,7 +133,7 @@ impl<'s> SemTypes<'s> {
       let mut last_error = None;
       ast.walk_node_list_mut(node, |ast, index, argument| {
          let parameters = self.functions.parameters(function);
-         let expected_type = parameters.formal[index].1;
+         let expected_type = self.symbols.type_id(parameters.formal[index]);
 
          let argument_log = self.annotate_node(ast, argument, NodeContext::Expression);
          let provided_type = self.log.typ(argument_log);

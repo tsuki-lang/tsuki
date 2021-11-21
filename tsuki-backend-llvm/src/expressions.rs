@@ -1,35 +1,14 @@
 //! Code generation for expressions.
 
-use inkwell::types::{FloatType, IntType};
-use inkwell::values::{BasicValue, BasicValueEnum, FloatValue, IntValue, StructValue};
+use inkwell::values::{BasicValue, BasicValueEnum, FloatValue, IntValue};
 use inkwell::IntPredicate;
-use tsuki_frontend::ast::{Ast, NodeHandle, NodeKind};
+use tsuki_frontend::ast::{NodeHandle, NodeKind};
 use tsuki_frontend::sem::Ir;
-use tsuki_frontend::types::{FloatSize, IntegerSize, TypeId, TypeKind, Types};
 
 use crate::codegen::CodeGen;
 use crate::libc;
 
-impl<'c, 'pm> CodeGen<'c, 'pm> {
-   /// Generates code for a unit literal.
-   pub(crate) fn generate_unit_literal(&self, _ast: &Ast, _node: NodeHandle) -> StructValue<'c> {
-      self.unit_type.const_zero()
-   }
-
-   /// Returns the integer type for the provided type, or panics if the type is not an integer type.
-   fn get_integer_type(&self, types: &Types, typ: TypeId) -> IntType<'c> {
-      if let TypeKind::Integer(size) = types.kind(typ) {
-         match size {
-            IntegerSize::U8 | IntegerSize::S8 => self.context.i8_type(),
-            IntegerSize::U16 | IntegerSize::S16 => self.context.i16_type(),
-            IntegerSize::U32 | IntegerSize::S32 => self.context.i32_type(),
-            IntegerSize::U64 | IntegerSize::S64 => self.context.i64_type(),
-         }
-      } else {
-         panic!("type is not an integer type")
-      }
-   }
-
+impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    /// Generates code for a Bool literal.
    fn generate_boolean_literal(&self, ir: &Ir, node: NodeHandle) -> IntValue<'c> {
       let typ = self.context.bool_type();
@@ -39,25 +18,13 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
 
    /// Generates code for an integer literal.
    fn generate_integer_literal(&self, ir: &Ir, node: NodeHandle) -> IntValue<'c> {
-      let typ = self.get_integer_type(&ir.types, ir.ast.type_id(node));
+      let typ = self.get_type(&ir.types, ir.ast.type_id(node)).into_int_type();
       typ.const_int(ir.ast.extra(node).unwrap_uint(), false)
-   }
-
-   /// Returns the float type for the provided type, or panics if the type is not a float type.
-   fn get_float_type(&self, types: &Types, typ: TypeId) -> FloatType<'c> {
-      if let TypeKind::Float(size) = types.kind(typ) {
-         match size {
-            FloatSize::S32 => self.context.f32_type(),
-            FloatSize::S64 => self.context.f64_type(),
-         }
-      } else {
-         panic!("type is not a float type")
-      }
    }
 
    /// Generates code for a float literal.
    fn generate_float_literal(&self, ir: &Ir, node: NodeHandle) -> FloatValue<'c> {
-      let typ = self.get_float_type(&ir.types, ir.ast.type_id(node));
+      let typ = self.get_type(&ir.types, ir.ast.type_id(node)).into_float_type();
       typ.const_float(ir.ast.extra(node).unwrap_float())
    }
 
@@ -73,7 +40,7 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
       let typ = ir.ast.type_id(node);
       let kind = ir.types.kind(typ);
       if kind.is_integer() {
-         let typ = self.get_integer_type(&ir.types, typ);
+         let typ = self.get_type(&ir.types, typ).into_int_type();
          let zero = typ.const_zero();
          self.builder.build_int_sub(zero, right.into_int_value(), "negtmp").into()
       } else if kind.is_float() {
@@ -150,7 +117,7 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
    fn generate_integer_conversion(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
       let inner = ir.ast.first_handle(node);
       let inner_value = self.generate_expression(ir, inner).into_int_value();
-      let dest_type = self.get_integer_type(&ir.types, ir.ast.type_id(node));
+      let dest_type = self.get_type(&ir.types, ir.ast.type_id(node)).into_int_type();
       match ir.ast.kind(node) {
          NodeKind::WidenUint => self.builder.build_int_z_extend(inner_value, dest_type, "uwidened"),
          NodeKind::WidenInt => self.builder.build_int_s_extend(inner_value, dest_type, "swidened"),
@@ -244,6 +211,7 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
          // Control flow
          NodeKind::DoExpression => self.generate_do(ir, node).unwrap(),
          NodeKind::IfExpression => self.generate_if(ir, node).unwrap(),
+         NodeKind::Call => self.generate_unit_literal().into(), // TODO
 
          // Intrinsics
          NodeKind::WidenUint | NodeKind::WidenInt => self.generate_integer_conversion(ir, node),
@@ -285,6 +253,6 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
          }
          _ => unreachable!(),
       }
-      self.generate_unit_literal(&ir.ast, node).into()
+      self.generate_unit_literal().into()
    }
 }

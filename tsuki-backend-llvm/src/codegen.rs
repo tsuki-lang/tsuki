@@ -8,7 +8,7 @@ use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::passes::PassManager;
 use inkwell::types::StructType;
-use inkwell::values::{BasicValue, FunctionValue};
+use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue};
 use tsuki_frontend::ast::{NodeHandle, NodeKind};
 use tsuki_frontend::common::SourceFile;
 use tsuki_frontend::sem::Ir;
@@ -17,10 +17,10 @@ use crate::functions::Function;
 use crate::variables::Variables;
 
 /// Code generation state shared across functions.
-pub struct CodeGen<'c, 'pm> {
-   pub(crate) source: SourceFile,
+pub struct CodeGen<'src, 'c, 'pm> {
+   pub(crate) source: &'src SourceFile,
    pub(crate) context: &'c Context,
-   pub(crate) module: Module<'c>,
+   pub(crate) module: &'pm Module<'c>,
    pub(crate) builder: Builder<'c>,
    pub(crate) pass_manager: &'pm PassManager<FunctionValue<'c>>,
 
@@ -30,12 +30,12 @@ pub struct CodeGen<'c, 'pm> {
    pub(crate) unit_type: StructType<'c>,
 }
 
-impl<'c, 'pm> CodeGen<'c, 'pm> {
+impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    pub fn new(
-      source: SourceFile,
+      source: &'src SourceFile,
       context: &'c Context,
       pass_manager: &'pm PassManager<FunctionValue<'c>>,
-      module: Module<'c>,
+      module: &'pm Module<'c>,
       function: Function<'c>,
    ) -> Self {
       let mut state = Self {
@@ -57,6 +57,18 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
       state
    }
 
+   /// Creates a new code generator, with the same source file, context, pass manager, and module,
+   /// but with a different function.
+   pub fn for_function(&self, function: Function<'c>) -> Self {
+      Self {
+         builder: self.context.create_builder(),
+         function,
+         variables: RefCell::new(Variables::new()),
+         unit_type: self.unit_type,
+         ..*self
+      }
+   }
+
    /// Generates code for an arbitrary node.
    pub fn generate_statement(&self, ir: &Ir, node: NodeHandle) {
       match ir.ast.kind(node) {
@@ -74,6 +86,7 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
          // Declarations
          NodeKind::Val | NodeKind::Var => self.generate_variable_declaration(ir, node),
          NodeKind::AssignDiscard => self.generate_discarding_assignment(ir, node),
+         NodeKind::Fun => self.generate_function(ir, node),
 
          // Expressions
          NodeKind::Assign => {
@@ -85,13 +98,20 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
       }
    }
 
-   pub fn finish_function(&self, return_value: Option<&dyn BasicValue<'c>>) {
-      self.builder.build_return(return_value);
+   /// Finishes compiling a function, by inserting a `ret` instruction at the end, as well
+   /// as running optimizations on it.
+   pub fn finish_function(&self, return_value: Option<BasicValueEnum<'c>>) {
+      // It seems like Rust can't really infer that I want to pass a &dyn when I .as_ref()
+      // the option, so this requires some manual matching.
+      match return_value {
+         Some(v) => self.builder.build_return(Some(&v)),
+         None => self.builder.build_return(None),
+      };
       self.pass_manager.run_on(&self.function.value);
    }
 }
 
-impl fmt::Debug for CodeGen<'_, '_> {
+impl fmt::Debug for CodeGen<'_, '_, '_> {
    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
       write!(f, "{}", &self.module.print_to_string().to_str().unwrap())
    }

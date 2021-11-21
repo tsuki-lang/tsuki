@@ -6,6 +6,7 @@ mod control_flow;
 mod expressions;
 mod functions;
 mod libc;
+mod types;
 mod variables;
 
 use std::fmt::{self, Display, Formatter};
@@ -18,6 +19,7 @@ use inkwell::passes::PassManager;
 use inkwell::targets::{
    CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
 };
+use inkwell::values::BasicValue;
 use thiserror::Error;
 use tsuki_frontend::backend;
 use tsuki_frontend::common::{self, Error, ErrorKind, Errors, SourceFile, Span};
@@ -94,7 +96,7 @@ impl backend::Backend for LlvmBackend {
    fn compile(&self, root: SourceFile) -> Result<Self::Target, Errors> {
       let ir = tsuki_frontend::analyze(&root, &self.frontend_debug_options)?;
       let context = Context::create();
-      let module = context.create_module(&root.filename.to_str().unwrap());
+      let module = context.create_module(&root.module_name());
 
       // Set up the pass manager.
       let pm = PassManager::create(&module);
@@ -131,13 +133,13 @@ impl backend::Backend for LlvmBackend {
 
       // Create the function and the codegen state.
       let main_fun = Function::new(&context, &module, "main", main_fun_type);
-      let state = CodeGen::new(root, &context, &pm, module, main_fun);
+      let state = CodeGen::new(&root, &context, &pm, &module, main_fun);
 
       // Compile the modules' code.
       state.generate_statement(&ir, ir.root_node);
 
       // Return the zero exit code.
-      state.finish_function(Some(&i32_type.const_zero()));
+      state.finish_function(Some(i32_type.const_zero().as_basic_value_enum()));
 
       if self.backend_debug_options.dump_ir {
          eprintln!(":: LLVM IR");

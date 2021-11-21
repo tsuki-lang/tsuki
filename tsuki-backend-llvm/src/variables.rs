@@ -20,7 +20,7 @@ impl<'c> Variables<'c> {
    }
 
    /// Inserts a new value under the given symbol ID.
-   fn insert(&mut self, symbol: SymbolId, value: PointerValue<'c>) {
+   pub(crate) fn insert(&mut self, symbol: SymbolId, value: PointerValue<'c>) {
       if self.variables.len() <= symbol.id() {
          self.variables.resize(symbol.id() + 1, None);
       }
@@ -28,7 +28,7 @@ impl<'c> Variables<'c> {
    }
 
    /// Retrieves the value under the given symbol ID.
-   fn get(&self, symbol: SymbolId) -> Option<PointerValue<'c>> {
+   pub(crate) fn get(&self, symbol: SymbolId) -> Option<PointerValue<'c>> {
       if symbol.id() >= self.variables.len() {
          None
       } else {
@@ -37,7 +37,7 @@ impl<'c> Variables<'c> {
    }
 }
 
-impl<'c, 'pm> CodeGen<'c, 'pm> {
+impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    /// Generates code for a variable reference.
    pub(crate) fn generate_variable_reference(
       &self,

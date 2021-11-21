@@ -2,7 +2,7 @@
 
 use crate::ast::{Ast, NodeHandle, NodeKind};
 use crate::common::ErrorKind;
-use crate::scope::{SymbolId, SymbolKind, Variable, VariableKind};
+use crate::scope::{Mutability, SymbolId, SymbolKind, Variable};
 use crate::types::{TypeLogEntry, TypeLogResult};
 
 use super::{NodeContext, SemTypes};
@@ -64,7 +64,7 @@ impl<'s> SemTypes<'s> {
          NodeKind::Variable => {
             let symbol = ast.first_handle(left);
             let variable = self.symbols.kind(ast.symbol_id(symbol)).unwrap_variable();
-            variable.kind == VariableKind::Var
+            variable.mutability == Mutability::Var
          }
          _ => false,
       };
@@ -84,11 +84,11 @@ impl<'s> SemTypes<'s> {
       node: NodeHandle,
    ) -> TypeLogResult {
       let kind = match ast.kind(node) {
-         NodeKind::Val => VariableKind::Val,
-         NodeKind::Var => VariableKind::Var,
+         NodeKind::Val => Mutability::Val,
+         NodeKind::Var => Mutability::Var,
          _ => unreachable!(),
       };
-      let variable = Variable { kind };
+      let variable = Variable { mutability: kind };
 
       // Figure out the name and expected type. This expected type can be `None`, and in that case,
       // should be inferred from context.

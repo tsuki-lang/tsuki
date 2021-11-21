@@ -3,7 +3,7 @@
 use smallvec::{smallvec, SmallVec};
 
 use crate::ast::{NodeHandle, NodeKind};
-use crate::scope::{ScopeId, Scopes, SymbolKind, Symbols};
+use crate::scope::{Mutability, ScopeId, Scopes, SymbolId, SymbolKind, Symbols, Variable};
 use crate::types::{BuiltinTypes, TypeId};
 
 /// The unique ID of a function in the registry.
@@ -32,7 +32,7 @@ impl FunctionKind {
 /// Function parameters.
 pub struct Parameters {
    /// The names and types of formal parameters this function accepts.
-   pub formal: SmallVec<[(String, TypeId); 8]>,
+   pub formal: SmallVec<[SymbolId; 8]>,
    /// The return type of the function.
    pub return_type: TypeId,
 }
@@ -130,7 +130,19 @@ pub fn register_intrinsics(
             $name.into(),
             String::new(),
             Parameters {
-               formal: smallvec! $params,
+               formal: $params
+                  .iter()
+                  .map(|&(name, type_id)| {
+                     symbols.create(
+                        name,
+                        NodeHandle::null(),
+                        type_id,
+                        SymbolKind::Variable(Variable {
+                           mutability: Mutability::Val,
+                        }),
+                     )
+                  })
+                  .collect(),
                return_type: $return_type,
             },
             FunctionKind::Intrinsic($intrinsic),
@@ -147,14 +159,14 @@ pub fn register_intrinsics(
 
    add_intrinsic!(
       "__intrin_print_int32",
-      [("x".into(), builtin.t_int32)],
+      [("x", builtin.t_int32)],
       builtin.t_unit,
-      Intrinsic::PrintInt32
+      Intrinsic::PrintInt32,
    );
    add_intrinsic!(
       "__intrin_print_float32",
-      [("x".into(), builtin.t_float32)],
+      [("x", builtin.t_float32)],
       builtin.t_unit,
-      Intrinsic::PrintFloat32
+      Intrinsic::PrintFloat32,
    );
 }

@@ -8,7 +8,7 @@ use tsuki_frontend::sem::Ir;
 
 use crate::codegen::CodeGen;
 
-impl<'c, 'pm> CodeGen<'c, 'pm> {
+impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    /// Generates code for a list of statements.
    pub(crate) fn generate_statements(&self, ir: &Ir, node: NodeHandle) {
       ir.ast.walk_node_list(node, |_ast, _index, node| {
@@ -17,7 +17,7 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
    }
 
    /// Generates code for a list of statements with a tail expression.
-   fn generate_statements_with_tail_expression(
+   pub(crate) fn generate_statements_with_tail_expression(
       &self,
       ir: &Ir,
       node: NodeHandle,
@@ -33,7 +33,7 @@ impl<'c, 'pm> CodeGen<'c, 'pm> {
       if let Some(tail) = tail {
          tail
       } else {
-         self.generate_unit_literal(&ir.ast, node).into()
+         self.generate_unit_literal().into()
       }
    }
 

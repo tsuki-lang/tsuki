@@ -8,7 +8,7 @@ pub const FUN_PRINTF: &str = "printf";
 pub const GLOBAL_PRINTF_INT_FORMAT: &str = "printf_int_format";
 pub const GLOBAL_PRINTF_FLOAT_FORMAT: &str = "printf_float_format";
 
-impl<'c, 'pm> CodeGen<'c, 'pm> {
+impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    fn add_const_string(&mut self, name: &str, string: &[u8]) {
       let s = self.context.const_string(string, true);
       let typ = s.get_type();

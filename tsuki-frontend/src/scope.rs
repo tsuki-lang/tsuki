@@ -3,8 +3,6 @@
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
 
-use smallvec::SmallVec;
-
 use crate::ast::NodeHandle;
 use crate::functions::FunctionId;
 use crate::types::TypeId;
@@ -44,11 +42,20 @@ impl SymbolKind {
          panic!("unwrap_variable called on a non-variable symbol")
       }
    }
+
+   /// Unwraps a function symbol.
+   pub fn unwrap_function(&self) -> FunctionId {
+      if let &SymbolKind::Function(function_id) = self {
+         function_id
+      } else {
+         panic!("unwrap_function called on a non-function symbol")
+      }
+   }
 }
 
-/// The kind of a variable.
+/// The mutability of a variable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum VariableKind {
+pub enum Mutability {
    /// A `val` (immutable) variable.
    Val,
    /// A `var` (mutable) variable.
@@ -57,7 +64,7 @@ pub enum VariableKind {
 
 /// Symbol data for a variable declaration.
 pub struct Variable {
-   pub kind: VariableKind,
+   pub mutability: Mutability,
 }
 
 /// Symbol storage. Symbols are looked up identifiers.
