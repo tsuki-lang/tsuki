@@ -23,6 +23,11 @@ pub enum FunctionKind {
 }
 
 impl FunctionKind {
+   /// Returns whether the function kind is for a local function.
+   pub fn is_local(&self) -> bool {
+      matches!(self, Self::Local)
+   }
+
    /// Returns whether the function kind is for a C varargs function.
    pub fn is_varargs(&self) -> bool {
       matches!(self, Self::ImportC { is_varargs: true })
@@ -90,6 +95,14 @@ impl Functions {
    /// Returns the kind of the function.
    pub fn kind(&self, function: FunctionId) -> &FunctionKind {
       &self.kinds[function.0]
+   }
+
+   /// Returns an iterator over function IDs.
+   pub fn iter(&self) -> FunctionsIter {
+      FunctionsIter {
+         current: 0,
+         len: self.names.len(),
+      }
    }
 }
 
@@ -169,4 +182,23 @@ pub fn register_intrinsics(
       builtin.t_unit,
       Intrinsic::PrintFloat32,
    );
+}
+
+pub struct FunctionsIter {
+   current: usize,
+   len: usize,
+}
+
+impl Iterator for FunctionsIter {
+   type Item = FunctionId;
+
+   fn next(&mut self) -> Option<Self::Item> {
+      if self.current < self.len {
+         let i = self.current;
+         self.current += 1;
+         Some(FunctionId(i))
+      } else {
+         None
+      }
+   }
 }

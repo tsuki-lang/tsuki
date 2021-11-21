@@ -8,7 +8,7 @@ use inkwell::types::{AnyType, BasicType, BasicTypeEnum, FunctionType};
 use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue};
 use smallvec::SmallVec;
 use tsuki_frontend::ast::NodeHandle;
-use tsuki_frontend::functions::FunctionId;
+use tsuki_frontend::functions::{FunctionId, FunctionKind};
 use tsuki_frontend::sem::Ir;
 
 use crate::codegen::CodeGen;
@@ -30,6 +30,13 @@ impl<'c> Function<'c> {
       let value = module.add_function(name, typ, None);
       let entry_block = context.append_basic_block(value, "entry");
       Self { value, entry_block }
+   }
+
+   pub fn from_value(value: FunctionValue<'c>) -> Self {
+      Self {
+         value,
+         entry_block: value.get_first_basic_block().expect("function did not have a basic block"),
+      }
    }
 
    /// Positions the given builder at the start of the function.
@@ -70,22 +77,35 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
       }
    }
 
+   /// Adds functions from the IR to the module.
+   pub fn add_functions(&self, ir: &Ir) {
+      for function_id in ir.functions.iter() {
+         // Skip non-local functions in the process.
+         if ir.functions.kind(function_id).is_local() {
+            let function_type = self.get_function_type(ir, function_id);
+            let _ = Function::new(
+               self.context,
+               self.module,
+               ir.functions.mangled_name(function_id),
+               function_type,
+            );
+         }
+      }
+   }
+
    /// Generates code for a function.
    pub fn generate_function(&self, ir: &Ir, node: NodeHandle) {
-      // Obtain the function's ID.
+      // Get the function ID from the AST.
       let name_node = ir.ast.first_handle(node);
       let symbol_id = ir.ast.symbol_id(name_node);
       let function_id = ir.symbols.kind(symbol_id).unwrap_function();
 
-      // Construct the new function.
-      let return_type = ir.functions.parameters(function_id).return_type;
-      let function_type = self.get_function_type(ir, function_id);
-      let function = Function::new(
-         self.context,
-         self.module,
-         ir.functions.mangled_name(function_id),
-         function_type,
-      );
+      // Obtain the function from the module.
+      let function = self
+         .module
+         .get_function(ir.functions.mangled_name(function_id))
+         .expect("function does not seem to exist");
+      let function = Function::from_value(function);
 
       // Create a new CodeGen for generating the function's body.
       let code_gen = self.for_function(function);
@@ -110,6 +130,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
       }
 
       // Generate the function's body.
+      let return_type = ir.functions.parameters(function_id).return_type;
       let return_value = if ir.types.kind(return_type).is_unit() {
          code_gen.generate_statements(ir, node);
          None

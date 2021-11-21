@@ -134,8 +134,9 @@ impl backend::Backend for LlvmBackend {
       // Create the function and the codegen state.
       let main_fun = Function::new(&context, &module, "main", main_fun_type);
       let state = CodeGen::new(&root, &context, &pm, &module, main_fun);
+      state.add_functions(&ir);
 
-      // Compile the modules' code.
+      // Compile the module's code.
       state.generate_statement(&ir, ir.root_node);
 
       // Return the zero exit code.
