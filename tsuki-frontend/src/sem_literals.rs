@@ -415,7 +415,7 @@ impl SemPass for SemLiterals<'_> {
    }
 
    fn filename(&self) -> &Path {
-      &self.common.file.filename
+      &self.common.file.path
    }
 
    fn errors(&self) -> &Errors {

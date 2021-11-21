@@ -39,7 +39,7 @@ impl<'s> Parser<'s> {
    fn emit_error(&mut self, kind: ErrorKind, span: Span) {
       self.errors.push(Error {
          // A bit inefficient wrt allocations, but errors don't occur very often.
-         filename: self.lexer.file().filename.clone(),
+         filename: self.lexer.file().path.clone(),
          span,
          kind,
       });

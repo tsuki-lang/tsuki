@@ -10,18 +10,54 @@ use crate::lexer::{IndentLevel, Token, TokenKind};
 
 /// Represents a source file.
 pub struct SourceFile {
-   pub filename: PathBuf,
+   /// The package the source file resides in.
+   pub package: String,
+   /// The root of the package.
+   pub package_root: PathBuf,
+   /// The path to the source file, relative to the package's `src` folder.
+   pub path: PathBuf,
+   /// The module name; that is, the package name and file path concatenated together with a colon,
+   /// with the extension stripped, and all path separators replaced with colons `:`.
+   pub module_name: String,
+   /// The source code itself.
    pub source: String,
 }
 
 impl SourceFile {
-   /// Extracts the module name from the filename.
-   pub fn module_name(&self) -> &str {
-      // NOTE (for mangling): the package's path should be separated out at the start of the
-      // compilation, and should be kept separated from the filename inside the actual root path.
-      // This way mangling the module name would be as simple as stripping away the .tsu extension
-      // and replacing all path separators with dots.
-      self.filename.file_stem().unwrap().to_str().expect("invalid UTF-8 in filename")
+   pub fn new(
+      package: String,
+      package_root: PathBuf,
+      path: PathBuf,
+      source: String,
+   ) -> Result<Self, Error> {
+      let module_name = {
+         let package_root = package_root
+            .canonicalize()
+            .map_err(|err| Error::spanless(path.clone(), ErrorKind::Io(err)))?;
+         let path = path
+            // Normalize the path into something that makes sense.
+            .canonicalize()
+            .map_err(|err| Error::spanless(path.clone(), ErrorKind::Io(err)))?
+            // Remove the package_root prefix.
+            .strip_prefix(&package_root)
+            .map_err(|_| Error::spanless(path.clone(), ErrorKind::InvalidPackageRoot))?
+            // Remove the .tsu extension.
+            .with_extension("")
+            // Convert it to a string.
+            .to_str()
+            .ok_or_else(|| Error::spanless(path.clone(), ErrorKind::InvalidUtf8InPath))?
+            // Replace path separators with dots.
+            .replace(std::path::MAIN_SEPARATOR, ".");
+         // And pray to God it's correct.
+         format!("{}:{}", package, path)
+      };
+      Ok(Self {
+         package,
+         package_root,
+         path,
+         module_name,
+         source,
+      })
    }
 }
 
@@ -43,6 +79,15 @@ impl Span {
 
    pub const INVALID_LINE: usize = 0;
    pub const INVALID_COLUMN: usize = 0;
+
+   pub const INVALID: Self = Self {
+      byte_start: 0,
+      line_start: Self::INVALID_LINE,
+      column_start: Self::INVALID_COLUMN,
+      byte_end: 0,
+      line_end: Self::INVALID_LINE,
+      column_end: Self::INVALID_COLUMN,
+   };
 
    /// Creates and initializes a new span starting at the first possible position in a file.
    pub fn new() -> Self {
@@ -153,6 +198,16 @@ impl Default for Span {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ErrorKind {
+   /*
+    * Non-compilation errors
+    */
+   #[error("invalid UTF-8 in path")]
+   InvalidUtf8InPath,
+   #[error("package root is not a prefix of the main file path")]
+   InvalidPackageRoot,
+   #[error("I/O error: {0}")]
+   Io(#[from] std::io::Error),
+
    /*
     * Lexer errors
     */
@@ -275,16 +330,31 @@ pub struct Error {
    pub kind: ErrorKind,
 }
 
+impl Error {
+   /// Constructs an error with an invalid span, such that no span is displayed.
+   pub fn spanless(filename: PathBuf, kind: ErrorKind) -> Self {
+      Self {
+         filename,
+         span: Span::INVALID,
+         kind,
+      }
+   }
+}
+
 impl fmt::Display for Error {
    /// The alternate format syntax `{:#}` can be used to display the full span of where the error
    /// occured, instead of its starting position only.
    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
       let filename = self.filename.to_str().unwrap();
-      if f.alternate() {
-         write!(f, "{}:{:#}: {}", filename, self.span, self.kind)?;
-      } else {
-         write!(f, "{}:{}: {}", filename, self.span, self.kind)?;
+      write!(f, "{}:", filename)?;
+      if !self.span.is_invalid() {
+         if f.alternate() {
+            write!(f, "{:#}:", self.span)?;
+         } else {
+            write!(f, "{}:", self.span)?;
+         }
       }
+      write!(f, " {}", self.kind)?;
       Ok(())
    }
 }

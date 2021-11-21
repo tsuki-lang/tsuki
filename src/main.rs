@@ -17,6 +17,14 @@ struct Options {
    #[structopt(short = "p", long, name = "name")]
    package_name: String,
 
+   /// The `src` directory of the package.
+   #[structopt(short = "r", long, name = "path")]
+   package_root: PathBuf,
+
+   /// The root source file. Must be located in the package root.
+   #[structopt(short = "m", long, name = "main file")]
+   main_file: PathBuf,
+
    /// The optimization level to use when compiling.
    #[structopt(long, name = "level", default_value = "essential")]
    optimize: OptimizationLevel,
@@ -36,10 +44,6 @@ struct Options {
    /// Dumps the generated LLVM IR.
    #[structopt(long)]
    dump_llvm_ir: bool,
-
-   /// The root source file.
-   #[structopt(name = "main file")]
-   main_file: PathBuf,
 }
 
 const EXIT_COMPILE: i32 = 1;
@@ -88,10 +92,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
    let source = unwrap_error(std::fs::read_to_string(&options.main_file));
 
-   let object = unwrap_errors(backend.compile(SourceFile {
-      filename: options.main_file,
+   let source_file = unwrap_error(SourceFile::new(
+      options.package_name,
+      options.package_root,
+      options.main_file,
       source,
-   }));
+   ));
+   let object = unwrap_errors(backend.compile(source_file));
 
    let executable = ExecutableFile::link(backend, &[object])?;
    executable.run(&[])?;

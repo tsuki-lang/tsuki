@@ -12,7 +12,7 @@ use super::{NodeContext, SemTypes};
 
 impl<'s> SemTypes<'s> {
    fn mangle_name(&self, function_name: &str) -> String {
-      format!("{}.{}", self.common.file.module_name(), function_name)
+      format!("{}.{}", &self.common.file.module_name, function_name)
    }
 
    pub(super) fn annotate_function_declaration(

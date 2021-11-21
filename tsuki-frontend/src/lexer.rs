@@ -471,7 +471,7 @@ impl<'i> Lexer<'i> {
    /// panic. This means once the lexer throws an error, all lexis must be aborted.
    fn error(&mut self, kind: ErrorKind) -> Error {
       Error {
-         filename: self.file.filename.to_owned(),
+         filename: self.file.path.to_owned(),
          span: self.span.clone(),
          kind,
       }

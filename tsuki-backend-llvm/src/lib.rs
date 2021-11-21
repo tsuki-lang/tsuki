@@ -96,7 +96,7 @@ impl backend::Backend for LlvmBackend {
    fn compile(&self, root: SourceFile) -> Result<Self::Target, Errors> {
       let ir = tsuki_frontend::analyze(&root, &self.frontend_debug_options)?;
       let context = Context::create();
-      let module = context.create_module(&root.module_name());
+      let module = context.create_module(&root.module_name);
 
       // Set up the pass manager.
       let pm = PassManager::create(&module);
