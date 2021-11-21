@@ -174,6 +174,7 @@ impl Scopes {
 
 /// A stack for tracking which local scopes are currently visible.
 /// This can also be used for identifier lookups.
+#[derive(Debug, Clone)]
 pub struct ScopeStack {
    scopes: Vec<ScopeId>,
 }

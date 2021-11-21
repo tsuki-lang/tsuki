@@ -6,7 +6,7 @@ use crate::ast::{Ast, NodeHandle, NodeKind};
 use crate::common::ErrorKind;
 use crate::functions::{FunctionKind, Intrinsic, Parameters};
 use crate::scope::{Mutability, SymbolKind, Variable};
-use crate::types::TypeLogResult;
+use crate::types::{TypeId, TypeLogResult};
 
 use super::{NodeContext, SemTypes};
 
@@ -20,8 +20,14 @@ impl<'s> SemTypes<'s> {
       ast: &mut Ast,
       node: NodeHandle,
    ) -> TypeLogResult {
-      // Mangle the function name.
+      // Check if the name is sem'd or not. If so, we are coming from a deferred sem'check,
+      // so simply check the body and return.
       let name_node = ast.first_handle(node);
+      if ast.kind(name_node) == NodeKind::Symbol {
+         return self.annotate_function_body(ast, node);
+      }
+
+      // Get the function name.
       let name = self.common.get_source_range_from_node(ast, name_node);
       let mangled_name = self.mangle_name(&name);
 
@@ -89,7 +95,32 @@ impl<'s> SemTypes<'s> {
       self.scopes.insert(declaration_scope, name, symbol);
       ast.convert_to_symbol(name_node, symbol);
 
-      // Sem'check the function's body.
+      // After all is done, pop the function's scope off.
+      self.scope_stack.pop();
+
+      if self.is_in_module_scope() {
+         // If we're at the top-level scope, defer sem until all items in scope have already been
+         // declared.
+         self.defer(node, NodeContext::Statement);
+         Ok(self.annotate(ast, node, TypeId::null()))
+      } else {
+         // If we're not top-level, check the function's body.
+         self.annotate_function_body(ast, node)
+      }
+   }
+
+   /// Annotates a function's body.
+   pub(super) fn annotate_function_body(
+      &mut self,
+      ast: &mut Ast,
+      node: NodeHandle,
+   ) -> TypeLogResult {
+      let name_node = ast.first_handle(node);
+      let symbol_id = ast.symbol_id(name_node);
+      let function_id = self.symbols.kind(symbol_id).unwrap_function();
+
+      let return_type = self.functions.parameters(function_id).return_type;
+
       let returns_unit = self.types.kind(return_type).is_unit();
       let body_log = self.annotate_statement_list(
          ast,
@@ -100,14 +131,12 @@ impl<'s> SemTypes<'s> {
             NodeContext::Expression
          },
       );
+
       // Check that the body's return type is correct.
       let body_type = self.log.typ(body_log);
       if !returns_unit && body_type != return_type {
          return Ok(self.type_mismatch(ast, node, return_type, body_type));
       }
-
-      // After all is done, pop the function's scope off.
-      self.scope_stack.pop();
 
       Ok(self.annotate(ast, node, self.builtin.t_statement))
    }

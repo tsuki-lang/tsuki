@@ -9,10 +9,12 @@ mod operators;
 
 use std::path::Path;
 
+use smallvec::SmallVec;
+
 use crate::ast::{Ast, NodeHandle, NodeKind};
 use crate::common::{ErrorKind, Errors};
 use crate::functions::{register_intrinsics, Functions};
-use crate::scope::{ScopeStack, Scopes, Symbols};
+use crate::scope::{ScopeId, ScopeStack, Scopes, Symbols};
 use crate::sem::{SemCommon, SemPass};
 use crate::types::{BuiltinTypes, TypeId, TypeLog, TypeLogEntry, Types};
 
@@ -28,6 +30,12 @@ pub(crate) struct SemTypes<'s> {
    functions: &'s mut Functions,
 
    scope_stack: ScopeStack,
+   module_scope: ScopeId,
+   /// A stack of vectors of nodes to be sem'checked after the module's done being checked.
+   ///
+   /// The scope ID is used to determine where the given node is placed. The scope of the node's
+   /// body is determined from the node's metadata.
+   deferred: SmallVec<[Vec<(NodeHandle, NodeContext)>; 4]>,
 }
 
 /// Values borrowed to `SemTypes`, used during its construction.
@@ -78,6 +86,8 @@ impl<'s> SemTypes<'s> {
          functions,
 
          scope_stack,
+         module_scope,
+         deferred: SmallVec::new(),
       }
    }
 
@@ -105,6 +115,37 @@ impl<'s> SemTypes<'s> {
       let provided_name = self.types.name(got);
       let kind = ErrorKind::TypeMismatch(expected_name.to_owned(), provided_name.to_owned());
       self.error(ast, node, kind)
+   }
+
+   /// Returns whether sem'checking is currently happening in the module scope.
+   fn is_in_module_scope(&self) -> bool {
+      self.scope_stack.top() == self.module_scope
+   }
+
+   /// Pushes a new vector of defers.
+   fn push_defers(&mut self) {
+      self.deferred.push(Vec::new());
+   }
+
+   /// Pushes a new defer into the current vector of defers.
+   fn defer(&mut self, node: NodeHandle, context: NodeContext) {
+      let defers = self.deferred.last_mut().unwrap();
+      defers.push((node, context));
+   }
+
+   /// Pops the current vector of defers off, and
+   fn pop_defers(&mut self, ast: &mut Ast) {
+      let defers = self.deferred.pop().expect("unbalanced stack of defers");
+      for (node, context) in defers {
+         let scope = ast.scope(node);
+         if let Some(scope) = scope {
+            self.scope_stack.push(scope);
+         }
+         let _ = self.annotate_node(ast, node, context);
+         if let Some(_) = scope {
+            self.scope_stack.pop();
+         }
+      }
    }
 
    /// Annotates a literal with a concrete type.
@@ -256,7 +297,9 @@ impl SemPass for SemTypes<'_> {
 
    /// Performs type analysis for the given AST node. This annotates the node with a concrete type.
    fn analyze(&mut self, mut ast: Ast, root_node: NodeHandle) -> Ast {
+      self.push_defers();
       let _ = self.annotate_node(&mut ast, root_node, NodeContext::Statement);
+      self.pop_defers(&mut ast);
       ast
    }
 

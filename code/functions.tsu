@@ -21,3 +21,15 @@ fun fib(n: Int): Int
    else -> fib(n - 1) + fib(n - 2)
 
 __intrin_print_int32(fib(10))
+
+# test mutually recursive functions
+
+fun foo(x: Int)
+   if x < 10
+      bar(x + 2)
+
+fun bar(x: Int)
+   if x < 20
+      foo(x - 1)
+
+foo(0)
