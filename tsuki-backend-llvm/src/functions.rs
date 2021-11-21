@@ -21,17 +21,25 @@ pub struct Function<'c> {
 
 impl<'c> Function<'c> {
    /// Creates a new function from the given name and type.
-   pub fn new(
+   ///
+   /// # Side effects
+   ///
+   /// This adds the new function to the module.
+   pub fn add_to_module(
       context: &'c Context,
       module: &Module<'c>,
       name: &str,
       typ: FunctionType<'c>,
    ) -> Self {
+      // Unfortunately this side effect of adding the function into the module is unavoidable,
+      // as far as I know. I generally prefer code that is free of any side effects but I guess
+      // some sacrifices have to be made.
       let value = module.add_function(name, typ, None);
       let entry_block = context.append_basic_block(value, "entry");
       Self { value, entry_block }
    }
 
+   /// Creates a `Function` from an existing `FunctionValue`.
    pub fn from_value(value: FunctionValue<'c>) -> Self {
       Self {
          value,
@@ -83,7 +91,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
          // Skip non-local functions in the process.
          if ir.functions.kind(function_id).is_local() {
             let function_type = self.get_function_type(ir, function_id);
-            let _ = Function::new(
+            let _ = Function::add_to_module(
                self.context,
                self.module,
                ir.functions.mangled_name(function_id),

@@ -132,7 +132,7 @@ impl backend::Backend for LlvmBackend {
       let main_fun_type = i32_type.fn_type(&[], false);
 
       // Create the function and the codegen state.
-      let main_fun = Function::new(&context, &module, "main", main_fun_type);
+      let main_fun = Function::add_to_module(&context, &module, "main", main_fun_type);
       let state = CodeGen::new(&root, &context, &pm, &module, main_fun);
       state.add_functions(&ir);
 
