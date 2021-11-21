@@ -1,8 +1,7 @@
 //! Conversion from tsuki types into LLVM types.
 
-use inkwell::types::{AnyType, AnyTypeEnum, BasicType, BasicTypeEnum, FloatType, IntType};
+use inkwell::types::{BasicType, BasicTypeEnum, FloatType, IntType};
 use inkwell::values::StructValue;
-use tsuki_frontend::ast::{Ast, NodeHandle};
 use tsuki_frontend::types::{FloatSize, IntegerSize, TypeId, TypeKind, Types};
 
 use crate::codegen::CodeGen;

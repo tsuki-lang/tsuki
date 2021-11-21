@@ -1,6 +1,6 @@
 //! Function registry.
 
-use smallvec::{smallvec, SmallVec};
+use smallvec::SmallVec;
 
 use crate::ast::{NodeHandle, NodeKind};
 use crate::scope::{Mutability, ScopeId, Scopes, SymbolId, SymbolKind, Symbols, Variable};

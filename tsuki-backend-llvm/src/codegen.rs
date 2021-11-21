@@ -8,7 +8,7 @@ use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::passes::PassManager;
 use inkwell::types::StructType;
-use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue};
+use inkwell::values::{BasicValueEnum, FunctionValue};
 use tsuki_frontend::ast::{NodeHandle, NodeKind};
 use tsuki_frontend::common::SourceFile;
 use tsuki_frontend::sem::Ir;

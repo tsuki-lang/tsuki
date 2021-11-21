@@ -4,11 +4,11 @@ use inkwell::basic_block::BasicBlock;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
-use inkwell::types::{AnyType, BasicType, BasicTypeEnum, FunctionType};
+use inkwell::types::{BasicType, BasicTypeEnum, FunctionType};
 use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue};
 use smallvec::SmallVec;
 use tsuki_frontend::ast::NodeHandle;
-use tsuki_frontend::functions::{FunctionId, FunctionKind};
+use tsuki_frontend::functions::FunctionId;
 use tsuki_frontend::sem::Ir;
 
 use crate::codegen::CodeGen;
