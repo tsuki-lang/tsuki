@@ -5,7 +5,7 @@ use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::types::{AnyType, BasicType, BasicTypeEnum, FunctionType};
-use inkwell::values::{BasicValue, FunctionValue, PointerValue};
+use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue};
 use smallvec::SmallVec;
 use tsuki_frontend::ast::NodeHandle;
 use tsuki_frontend::functions::FunctionId;
@@ -119,5 +119,26 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
 
       // Finish the function up.
       code_gen.finish_function(return_value);
+   }
+
+   /// Generates code for a function call.
+   pub(crate) fn generate_call(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
+      // Get the function we want to call.
+      let callee_node = ir.ast.first_handle(node);
+      let symbol_id = ir.ast.symbol_id(callee_node);
+      let function_id = ir.symbols.kind(symbol_id).unwrap_function();
+      let function = self
+         .module
+         .get_function(ir.functions.mangled_name(function_id))
+         .expect("function does not seem to exist");
+
+      // Generate code for all the arguments.
+      let mut arguments = SmallVec::<[BasicValueEnum<'c>; 8]>::new();
+      for &argument in ir.ast.extra(node).unwrap_node_list() {
+         arguments.push(self.generate_expression(ir, argument));
+      }
+      let call = self.builder.build_call(function, &arguments, "calltmp");
+
+      call.try_as_basic_value().either(|value| value, |_void| self.generate_unit_literal().into())
    }
 }

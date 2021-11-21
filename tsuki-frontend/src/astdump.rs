@@ -67,9 +67,7 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
       _ => (),
    }
    match extra {
-      number
-      @
-      (NodeData::Uint8(..)
+      number @ (NodeData::Uint8(..)
       | NodeData::Uint16(..)
       | NodeData::Uint32(..)
       | NodeData::Uint64(..)
@@ -139,6 +137,7 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
       | NodeKind::Unwrap
       | NodeKind::Deref
       | NodeKind::Call
+      | NodeKind::CallFunction
       | NodeKind::Not
       | NodeKind::Neg
       | NodeKind::BitNot
@@ -164,7 +163,7 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
                | NodeKind::BitNot
                | NodeKind::Member
                | NodeKind::Ref => Prefix::R,
-               NodeKind::Call => Prefix::Fun,
+               NodeKind::Call | NodeKind::CallFunction => Prefix::Fun,
                NodeKind::IfBranch | NodeKind::While => Prefix::Cond,
                NodeKind::FormalParameters => Prefix::Return,
                NodeKind::NamedParameters => Prefix::Type,

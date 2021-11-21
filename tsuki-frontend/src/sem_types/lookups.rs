@@ -48,10 +48,10 @@ impl<'s> SemTypes<'s> {
       &mut self,
       ast: &Ast,
       node: NodeHandle,
-   ) -> Result<FunctionId, TypeLogEntry> {
+   ) -> Result<(SymbolId, FunctionId), TypeLogEntry> {
       let symbol = self.lookup_identifier(ast, node)?;
       if let &SymbolKind::Function(id) = self.symbols.kind(symbol) {
-         Ok(id)
+         Ok((symbol, id))
       } else {
          Err(self.error(ast, node, ErrorKind::ExpressionCannotBeCalled))
       }

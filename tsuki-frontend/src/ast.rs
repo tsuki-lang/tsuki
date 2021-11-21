@@ -467,6 +467,7 @@ pub enum NodeKind {
    DoStatement,
    IfExpression,
    IfStatement,
+   CallFunction,
 
    // Intrinsics
    WidenUint,

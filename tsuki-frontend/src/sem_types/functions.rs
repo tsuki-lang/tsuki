@@ -115,11 +115,13 @@ impl<'s> SemTypes<'s> {
       if ast.kind(callee_node) != NodeKind::Identifier {
          return Ok(self.error(ast, callee_node, ErrorKind::ExpressionCannotBeCalled));
       }
-      let function = self.lookup_function(ast, callee_node)?;
+      let (symbol_id, function_id) = self.lookup_function(ast, callee_node)?;
+      // Convert the callee to a symbol.
+      ast.convert_to_symbol(callee_node, symbol_id);
 
       // Check if we have the right amount of arguments.
       let given_parameter_count = ast.extra(node).unwrap_node_list().len();
-      let declared_parameter_count = self.functions.parameters(function).formal.len();
+      let declared_parameter_count = self.functions.parameters(function_id).formal.len();
       if given_parameter_count != declared_parameter_count {
          return Ok(self.error(
             ast,
@@ -132,7 +134,7 @@ impl<'s> SemTypes<'s> {
       // messages as we can.
       let mut last_error = None;
       ast.walk_node_list_mut(node, |ast, index, argument| {
-         let parameters = self.functions.parameters(function);
+         let parameters = self.functions.parameters(function_id);
          let expected_type = self.symbols.type_id(parameters.formal[index]);
 
          let argument_log = self.annotate_node(ast, argument, NodeContext::Expression);
@@ -152,12 +154,16 @@ impl<'s> SemTypes<'s> {
          return Ok(error);
       }
 
-      if let &FunctionKind::Intrinsic(intrinsic) = self.functions.kind(function) {
+      if let &FunctionKind::Intrinsic(intrinsic) = self.functions.kind(function_id) {
          // Intrinsic calls have some transformation magic going on.
          self.annotate_intrinsic_call(ast, node, intrinsic);
+      } else {
+         // For other calls, we use the CallFunction node, which is a normalized version of `Call`
+         // that takes the form of `function_name(params)`. Even for instance functions.
+         ast.convert_preserve(node, NodeKind::CallFunction);
       }
 
-      let return_type = self.functions.parameters(function).return_type;
+      let return_type = self.functions.parameters(function_id).return_type;
       Ok(self.annotate(ast, node, return_type))
    }
 
