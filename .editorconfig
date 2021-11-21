@@ -3,12 +3,7 @@ root = true
 [*]
 end_of_line = lf
 
-[*.rs]
+[*.{rs,tsu}]
 indent_size = 3
 indent_style = space
 max_line_length = 100
-
-[*.tsu]
-indent_size = 2
-indent_style = space
-max_line_length = 80
