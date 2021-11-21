@@ -30,6 +30,9 @@ impl<'s> SemTypes<'s> {
       let formal_parameters_node = ast.second_handle(parameters_node);
 
       // Create a scope for the generic and formal parameters.
+      // We save the declaration scope for later, as that's where we'll be adding the function
+      // symbol itself.
+      let declaration_scope = self.scope_stack.top();
       let scope = self.scope_stack.push(self.scopes.create_scope());
       ast.set_scope(node, Some(scope));
 
@@ -67,6 +70,25 @@ impl<'s> SemTypes<'s> {
          self.builtin.t_unit
       };
 
+      // Register the function in the registry and add it to scope.
+      // Registering the function _here_ allows for the referring to the function inside its
+      // body, enabling recursion.
+      let function_id = self.functions.create(
+         name.to_owned(),
+         mangled_name,
+         Parameters {
+            formal: parameters,
+            return_type,
+         },
+         FunctionKind::Local,
+      );
+      let symbol_kind = SymbolKind::Function(function_id);
+      // TODO: Function/closure types. Right now we treat function symbols as having the
+      // 'statement' type, which isn't exactly correct.
+      let symbol = self.symbols.create(name, node, self.builtin.t_statement, symbol_kind);
+      self.scopes.insert(declaration_scope, name, symbol);
+      ast.convert_to_symbol(name_node, symbol);
+
       // Sem'check the function's body.
       let returns_unit = self.types.kind(return_type).is_unit();
       let body_log = self.annotate_statement_list(
@@ -86,23 +108,6 @@ impl<'s> SemTypes<'s> {
 
       // After all is done, pop the function's scope off.
       self.scope_stack.pop();
-
-      // Register the function in the registry and add it to scope.
-      let function_id = self.functions.create(
-         name.to_owned(),
-         mangled_name,
-         Parameters {
-            formal: parameters,
-            return_type,
-         },
-         FunctionKind::Local,
-      );
-      let symbol_kind = SymbolKind::Function(function_id);
-      // TODO: Function/closure types. Right now we treat function symbols as having the
-      // 'statement' type, which isn't exactly correct.
-      let symbol = self.symbols.create(name, node, self.builtin.t_statement, symbol_kind);
-      self.add_to_scope(name, symbol);
-      ast.convert_to_symbol(name_node, symbol);
 
       Ok(self.annotate(ast, node, self.builtin.t_statement))
    }
