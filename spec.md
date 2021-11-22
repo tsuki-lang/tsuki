@@ -1659,6 +1659,43 @@ print(add_two[Int64](2))  # 4
 val c = MyContainer[Int] {}
 ```
 
+`impl` blocks can have generic parameters. Note that the parameters are specified after the `impl` keyword, as implementations don't define any symbols on their own.
+```
+impl[T] Seq[T]
+   _
+```
+These generic parameters are used to provide generic _arguments_ to types. Constraints for generic parameters in `impl` blocks are inferred automatically, so it's only required to specify a master set of constraints wherever the implemented type is declared:
+```
+object Vec2[T]
+where
+   T: Default
+
+   var x, y: T
+
+# Here, the T is inferred to have the Default constraint.
+impl[T] Vec2[T]
+   fn zero(): Self
+      Self {
+         x = T.default(),
+         y = T.default(),
+      }
+```
+Additional constraints can be specified after the `impl` block's implemented type. This can be used to only enable certain sets of functions when a generic parameter implements some trait:
+```
+impl[T] Add[Self] for Vec2[T]
+where
+   T: Add[T]
+
+   type Result = Self
+
+   fun add(self, rhs: T): Self
+      Self {
+         x = self.x + rhs.x,
+         y = self.y + rhs.y,
+      }
+```
+In the example above, `Vec2[T]` will only overload the `+` operator if `T` implements the `Add[T]` trait.
+
 # Modules
 
 tsuki programs are always split into modules. Compilation is performed by telling the compiler which module is the main module, and the compiler will recursively compile every module imported into the program.
