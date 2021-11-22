@@ -1,6 +1,18 @@
 # tsuki
 
-My idea for a programming language that's actually fun to program in.
+An elegant, robust, and efficient programming language, that just lets you get things done.
+
+---
+
+# Preamble
+
+Dear reader,
+
+What you're reading here, is my ([@liquidev](https://github.com/liquidev)'s) vision, of what a _fun_ programming language looks like. A programming language that focuses on usability, readability, and sensible defaults, while letting the programmer decide when they need to use advanced, more low-level features, to squeeze out extra performance.
+
+Right now, this document is not much more than a vision for what the language should be. The first compiler is _nowhere_ near complete, but I appreciate that you're reading this informal specification about what I'd like this language to become.
+
+Enjoy programming, and have fun reading.
 
 ---
 
