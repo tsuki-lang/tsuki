@@ -39,7 +39,7 @@ struct State<'s, 'a, 't> {
    types: Option<&'t Types>,
 }
 
-fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) {
+fn dump_node(s: &State, node: NodeId, depth: usize, prefix: Option<Prefix>) {
    let State { file, ast, types } = s;
    print_indentation(depth);
 
@@ -190,6 +190,6 @@ fn dump_node(s: &State, node: NodeHandle, depth: usize, prefix: Option<Prefix>) 
 }
 
 /// Prints the AST to stdout, starting from the given root node.
-pub fn dump_ast(file: &SourceFile, ast: &Ast, types: Option<&Types>, root_node: NodeHandle) {
+pub fn dump_ast(file: &SourceFile, ast: &Ast, types: Option<&Types>, root_node: NodeId) {
    dump_node(&State { file, ast, types }, root_node, 0, None);
 }

@@ -1,6 +1,6 @@
 /// Code generation for variable declarations.
 use inkwell::values::{BasicValueEnum, PointerValue};
-use tsuki_frontend::ast::{NodeHandle, NodeKind};
+use tsuki_frontend::ast::{NodeId, NodeKind};
 use tsuki_frontend::scope::SymbolId;
 use tsuki_frontend::sem::Ir;
 
@@ -39,11 +39,7 @@ impl<'c> Variables<'c> {
 
 impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    /// Generates code for a variable reference.
-   pub(crate) fn generate_variable_reference(
-      &self,
-      ir: &Ir,
-      node: NodeHandle,
-   ) -> BasicValueEnum<'c> {
+   pub(crate) fn generate_variable_reference(&self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
       let symbol_node = ir.ast.first_handle(node);
       let symbol = ir.ast.symbol_id(symbol_node);
 
@@ -53,7 +49,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for variable declarations.
-   pub(crate) fn generate_variable_declaration(&self, ir: &Ir, node: NodeHandle) {
+   pub(crate) fn generate_variable_declaration(&self, ir: &Ir, node: NodeId) {
       let symbol_node = ir.ast.first_handle(node);
       let symbol = ir.ast.symbol_id(symbol_node);
 
@@ -73,17 +69,13 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for `AssignDiscard`.
-   pub(crate) fn generate_discarding_assignment(&self, ir: &Ir, node: NodeHandle) {
+   pub(crate) fn generate_discarding_assignment(&self, ir: &Ir, node: NodeId) {
       let value_node = ir.ast.first_handle(node);
       let _ = self.generate_expression(ir, value_node);
    }
 
    /// Generates code for assignments to variables.
-   pub(crate) fn generate_assignment(
-      &self,
-      ir: &Ir,
-      node: NodeHandle,
-   ) -> Option<BasicValueEnum<'c>> {
+   pub(crate) fn generate_assignment(&self, ir: &Ir, node: NodeId) -> Option<BasicValueEnum<'c>> {
       // When the assignment is not an expression, we do a little optimization where we don't
       // generate the load
       let result_type = ir.ast.type_id(node);

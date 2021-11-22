@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crate::ast::{Ast, NodeHandle};
+use crate::ast::{Ast, NodeId};
 use crate::common::{Error, ErrorKind, Errors, SourceFile, Span};
 use crate::functions::Functions;
 use crate::scope::{Scopes, Symbols};
@@ -17,7 +17,7 @@ pub(crate) trait SemPass {
    type Result;
 
    /// Analyzes the AST from the given root node, and returns the modified version of the AST.
-   fn analyze(&mut self, ast: Ast, root_node: NodeHandle) -> Ast;
+   fn analyze(&mut self, ast: Ast, root_node: NodeId) -> Ast;
 
    /// Returns the filename string.
    fn filename(&self) -> &Path;
@@ -42,7 +42,7 @@ pub(crate) trait SemPass {
 /// Semantic analysis state.
 struct Analyzer {
    ast: Ast,
-   root_node: NodeHandle,
+   root_node: NodeId,
 }
 
 impl Analyzer {
@@ -66,7 +66,7 @@ pub(crate) struct SemCommon<'s> {
 
 impl<'s> SemCommon<'s> {
    /// Returns the source code substring pointed to by the node's `first..second`.
-   pub fn get_source_range_from_node(&self, ast: &Ast, node: NodeHandle) -> &str {
+   pub fn get_source_range_from_node(&self, ast: &Ast, node: NodeId) -> &str {
       let source_range = ast.first(node)..ast.second(node);
       &self.file.source[source_range]
    }
@@ -76,7 +76,7 @@ impl<'s> SemCommon<'s> {
 /// information.
 pub struct Ir {
    pub ast: Ast,
-   pub root_node: NodeHandle,
+   pub root_node: NodeId,
    pub types: Types,
    pub symbols: Symbols,
    pub functions: Functions,
@@ -86,7 +86,7 @@ pub struct Ir {
 pub struct AnalyzeOptions<'s> {
    pub file: &'s SourceFile,
    pub ast: Ast,
-   pub root_node: NodeHandle,
+   pub root_node: NodeId,
    pub default_types: DefaultTypes,
 }
 

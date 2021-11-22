@@ -1,6 +1,6 @@
 //! Implicit conversions between types.
 
-use crate::ast::{Ast, NodeData, NodeHandle, NodeKind};
+use crate::ast::{Ast, NodeData, NodeId, NodeKind};
 use crate::types::{FloatSize, IntegerSize, TypeId, TypeLogEntry};
 
 use super::SemTypes;
@@ -10,12 +10,7 @@ impl<'s> SemTypes<'s> {
    ///
    /// For literal nodes, this converts the literal directly. For other nodes, this wraps the node
    /// in a `WidenUint` or `WidenInt` with the type set to represent the new size.
-   fn widen_integer(
-      &mut self,
-      ast: &mut Ast,
-      node: NodeHandle,
-      new_size: IntegerSize,
-   ) -> TypeLogEntry {
+   fn widen_integer(&mut self, ast: &mut Ast, node: NodeId, new_size: IntegerSize) -> TypeLogEntry {
       if ast.kind(node).is_integer() {
          // Shortcut path for literals.
          let as_uint = ast.extra(node).unwrap_uint();
@@ -72,7 +67,7 @@ impl<'s> SemTypes<'s> {
    /// Widens a float node to the given size.
    ///
    /// Behavior with literals is similar to `widen_integer`.
-   fn widen_float(&mut self, ast: &mut Ast, node: NodeHandle, new_size: FloatSize) -> TypeLogEntry {
+   fn widen_float(&mut self, ast: &mut Ast, node: NodeId, new_size: FloatSize) -> TypeLogEntry {
       if ast.kind(node).is_float() {
          let as_float = ast.extra(node).unwrap_float();
          ast.convert(
@@ -107,7 +102,7 @@ impl<'s> SemTypes<'s> {
    pub(super) fn perform_implicit_conversion(
       &mut self,
       ast: &mut Ast,
-      node: NodeHandle,
+      node: NodeId,
       from: TypeId,
       to: TypeId,
    ) -> Option<TypeLogEntry> {

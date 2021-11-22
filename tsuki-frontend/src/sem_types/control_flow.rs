@@ -1,6 +1,6 @@
 //! Type analysis for control flow constructs.
 
-use crate::ast::{Ast, NodeHandle, NodeKind};
+use crate::ast::{Ast, NodeId, NodeKind};
 use crate::common::ErrorKind;
 use crate::sem::SemPass;
 use crate::types::TypeLogEntry;
@@ -9,7 +9,7 @@ use super::{NodeContext, SemTypes};
 
 impl<'s> SemTypes<'s> {
    /// Annotates a "pass" (`_`) statement.
-   pub(super) fn annotate_pass(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
+   pub(super) fn annotate_pass(&mut self, ast: &mut Ast, node: NodeId) -> TypeLogEntry {
       self.annotate(ast, node, self.builtin.t_statement)
    }
 
@@ -17,7 +17,7 @@ impl<'s> SemTypes<'s> {
    pub(super) fn annotate_do(
       &mut self,
       ast: &mut Ast,
-      node: NodeHandle,
+      node: NodeId,
       context: NodeContext,
    ) -> TypeLogEntry {
       let scope = self.scope_stack.push(self.scopes.create_scope());
@@ -38,7 +38,7 @@ impl<'s> SemTypes<'s> {
    pub(super) fn annotate_if(
       &mut self,
       ast: &mut Ast,
-      node: NodeHandle,
+      node: NodeId,
       context: NodeContext,
    ) -> TypeLogEntry {
       let mut typ = None;
@@ -86,7 +86,7 @@ impl<'s> SemTypes<'s> {
    }
 
    /// Annotates a `while` loop.
-   pub(super) fn annotate_while(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
+   pub(super) fn annotate_while(&mut self, ast: &mut Ast, node: NodeId) -> TypeLogEntry {
       let condition_node = ast.first_handle(node);
       let condition_entry = self.annotate_node(ast, condition_node, NodeContext::Expression);
       let condition_type = self.log.typ(condition_entry);

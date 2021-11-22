@@ -11,13 +11,13 @@ use crate::types::TypeId;
 /// A handle to a single node in the AST. The actual AST is not stored next to the handle for
 /// efficiency and appeasing the borrow checker.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct NodeHandle(usize);
+pub struct NodeId(usize);
 
-impl NodeHandle {
+impl NodeId {
    /// Returns the null node handle. This handle always points to the Empty node and denotes the
    /// lack of a usable node.
-   pub fn null() -> NodeHandle {
-      NodeHandle(0)
+   pub fn null() -> NodeId {
+      NodeId(0)
    }
 
    /// Returns the raw ID stored in the node handle.
@@ -41,7 +41,7 @@ pub struct Ast {
    extra: Vec<NodeData>,
    /// Converted nodes duplicate their old nodes and store them in this table.
    /// Nodes that don't have a valid ancestor have this set to the null node.
-   ancestors: Vec<NodeHandle>,
+   ancestors: Vec<NodeId>,
    /// The type information is stored inside of the AST so that duplications also copy type info
    /// around.
    types: Vec<TypeId>,
@@ -70,133 +70,133 @@ impl Ast {
 
    /// Creates a new node of the given kind and returns a handle to it.
    #[must_use]
-   pub fn create_node(&mut self, kind: NodeKind) -> NodeHandle {
+   pub fn create_node(&mut self, kind: NodeKind) -> NodeId {
       let id = self.kinds.len();
       self.kinds.push(kind);
       self.spans.push(Span::default());
       self.first.push(0);
       self.second.push(0);
       self.extra.push(NodeData::None);
-      self.ancestors.push(NodeHandle::null());
+      self.ancestors.push(NodeId::null());
       self.types.push(TypeId::null());
       self.scopes.push(None);
-      NodeHandle(id)
+      NodeId(id)
    }
 
    /// Returns the kind of the node behind the given handle.
-   pub fn kind(&self, handle: NodeHandle) -> NodeKind {
-      self.kinds[handle.0]
+   pub fn kind(&self, node: NodeId) -> NodeKind {
+      self.kinds[node.0]
    }
 
    /// Returns the span of the given handle.
-   pub fn span(&self, handle: NodeHandle) -> &Span {
-      &self.spans[handle.0]
+   pub fn span(&self, node: NodeId) -> &Span {
+      &self.spans[node.0]
    }
 
    /// Sets the span of the given handle.
-   pub fn set_span(&mut self, handle: NodeHandle, span: Span) {
-      self.spans[handle.0] = span;
+   pub fn set_span(&mut self, node: NodeId, span: Span) {
+      self.spans[node.0] = span;
    }
 
    /// Returns the first value of the node with the given handle.
-   pub fn first(&self, handle: NodeHandle) -> usize {
-      self.first[handle.0]
+   pub fn first(&self, node: NodeId) -> usize {
+      self.first[node.0]
    }
 
    /// Returns the first value of the node with the given handle. The stored value is interpreted
    /// as a node handle.
-   pub fn first_handle(&self, handle: NodeHandle) -> NodeHandle {
-      NodeHandle(self.first[handle.0])
+   pub fn first_handle(&self, node: NodeId) -> NodeId {
+      NodeId(self.first[node.0])
    }
 
    /// Sets the first value of a node handle.
-   pub fn set_first(&mut self, handle: NodeHandle, first: usize) {
-      self.first[handle.0] = first;
+   pub fn set_first(&mut self, node: NodeId, first: usize) {
+      self.first[node.0] = first;
    }
 
    /// Sets the first value of a node handle. The value stored is a node handle.
-   pub fn set_first_handle(&mut self, handle: NodeHandle, first: NodeHandle) {
-      self.first[handle.0] = first.0;
+   pub fn set_first_handle(&mut self, node: NodeId, first: NodeId) {
+      self.first[node.0] = first.0;
    }
 
    /// Returns the symbol ID stored in a node. This function must only be used on nodes whose kind
    /// is `NodeKind::Symbol`.
-   pub fn symbol_id(&self, handle: NodeHandle) -> SymbolId {
+   pub fn symbol_id(&self, node: NodeId) -> SymbolId {
       assert!(
-         self.kind(handle) == NodeKind::Symbol,
+         self.kind(node) == NodeKind::Symbol,
          "node passed to symbol_id must be a symbol"
       );
-      SymbolId::new(self.first(handle))
+      SymbolId::new(self.first(node))
    }
 
    /// Sets the first value of a node to the given symbol ID. This function must only be used on
    /// nodes whose kind is `NodeKind::Symbol`.
-   pub fn set_symbol_id(&mut self, handle: NodeHandle, symbol: SymbolId) {
+   pub fn set_symbol_id(&mut self, node: NodeId, symbol: SymbolId) {
       assert!(
-         self.kind(handle) == NodeKind::Symbol,
+         self.kind(node) == NodeKind::Symbol,
          "node passed to set_symbol_id must be a symbol"
       );
-      self.set_first(handle, symbol.id())
+      self.set_first(node, symbol.id())
    }
 
    /// Returns the second value of the node with the given handle.
-   pub fn second(&self, handle: NodeHandle) -> usize {
-      self.second[handle.0]
+   pub fn second(&self, node: NodeId) -> usize {
+      self.second[node.0]
    }
 
    /// Returns the second value of the node with the given handle. The stored value is interpreted
    /// as a node handle.
-   pub fn second_handle(&self, handle: NodeHandle) -> NodeHandle {
-      NodeHandle(self.second[handle.0])
+   pub fn second_handle(&self, node: NodeId) -> NodeId {
+      NodeId(self.second[node.0])
    }
 
    /// Sets the second value of a node handle.
-   pub fn set_second(&mut self, handle: NodeHandle, second: usize) {
-      self.second[handle.0] = second;
+   pub fn set_second(&mut self, node: NodeId, second: usize) {
+      self.second[node.0] = second;
    }
 
    /// Sets the second value of a node handle. The value stored is a node handle.
-   pub fn set_second_handle(&mut self, handle: NodeHandle, second: NodeHandle) {
-      self.second[handle.0] = second.0;
+   pub fn set_second_handle(&mut self, node: NodeId, second: NodeId) {
+      self.second[node.0] = second.0;
    }
 
    /// Returns a reference to the extra data for the node with the given handle.
-   pub fn extra(&self, handle: NodeHandle) -> &NodeData {
-      &self.extra[handle.0]
+   pub fn extra(&self, node: NodeId) -> &NodeData {
+      &self.extra[node.0]
    }
 
    /// Sets the extra data for the node with the given handle.
-   pub fn set_extra(&mut self, handle: NodeHandle, data: NodeData) {
-      self.extra[handle.0] = data;
+   pub fn set_extra(&mut self, node: NodeId, data: NodeData) {
+      self.extra[node.0] = data;
    }
 
    /// Returns the ancestor of the node.
-   pub fn ancestor(&self, handle: NodeHandle) -> NodeHandle {
-      self.ancestors[handle.0]
+   pub fn ancestor(&self, node: NodeId) -> NodeId {
+      self.ancestors[node.0]
    }
 
    /// Returns the type ID of the given node.
-   pub fn type_id(&self, handle: NodeHandle) -> TypeId {
-      self.types[handle.0]
+   pub fn type_id(&self, node: NodeId) -> TypeId {
+      self.types[node.0]
    }
 
    /// Sets the type ID of the given node.
-   pub fn set_type_id(&mut self, handle: NodeHandle, typ: TypeId) {
-      self.types[handle.0] = typ;
+   pub fn set_type_id(&mut self, node: NodeId, typ: TypeId) {
+      self.types[node.0] = typ;
    }
 
    /// Returns the scope that is introduced by this node, or `None` if it doesn't introduce a scope.
-   pub fn scope(&self, handle: NodeHandle) -> Option<ScopeId> {
-      self.scopes[handle.0]
+   pub fn scope(&self, node: NodeId) -> Option<ScopeId> {
+      self.scopes[node.0]
    }
 
    /// Sets the scope that is introduced by the node.
-   pub fn set_scope(&mut self, handle: NodeHandle, scope: Option<ScopeId>) {
-      self.scopes[handle.0] = scope;
+   pub fn set_scope(&mut self, node: NodeId, scope: Option<ScopeId>) {
+      self.scopes[node.0] = scope;
    }
 
    /// Duplicates the given node, and returns a handle to the new node.
-   fn duplicate(&mut self, node: NodeHandle) -> NodeHandle {
+   fn duplicate(&mut self, node: NodeId) -> NodeId {
       let new = self.create_node(self.kind(node));
       self.set_span(new, self.span(node).clone());
       self.set_first(new, self.first(node));
@@ -210,7 +210,7 @@ impl Ast {
    }
 
    /// Converts the given node to a new node of the given kind, preserving its metadata.
-   pub fn convert_preserve(&mut self, node: NodeHandle, kind: NodeKind) {
+   pub fn convert_preserve(&mut self, node: NodeId, kind: NodeKind) {
       self.ancestors[node.0] = self.duplicate(node);
       self.kinds[node.0] = kind;
    }
@@ -218,7 +218,7 @@ impl Ast {
    /// Converts the given node to a new node of the given kind.
    /// Field values are not preserved, and instead moved to a new node, which is set to be the
    /// ancestor of the existing node.
-   pub fn convert(&mut self, node: NodeHandle, kind: NodeKind) {
+   pub fn convert(&mut self, node: NodeId, kind: NodeKind) {
       self.convert_preserve(node, kind);
       self.set_span(node, Span::default());
       self.set_first(node, 0);
@@ -228,7 +228,7 @@ impl Ast {
    }
 
    /// Converts the given node to a symbol node.
-   pub fn convert_to_symbol(&mut self, node: NodeHandle, symbol: SymbolId) {
+   pub fn convert_to_symbol(&mut self, node: NodeId, symbol: SymbolId) {
       let span = self.span(node).clone();
       self.convert(node, NodeKind::Symbol);
       self.set_symbol_id(node, symbol);
@@ -239,7 +239,7 @@ impl Ast {
    ///
    /// That is, converts the given node to the given kind, and sets the `first` to the
    /// ancestor node.
-   pub fn wrap(&mut self, node: NodeHandle, kind: NodeKind) {
+   pub fn wrap(&mut self, node: NodeId, kind: NodeKind) {
       let span = self.span(node).clone();
       self.convert(node, kind);
       self.set_first_handle(node, self.ancestors[node.0]);
@@ -294,31 +294,31 @@ macro_rules! walk_impl {
 impl Ast {
    /// Walks through the node data of a node whose `NodeData` is a node list.
    /// If the `NodeData` isn't a node list, this is a noop.
-   pub fn walk_node_list(&self, node: NodeHandle, mut then: impl FnMut(&Self, usize, NodeHandle)) {
+   pub fn walk_node_list(&self, node: NodeId, mut then: impl FnMut(&Self, usize, NodeId)) {
       walk_node_list_impl!(self, node, then);
    }
 
    /// Same as `walk_node_list`, but `self` is mutable.
    pub fn walk_node_list_mut(
       &mut self,
-      node: NodeHandle,
-      mut then: impl FnMut(&mut Self, usize, NodeHandle),
+      node: NodeId,
+      mut then: impl FnMut(&mut Self, usize, NodeId),
    ) {
       walk_node_list_impl!(self, node, then);
    }
 
    /// Walks through the given node's children.
-   pub fn walk(&self, node: NodeHandle, mut then: impl FnMut(&Self, NodeHandle)) {
+   pub fn walk(&self, node: NodeId, mut then: impl FnMut(&Self, NodeId)) {
       walk_impl!(self, node, then, walk_node_list);
    }
 
    /// Walks through the given node's children, but the first argument of `then` is mutable.
-   pub fn walk_mut(&mut self, node: NodeHandle, mut then: impl FnMut(&mut Self, NodeHandle)) {
+   pub fn walk_mut(&mut self, node: NodeId, mut then: impl FnMut(&mut Self, NodeId)) {
       walk_impl!(self, node, then, walk_node_list_mut);
    }
 
    /// Returns whether the given index is the last child index in a node's node list.
-   pub fn is_last_child(&self, parent: NodeHandle, index: usize) -> bool {
+   pub fn is_last_child(&self, parent: NodeId, index: usize) -> bool {
       if let NodeData::NodeList(list) = self.extra(parent) {
          index == list.len() - 1
       } else {
@@ -516,7 +516,7 @@ impl NodeKind {
 #[derive(Clone, Debug)]
 pub enum NodeData {
    None,
-   NodeList(Vec<NodeHandle>),
+   NodeList(Vec<NodeId>),
    // Resolved Integer and Float literals are stored as NodeData, because `usize` doesn't
    // necessarily have to be a `u64` internally. This also avoids some `std::mem::transmute`s for
    // signed integers and floating-point numbers. Overall, I don't think integer literals are
@@ -535,7 +535,7 @@ pub enum NodeData {
 
 impl NodeData {
    /// Unwraps a node list, or panics if the data aren't a node list.
-   pub fn unwrap_node_list(&self) -> &[NodeHandle] {
+   pub fn unwrap_node_list(&self) -> &[NodeId] {
       if let Self::NodeList(list) = self {
          &list
       } else {
@@ -575,13 +575,13 @@ pub struct NodeHandles {
 }
 
 impl Iterator for NodeHandles {
-   type Item = NodeHandle;
+   type Item = NodeId;
 
    fn next(&mut self) -> Option<Self::Item> {
       if self.i < self.len {
          let id = self.i;
          self.i += 1;
-         Some(NodeHandle(id))
+         Some(NodeId(id))
       } else {
          None
       }

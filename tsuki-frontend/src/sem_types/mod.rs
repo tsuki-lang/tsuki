@@ -11,7 +11,7 @@ use std::path::Path;
 
 use smallvec::SmallVec;
 
-use crate::ast::{Ast, NodeHandle, NodeKind};
+use crate::ast::{Ast, NodeId, NodeKind};
 use crate::common::{ErrorKind, Errors};
 use crate::functions::{register_intrinsics, Functions};
 use crate::scope::{ScopeId, ScopeStack, Scopes, Symbols};
@@ -35,7 +35,7 @@ pub(crate) struct SemTypes<'s> {
    ///
    /// The scope ID is used to determine where the given node is placed. The scope of the node's
    /// body is determined from the node's metadata.
-   deferred: SmallVec<[Vec<(NodeHandle, NodeContext)>; 4]>,
+   deferred: SmallVec<[Vec<(NodeId, NodeContext)>; 4]>,
 }
 
 /// Values borrowed to `SemTypes`, used during its construction.
@@ -92,13 +92,13 @@ impl<'s> SemTypes<'s> {
    }
 
    /// Annotates the given AST with the given type, and returns the type.
-   fn annotate(&mut self, ast: &mut Ast, node: NodeHandle, typ: TypeId) -> TypeLogEntry {
+   fn annotate(&mut self, ast: &mut Ast, node: NodeId, typ: TypeId) -> TypeLogEntry {
       ast.set_type_id(node, typ);
       self.log.push(typ, node)
    }
 
    /// Emits an error of the given kind, also returning the error type.
-   fn error(&mut self, ast: &Ast, node: NodeHandle, kind: ErrorKind) -> TypeLogEntry {
+   fn error(&mut self, ast: &Ast, node: NodeId, kind: ErrorKind) -> TypeLogEntry {
       self.emit_error(kind, ast.span(node).clone());
       self.log.push(self.builtin.t_error, node)
    }
@@ -107,7 +107,7 @@ impl<'s> SemTypes<'s> {
    fn type_mismatch(
       &mut self,
       ast: &Ast,
-      node: NodeHandle,
+      node: NodeId,
       expected: TypeId,
       got: TypeId,
    ) -> TypeLogEntry {
@@ -128,7 +128,7 @@ impl<'s> SemTypes<'s> {
    }
 
    /// Pushes a new defer into the current vector of defers.
-   fn defer(&mut self, node: NodeHandle, context: NodeContext) {
+   fn defer(&mut self, node: NodeId, context: NodeContext) {
       let defers = self.deferred.last_mut().unwrap();
       defers.push((node, context));
    }
@@ -149,7 +149,7 @@ impl<'s> SemTypes<'s> {
    }
 
    /// Annotates a literal with a concrete type.
-   fn annotate_literal(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogEntry {
+   fn annotate_literal(&mut self, ast: &mut Ast, node: NodeId) -> TypeLogEntry {
       let typ = match ast.kind(node) {
          NodeKind::True => self.builtin.t_bool,
          NodeKind::False => self.builtin.t_bool,
@@ -173,7 +173,7 @@ impl<'s> SemTypes<'s> {
    fn annotate_statement_list(
       &mut self,
       ast: &mut Ast,
-      node: NodeHandle,
+      node: NodeId,
       context: NodeContext,
    ) -> TypeLogEntry {
       let mut last_log = None;
@@ -222,12 +222,7 @@ impl<'s> SemTypes<'s> {
    }
 
    /// Annotates the given AST node.
-   fn annotate_node(
-      &mut self,
-      ast: &mut Ast,
-      node: NodeHandle,
-      context: NodeContext,
-   ) -> TypeLogEntry {
+   fn annotate_node(&mut self, ast: &mut Ast, node: NodeId, context: NodeContext) -> TypeLogEntry {
       match ast.kind(node) {
          // Literals
          | NodeKind::True
@@ -296,7 +291,7 @@ impl SemPass for SemTypes<'_> {
    type Result = TypeLogEntry;
 
    /// Performs type analysis for the given AST node. This annotates the node with a concrete type.
-   fn analyze(&mut self, mut ast: Ast, root_node: NodeHandle) -> Ast {
+   fn analyze(&mut self, mut ast: Ast, root_node: NodeId) -> Ast {
       self.push_defers();
       let _ = self.annotate_node(&mut ast, root_node, NodeContext::Statement);
       self.pop_defers(&mut ast);

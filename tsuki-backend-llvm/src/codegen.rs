@@ -9,7 +9,7 @@ use inkwell::module::Module;
 use inkwell::passes::PassManager;
 use inkwell::types::StructType;
 use inkwell::values::{BasicValueEnum, FunctionValue};
-use tsuki_frontend::ast::{NodeHandle, NodeKind};
+use tsuki_frontend::ast::{NodeId, NodeKind};
 use tsuki_frontend::common::SourceFile;
 use tsuki_frontend::sem::Ir;
 
@@ -70,7 +70,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for an arbitrary node.
-   pub fn generate_statement(&self, ir: &Ir, node: NodeHandle) {
+   pub fn generate_statement(&self, ir: &Ir, node: NodeId) {
       match ir.ast.kind(node) {
          // Control flow
          NodeKind::Pass => (),

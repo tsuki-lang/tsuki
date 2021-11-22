@@ -9,7 +9,7 @@ use std::path::Path;
 
 use smallvec::SmallVec;
 
-use crate::ast::{Ast, NodeData, NodeHandle, NodeKind};
+use crate::ast::{Ast, NodeData, NodeId, NodeKind};
 use crate::common::{ErrorKind, Errors, Span};
 use crate::sem::{SemCommon, SemPass};
 use crate::types::{FloatSize, IntegerSize};
@@ -212,7 +212,7 @@ impl<'c> SemLiterals<'c> {
    fn convert_integer_node(
       &mut self,
       ast: &mut Ast,
-      node: NodeHandle,
+      node: NodeId,
       negative: bool,
       number: u64,
       mut suffix: LiteralSuffix,
@@ -287,7 +287,7 @@ impl<'c> SemLiterals<'c> {
 
    /// Extracts the sign and number node from a potentially `Neg` node. The first value returned
    /// specifies whether the number is negative, and the second value is the actual number.
-   fn extract_neg_node(ast: &Ast, node: NodeHandle) -> (bool, NodeHandle) {
+   fn extract_neg_node(ast: &Ast, node: NodeId) -> (bool, NodeId) {
       let negative = ast.kind(node) == NodeKind::Neg;
       let number_node = if negative {
          ast.first_handle(node)
@@ -298,7 +298,7 @@ impl<'c> SemLiterals<'c> {
    }
 
    /// Parses an integer literal to one of the type-strict kinds `Int8`, `Int16`, etc.
-   fn analyze_integer(&mut self, ast: &mut Ast, node: NodeHandle) {
+   fn analyze_integer(&mut self, ast: &mut Ast, node: NodeId) {
       let (negative, number_node) = Self::extract_neg_node(ast, node);
       let source = self.common.get_source_range_from_node(ast, number_node);
       assert!(!source.is_empty());
@@ -336,7 +336,7 @@ impl<'c> SemLiterals<'c> {
    fn convert_float_node(
       &mut self,
       ast: &mut Ast,
-      node: NodeHandle,
+      node: NodeId,
       negative: bool,
       mut number: f64,
       mut suffix: LiteralSuffix,
@@ -365,7 +365,7 @@ impl<'c> SemLiterals<'c> {
    }
 
    /// Parses a float to a `Float32` or a `Float64`.
-   fn analyze_float(&mut self, ast: &mut Ast, node: NodeHandle) {
+   fn analyze_float(&mut self, ast: &mut Ast, node: NodeId) {
       let (negative, number_node) = Self::extract_neg_node(ast, node);
       let source = self.common.get_source_range_from_node(ast, number_node);
       assert!(!source.is_empty());
@@ -375,7 +375,7 @@ impl<'c> SemLiterals<'c> {
    }
 
    /// Walks through the sub-nodes of a branch node.
-   fn walk_branch(&mut self, ast: &mut Ast, node: NodeHandle) {
+   fn walk_branch(&mut self, ast: &mut Ast, node: NodeId) {
       let left = ast.first_handle(node);
       match ast.kind(node) {
          // The negation sign `-` is not included in the literal, so these extra cases ensure that
@@ -395,7 +395,7 @@ impl<'c> SemLiterals<'c> {
    }
 
    /// Analyzes the given syntax tree node.
-   fn analyze_node(&mut self, ast: &mut Ast, node: NodeHandle) {
+   fn analyze_node(&mut self, ast: &mut Ast, node: NodeId) {
       match ast.kind(node) {
          NodeKind::Integer => self.analyze_integer(ast, node),
          NodeKind::Float => self.analyze_float(ast, node),
@@ -409,7 +409,7 @@ impl SemPass for SemLiterals<'_> {
    type Result = ();
 
    /// Performs literal resolution for the syntax tree.
-   fn analyze(&mut self, mut ast: Ast, root_node: NodeHandle) -> Ast {
+   fn analyze(&mut self, mut ast: Ast, root_node: NodeId) -> Ast {
       self.analyze_node(&mut ast, root_node);
       ast
    }

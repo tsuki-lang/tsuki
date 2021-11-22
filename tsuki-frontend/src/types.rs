@@ -6,7 +6,7 @@
 use std::cmp::Ordering;
 use std::ops::Range;
 
-use crate::ast::NodeHandle;
+use crate::ast::NodeId;
 use crate::scope::{ScopeId, Scopes, SymbolKind, Symbols};
 
 /// Data-oriented type storage.
@@ -370,7 +370,7 @@ impl BuiltinTypes {
          ($field:tt, $name:tt) => {
             let symbol = symbols.create(
                $name,
-               NodeHandle::null(),
+               NodeId::null(),
                self.t_type,
                SymbolKind::Type(self.$field),
             );
@@ -420,7 +420,7 @@ impl From<TypeLogResult> for TypeLogEntry {
 /// A log storing the AST nodes from which different instances of types came from.
 pub struct TypeLog {
    types: Vec<TypeId>,
-   nodes: Vec<NodeHandle>,
+   nodes: Vec<NodeId>,
 }
 
 impl TypeLog {
@@ -433,7 +433,7 @@ impl TypeLog {
    }
 
    /// Inserts a new type into the log and returns its handle.
-   pub fn push(&mut self, typ: TypeId, node: NodeHandle) -> TypeLogEntry {
+   pub fn push(&mut self, typ: TypeId, node: NodeId) -> TypeLogEntry {
       let id = self.types.len();
       self.types.push(typ);
       self.nodes.push(node);
@@ -446,7 +446,7 @@ impl TypeLog {
    }
 
    /// Returns the source node stored in the log entry.
-   pub fn node(&self, entry: TypeLogEntry) -> NodeHandle {
+   pub fn node(&self, entry: TypeLogEntry) -> NodeId {
       self.nodes[entry.0]
    }
 }

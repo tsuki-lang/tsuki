@@ -1,6 +1,6 @@
 //! Type analysis for variables, object fields, pointers, etc.
 
-use crate::ast::{Ast, NodeHandle, NodeKind};
+use crate::ast::{Ast, NodeId, NodeKind};
 use crate::common::ErrorKind;
 use crate::scope::{Mutability, SymbolId, SymbolKind, Variable};
 use crate::types::{TypeLogEntry, TypeLogResult};
@@ -9,7 +9,7 @@ use super::{NodeContext, SemTypes};
 
 impl<'s> SemTypes<'s> {
    /// Annotates a location expression, ie. variables `a`, members `.x`.
-   pub(super) fn annotate_location(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogResult {
+   pub(super) fn annotate_location(&mut self, ast: &mut Ast, node: NodeId) -> TypeLogResult {
       match ast.kind(node) {
          NodeKind::Identifier => {
             let symbol = self.lookup_variable(ast, node)?;
@@ -25,7 +25,7 @@ impl<'s> SemTypes<'s> {
    fn annotate_location_symbol(
       &mut self,
       ast: &mut Ast,
-      node: NodeHandle,
+      node: NodeId,
       symbol: SymbolId,
    ) -> TypeLogEntry {
       match self.symbols.kind(symbol) {
@@ -44,7 +44,7 @@ impl<'s> SemTypes<'s> {
    pub(super) fn annotate_assignment(
       &mut self,
       ast: &mut Ast,
-      node: NodeHandle,
+      node: NodeId,
       context: NodeContext,
    ) -> TypeLogResult {
       // TODO: Pointers and assigning values to them.
@@ -81,7 +81,7 @@ impl<'s> SemTypes<'s> {
    pub(super) fn annotate_variable_declaration(
       &mut self,
       ast: &mut Ast,
-      node: NodeHandle,
+      node: NodeId,
    ) -> TypeLogResult {
       let kind = match ast.kind(node) {
          NodeKind::Val => Mutability::Val,

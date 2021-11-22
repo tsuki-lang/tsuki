@@ -2,7 +2,7 @@
 
 use smallvec::SmallVec;
 
-use crate::ast::{NodeHandle, NodeKind};
+use crate::ast::{NodeId, NodeKind};
 use crate::scope::{Mutability, ScopeId, Scopes, SymbolId, SymbolKind, Symbols, Variable};
 use crate::types::{BuiltinTypes, TypeId};
 
@@ -148,7 +148,7 @@ pub fn register_intrinsics(
                   .map(|&(name, type_id)| {
                      symbols.create(
                         name,
-                        NodeHandle::null(),
+                        NodeId::null(),
                         type_id,
                         SymbolKind::Variable(Variable {
                            mutability: Mutability::Val,
@@ -162,7 +162,7 @@ pub fn register_intrinsics(
          );
          let symbol_id = symbols.create(
             $name,
-            NodeHandle::null(),
+            NodeId::null(),
             builtin.t_statement,
             SymbolKind::Function(function_id),
          );

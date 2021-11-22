@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
 
-use crate::ast::NodeHandle;
+use crate::ast::NodeId;
 use crate::functions::FunctionId;
 use crate::types::TypeId;
 
@@ -70,7 +70,7 @@ pub struct Variable {
 /// Symbol storage. Symbols are looked up identifiers.
 pub struct Symbols {
    names: Vec<String>,
-   nodes: Vec<NodeHandle>,
+   nodes: Vec<NodeId>,
    types: Vec<TypeId>,
    kinds: Vec<SymbolKind>,
 }
@@ -87,13 +87,7 @@ impl Symbols {
    }
 
    /// Creates a symbol from a name, handle, type, and kind.
-   pub fn create(
-      &mut self,
-      name: &str,
-      node: NodeHandle,
-      typ: TypeId,
-      kind: SymbolKind,
-   ) -> SymbolId {
+   pub fn create(&mut self, name: &str, node: NodeId, typ: TypeId, kind: SymbolKind) -> SymbolId {
       let id = self.nodes.len();
       self.names.push(name.to_owned());
       self.nodes.push(node);
@@ -108,7 +102,7 @@ impl Symbols {
    }
 
    /// Returns the symbol's ancestor node.
-   pub fn node(&self, symbol: SymbolId) -> NodeHandle {
+   pub fn node(&self, symbol: SymbolId) -> NodeId {
       self.nodes[symbol.0]
    }
 

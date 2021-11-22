@@ -47,7 +47,7 @@ impl<'s> Parser<'s> {
 
    /// Emits a parsing error and creates an error node.
    #[must_use]
-   fn error(&mut self, kind: ErrorKind, span: Span) -> NodeHandle {
+   fn error(&mut self, kind: ErrorKind, span: Span) -> NodeId {
       self.emit_error(kind, span);
       self.ast.create_node(NodeKind::Error)
    }
@@ -85,7 +85,7 @@ impl<'s> Parser<'s> {
 
    /// Creates a node and copies the `first` and `second` arguments the `first` and
    /// `second` data fields of the node.
-   fn create_node_with(&mut self, kind: NodeKind, first: usize, second: usize) -> NodeHandle {
+   fn create_node_with(&mut self, kind: NodeKind, first: usize, second: usize) -> NodeId {
       let handle = self.ast.create_node(kind);
       self.ast.set_first(handle, first);
       self.ast.set_second(handle, second);
@@ -93,12 +93,7 @@ impl<'s> Parser<'s> {
    }
 
    /// Similar to `create_node_with`, but for storing nodes inside of other nodes.
-   fn create_node_with_handles(
-      &mut self,
-      kind: NodeKind,
-      first: NodeHandle,
-      second: NodeHandle,
-   ) -> NodeHandle {
+   fn create_node_with_handles(&mut self, kind: NodeKind, first: NodeId, second: NodeId) -> NodeId {
       let handle = self.ast.create_node(kind);
       self.ast.set_first_handle(handle, first);
       self.ast.set_second_handle(handle, second);
@@ -106,7 +101,7 @@ impl<'s> Parser<'s> {
    }
 
    /// Similar to `create_node_with`, but for storing a single node inside of another node.
-   fn create_node_with_handle(&mut self, kind: NodeKind, child: NodeHandle) -> NodeHandle {
+   fn create_node_with_handle(&mut self, kind: NodeKind, child: NodeId) -> NodeId {
       let handle = self.ast.create_node(kind);
       self.ast.set_first_handle(handle, child);
       handle
@@ -114,12 +109,12 @@ impl<'s> Parser<'s> {
 
    /// Creates a node and copies the `start` and `end` of the given range to the `first` and
    /// `second` data fields of the node.
-   fn create_node_with_range(&mut self, kind: NodeKind, range: Range<usize>) -> NodeHandle {
+   fn create_node_with_range(&mut self, kind: NodeKind, range: Range<usize>) -> NodeId {
       self.create_node_with(kind, range.start, range.end)
    }
 
    /// Creates a span spanning all the nodes in the given slice.
-   fn span_all_nodes(&self, nodes: &[NodeHandle]) -> Span {
+   fn span_all_nodes(&self, nodes: &[NodeId]) -> Span {
       if nodes.len() >= 2 {
          Span::join(self.ast.span(nodes[0]), self.ast.span(nodes[1]))
       } else if nodes.len() == 1 {
@@ -130,7 +125,7 @@ impl<'s> Parser<'s> {
    }
 
    /// Turns an identifier token into a node.
-   fn create_identifier(&mut self, token: Token) -> NodeHandle {
+   fn create_identifier(&mut self, token: Token) -> NodeId {
       if let TokenKind::Identifier(range) = token.kind {
          let handle = self.create_node_with_range(NodeKind::Identifier, range);
          self.ast.set_span(handle, token.span);
@@ -160,10 +155,10 @@ impl<'s> Parser<'s> {
    /// encountered.
    fn parse_comma_separated(
       &mut self,
-      dest: &mut Vec<NodeHandle>,
+      dest: &mut Vec<NodeId>,
       start: &Token,
       end: TokenKind,
-      mut next: impl FnMut(&mut Self) -> Result<NodeHandle, Error>,
+      mut next: impl FnMut(&mut Self) -> Result<NodeId, Error>,
    ) -> Result<Token, Error> {
       loop {
          match &self.lexer.peek()?.kind {
@@ -201,9 +196,9 @@ impl<'s> Parser<'s> {
    /// exceed should be taken from.
    fn parse_indented_block(
       &mut self,
-      dest: &mut Vec<NodeHandle>,
+      dest: &mut Vec<NodeId>,
       parent_token: &Token,
-      mut next: impl FnMut(&mut Self) -> Result<NodeHandle, Error>,
+      mut next: impl FnMut(&mut Self) -> Result<NodeId, Error>,
       missing_line_break_error: impl FnOnce() -> ErrorKind,
    ) -> Result<(), Error> {
       let indent_level = {
@@ -238,7 +233,7 @@ impl<'s> Parser<'s> {
     */
 
    /// Parses a type.
-   fn parse_type(&mut self) -> Result<NodeHandle, Error> {
+   fn parse_type(&mut self) -> Result<NodeId, Error> {
       let token = self.lexer.next()?;
       Ok(match token.kind {
          TokenKind::Identifier(..) => self.create_identifier(token),
@@ -251,7 +246,7 @@ impl<'s> Parser<'s> {
     */
 
    /// Parses a literal token and returns the node corresponding to it.
-   fn parse_literal(&mut self, token: Token) -> NodeHandle {
+   fn parse_literal(&mut self, token: Token) -> NodeId {
       let literal = match token.kind {
          TokenKind::Nil => self.ast.create_node(NodeKind::Nil),
          TokenKind::True => self.ast.create_node(NodeKind::True),
@@ -268,7 +263,7 @@ impl<'s> Parser<'s> {
    }
 
    /// Parses expressions in parentheses.
-   fn parentheses(&mut self, _left: Token) -> Result<NodeHandle, Error> {
+   fn parentheses(&mut self, _left: Token) -> Result<NodeId, Error> {
       // TODO: tuples and unit literal
       let inner = self.parse_expression(0)?;
       let _ = self.expect_token(TokenKind::RightParen, |t| {
@@ -278,14 +273,14 @@ impl<'s> Parser<'s> {
    }
 
    /// Creates a node for a nullary operator.
-   fn nullary_operator(&mut self, operator: Token, node_kind: NodeKind) -> NodeHandle {
+   fn nullary_operator(&mut self, operator: Token, node_kind: NodeKind) -> NodeId {
       let node = self.create_node_with(node_kind, 0, 0);
       self.ast.set_span(node, operator.span);
       node
    }
 
    /// Parses the right-hand side of a unary prefix operator.
-   fn unary_prefix(&mut self, operator: Token, node_kind: NodeKind) -> Result<NodeHandle, Error> {
+   fn unary_prefix(&mut self, operator: Token, node_kind: NodeKind) -> Result<NodeId, Error> {
       let operator_span = operator.span.clone();
       let token = self.lexer.next()?;
       let right = self.parse_prefix(token)?;
@@ -295,7 +290,7 @@ impl<'s> Parser<'s> {
    }
 
    /// Parses a prefix from the given token.
-   fn parse_prefix(&mut self, token: Token) -> Result<NodeHandle, Error> {
+   fn parse_prefix(&mut self, token: Token) -> Result<NodeId, Error> {
       let span = token.span.clone();
       Ok(match token.kind {
          // Literals
@@ -327,7 +322,7 @@ impl<'s> Parser<'s> {
    }
 
    /// Parses a prefix `do` expression (or statement).
-   fn parse_do_expression(&mut self, token: Option<Token>) -> Result<NodeHandle, Error> {
+   fn parse_do_expression(&mut self, token: Option<Token>) -> Result<NodeId, Error> {
       let token = self.some_or_next(token)?;
       let node = self.ast.create_node(NodeKind::Do);
       let mut statements = Vec::new();
@@ -346,7 +341,7 @@ impl<'s> Parser<'s> {
    }
 
    /// Parses an `if` expression or statement.
-   fn parse_if_expression(&mut self, token: Option<Token>) -> Result<NodeHandle, Error> {
+   fn parse_if_expression(&mut self, token: Option<Token>) -> Result<NodeId, Error> {
       let mut branch_token = self.some_or_next(token)?;
       let mut branches = Vec::new();
       let mut is_elif = true;
@@ -355,7 +350,7 @@ impl<'s> Parser<'s> {
          let condition = if is_elif {
             self.parse_expression(0)?
          } else {
-            NodeHandle::null()
+            NodeId::null()
          };
          // The branch body can be either `->` followed by an expression, or a block of code.
          let mut branch_body = Vec::new();
@@ -410,7 +405,7 @@ impl<'s> Parser<'s> {
    }
 
    /// Creates a node from the left-hand side and operator token of a unary postfix operator.
-   fn unary_postfix(&mut self, lhs: NodeHandle, token: Token, kind: NodeKind) -> NodeHandle {
+   fn unary_postfix(&mut self, lhs: NodeId, token: Token, kind: NodeKind) -> NodeId {
       let node = self.create_node_with_handle(kind, lhs);
       self.ast.set_span(node, Span::join(self.ast.span(lhs), &token.span));
       node
@@ -419,10 +414,10 @@ impl<'s> Parser<'s> {
    /// Parses the right-hand side of an infix operator.
    fn binary_operator(
       &mut self,
-      lhs: NodeHandle,
+      lhs: NodeId,
       token: Token,
       node_kind: NodeKind,
-   ) -> Result<NodeHandle, Error> {
+   ) -> Result<NodeId, Error> {
       let right_associative = token.kind.associativity() == Associativity::Right;
       let precedence = token.kind.precedence() - right_associative as i8;
       let rhs = self.parse_expression(precedence)?;
@@ -432,7 +427,7 @@ impl<'s> Parser<'s> {
    }
 
    /// Parses the right-hand side of a function call.
-   fn parse_call(&mut self, left: NodeHandle, lparen: Token) -> Result<NodeHandle, Error> {
+   fn parse_call(&mut self, left: NodeId, lparen: Token) -> Result<NodeId, Error> {
       let node = self.create_node_with_handle(NodeKind::Call, left);
       let mut args = Vec::new();
       let rparen = self.parse_comma_separated(&mut args, &lparen, TokenKind::RightParen, |p| {
@@ -446,11 +441,11 @@ impl<'s> Parser<'s> {
    /// Parses an indexing operator.
    fn parse_index(
       &mut self,
-      left: NodeHandle,
+      left: NodeId,
       lparen: Token,
       rparen_kind: TokenKind,
       node_kind: NodeKind,
-   ) -> Result<NodeHandle, Error> {
+   ) -> Result<NodeId, Error> {
       let right = self.parse_expression(0)?;
       let maybe_rparen = self.expect_token(rparen_kind.clone(), |_| {
          ErrorKind::MissingClosingToken(rparen_kind, lparen.clone())
@@ -465,7 +460,7 @@ impl<'s> Parser<'s> {
    }
 
    /// Parses an infix, given the left node and infix token.
-   fn parse_infix(&mut self, left: NodeHandle, token: Token) -> Result<NodeHandle, Error> {
+   fn parse_infix(&mut self, left: NodeId, token: Token) -> Result<NodeId, Error> {
       let span = token.span.clone();
       Ok(match token.kind {
          // What do you sacrifice for efficiency.
@@ -520,7 +515,7 @@ impl<'s> Parser<'s> {
 
    /// Parses a full expression, where infix operators must have at least the given
    /// precedence level.
-   fn parse_expression(&mut self, precedence: i8) -> Result<NodeHandle, Error> {
+   fn parse_expression(&mut self, precedence: i8) -> Result<NodeId, Error> {
       let mut token = self.lexer.next()?;
       let expr_indent_level = token.indent_level;
       let expr_line = token.line();
@@ -545,7 +540,7 @@ impl<'s> Parser<'s> {
    }
 
    /// Parses a pass (`_`) statement.
-   fn parse_pass(&mut self) -> Result<NodeHandle, Error> {
+   fn parse_pass(&mut self) -> Result<NodeId, Error> {
       let token = self.lexer.next()?;
       let node = self.ast.create_node(NodeKind::Pass);
       self.ast.set_span(node, token.span);
@@ -553,7 +548,7 @@ impl<'s> Parser<'s> {
    }
 
    /// Parses a `while` loop.
-   fn parse_while_loop(&mut self) -> Result<NodeHandle, Error> {
+   fn parse_while_loop(&mut self) -> Result<NodeId, Error> {
       let token = self.lexer.next()?;
       let condition = self.parse_expression(0)?;
       let node = self.create_node_with_handle(NodeKind::While, condition);
@@ -579,7 +574,7 @@ impl<'s> Parser<'s> {
    /// Parses a comma-separated parameter list, like `(a: Int, b: Int, c, d: Int)`.
    fn parse_parameter_list(
       &mut self,
-      dest: &mut Vec<NodeHandle>,
+      dest: &mut Vec<NodeId>,
       start: &Token,
       end: TokenKind,
    ) -> Result<Token, Error> {
@@ -616,7 +611,7 @@ impl<'s> Parser<'s> {
    }
 
    /// Parses a `val` or `var` declaration.
-   fn parse_variable_declaration(&mut self) -> Result<NodeHandle, Error> {
+   fn parse_variable_declaration(&mut self) -> Result<NodeId, Error> {
       let var_token = self.lexer.next()?;
       let node_kind = match var_token.kind {
          TokenKind::Val => NodeKind::Val,
@@ -653,7 +648,7 @@ impl<'s> Parser<'s> {
    }
 
    /// Parses a function declaration.
-   fn parse_function_declaration(&mut self) -> Result<NodeHandle, Error> {
+   fn parse_function_declaration(&mut self) -> Result<NodeId, Error> {
       // TODO: anonymous functions.
       // Those are not in the spec yet, as I'm not sure how I want closures to be implemented.
 
@@ -674,7 +669,7 @@ impl<'s> Parser<'s> {
          self.parse_parameter_list(&mut formal_param_list, &left_paren, TokenKind::RightParen)?;
 
       // Handle the optional return type.
-      let mut return_type = NodeHandle::null();
+      let mut return_type = NodeId::null();
       if let Some(..) = self.match_token(TokenKind::Colon)? {
          return_type = self.parse_type()?;
       }
@@ -689,7 +684,7 @@ impl<'s> Parser<'s> {
       )?;
 
       // Construct the AST.
-      let generic_params = NodeHandle::null(); // TODO: generic parameters
+      let generic_params = NodeId::null(); // TODO: generic parameters
       let formal_params = self.ast.create_node(NodeKind::FormalParameters);
       self.ast.set_span(
          formal_params,
@@ -700,7 +695,7 @@ impl<'s> Parser<'s> {
 
       let params =
          self.create_node_with_handles(NodeKind::Parameters, generic_params, formal_params);
-      let params_span = if generic_params != NodeHandle::null() {
+      let params_span = if generic_params != NodeId::null() {
          Span::join(self.ast.span(generic_params), self.ast.span(formal_params))
       } else {
          self.ast.span(formal_params).clone()
@@ -715,7 +710,7 @@ impl<'s> Parser<'s> {
    }
 
    /// Parses a statement.
-   fn parse_statement(&mut self) -> Result<NodeHandle, Error> {
+   fn parse_statement(&mut self) -> Result<NodeId, Error> {
       let token_kind = self.lexer.peek()?.kind.clone();
       let node = match token_kind {
          // Declarations
@@ -735,7 +730,7 @@ impl<'s> Parser<'s> {
    }
 
    /// Parses the entire source code of a module.
-   fn parse_module(&mut self) -> Result<NodeHandle, Error> {
+   fn parse_module(&mut self) -> Result<NodeId, Error> {
       let node = self.ast.create_node(NodeKind::StatementList);
       let mut statements = Vec::new();
       let mut previous_line = Span::INVALID_LINE;
@@ -764,7 +759,7 @@ impl<'s> Parser<'s> {
 
 /// Parses a source file with the given filename and source code. On success, returns the AST and
 /// the handle to the root node. On failure, returns a list of errors.
-pub fn parse(lexer: Lexer) -> Result<(Ast, NodeHandle), Errors> {
+pub fn parse(lexer: Lexer) -> Result<(Ast, NodeId), Errors> {
    let mut parser = Parser::new(lexer);
    let root_node = match parser.parse_module() {
       Ok(node) => node,

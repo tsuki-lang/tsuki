@@ -7,7 +7,7 @@ use inkwell::module::Module;
 use inkwell::types::{BasicType, BasicTypeEnum, FunctionType};
 use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue};
 use smallvec::SmallVec;
-use tsuki_frontend::ast::NodeHandle;
+use tsuki_frontend::ast::NodeId;
 use tsuki_frontend::functions::FunctionId;
 use tsuki_frontend::sem::Ir;
 
@@ -102,7 +102,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for a function.
-   pub fn generate_function(&self, ir: &Ir, node: NodeHandle) {
+   pub fn generate_function(&self, ir: &Ir, node: NodeId) {
       // Get the function ID from the AST.
       let name_node = ir.ast.first_handle(node);
       let symbol_id = ir.ast.symbol_id(name_node);
@@ -151,7 +151,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for a function call.
-   pub(crate) fn generate_call(&self, ir: &Ir, node: NodeHandle) -> BasicValueEnum<'c> {
+   pub(crate) fn generate_call(&self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
       // Get the function we want to call.
       let callee_node = ir.ast.first_handle(node);
       let symbol_id = ir.ast.symbol_id(callee_node);

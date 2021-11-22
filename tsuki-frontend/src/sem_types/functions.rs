@@ -2,7 +2,7 @@
 
 use smallvec::SmallVec;
 
-use crate::ast::{Ast, NodeHandle, NodeKind};
+use crate::ast::{Ast, NodeId, NodeKind};
 use crate::common::ErrorKind;
 use crate::functions::{FunctionKind, Intrinsic, Parameters};
 use crate::scope::{Mutability, SymbolKind, Variable};
@@ -18,7 +18,7 @@ impl<'s> SemTypes<'s> {
    pub(super) fn annotate_function_declaration(
       &mut self,
       ast: &mut Ast,
-      node: NodeHandle,
+      node: NodeId,
    ) -> TypeLogResult {
       // Check if the name is sem'd or not. If so, we are coming from a deferred sem'check,
       // so simply check the body and return.
@@ -110,11 +110,7 @@ impl<'s> SemTypes<'s> {
    }
 
    /// Annotates a function's body.
-   pub(super) fn annotate_function_body(
-      &mut self,
-      ast: &mut Ast,
-      node: NodeHandle,
-   ) -> TypeLogResult {
+   pub(super) fn annotate_function_body(&mut self, ast: &mut Ast, node: NodeId) -> TypeLogResult {
       let name_node = ast.first_handle(node);
       let symbol_id = ast.symbol_id(name_node);
       let function_id = self.symbols.kind(symbol_id).unwrap_function();
@@ -142,7 +138,7 @@ impl<'s> SemTypes<'s> {
    }
 
    /// Annotates a function call.
-   pub(super) fn annotate_call(&mut self, ast: &mut Ast, node: NodeHandle) -> TypeLogResult {
+   pub(super) fn annotate_call(&mut self, ast: &mut Ast, node: NodeId) -> TypeLogResult {
       // Extract what is being called.
       let callee_node = ast.first_handle(node);
       // TODO: Method calls.
@@ -202,7 +198,7 @@ impl<'s> SemTypes<'s> {
    }
 
    /// Annotates an intrinsic function call.
-   fn annotate_intrinsic_call(&mut self, ast: &mut Ast, node: NodeHandle, intrinsic: Intrinsic) {
+   fn annotate_intrinsic_call(&mut self, ast: &mut Ast, node: NodeId, intrinsic: Intrinsic) {
       ast.convert_preserve(node, NodeKind::from(intrinsic));
    }
 }

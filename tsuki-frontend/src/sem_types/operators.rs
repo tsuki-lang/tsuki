@@ -1,6 +1,6 @@
 //! Semantic analysis for operators and compiler intrinsics.
 
-use crate::ast::{Ast, NodeHandle, NodeKind};
+use crate::ast::{Ast, NodeId, NodeKind};
 use crate::common::ErrorKind;
 use crate::types::TypeLogEntry;
 
@@ -12,11 +12,7 @@ impl<'s> SemTypes<'s> {
    // replaced by much simpler logic and compiler intrinsics inside the stdlib.
 
    /// Annotates a unary operator with types.
-   pub(super) fn annotate_unary_operator(
-      &mut self,
-      ast: &mut Ast,
-      node: NodeHandle,
-   ) -> TypeLogEntry {
+   pub(super) fn annotate_unary_operator(&mut self, ast: &mut Ast, node: NodeId) -> TypeLogEntry {
       let log_entry = self.annotate_node(ast, ast.first_handle(node), NodeContext::Expression);
       let right = self.log.typ(log_entry);
       let right_kind = self.types.kind(right);
@@ -34,11 +30,7 @@ impl<'s> SemTypes<'s> {
    }
 
    /// Annotates a binary operator with types.
-   pub(super) fn annotate_binary_operator(
-      &mut self,
-      ast: &mut Ast,
-      node: NodeHandle,
-   ) -> TypeLogEntry {
+   pub(super) fn annotate_binary_operator(&mut self, ast: &mut Ast, node: NodeId) -> TypeLogEntry {
       let (left, right) = (ast.first_handle(node), ast.second_handle(node));
       let left_entry = self.annotate_node(ast, left, NodeContext::Expression);
       let right_entry = self.annotate_node(ast, right, NodeContext::Expression);
