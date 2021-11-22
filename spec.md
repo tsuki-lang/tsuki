@@ -102,8 +102,8 @@ This is enforced by the compiler to keep a consistent coding style across variou
 The following identifiers are reserved as _keywords_:
 ```
 _ and as atom auto dependency derive do elif else for fun getters if impl
-import in is macro match move not object or pub rc return try type uninit union
-where while val var
+import in is macro match move not object or pub rc return self try type uninit
+union where while val var
 ```
 TODO: This list of keywords is constantly changing as the language spec is refined, and may currently be imprecise. It should be updated once the compiler is finished.
 
