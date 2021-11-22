@@ -1856,7 +1856,7 @@ This is done through the special `import if` statement. The `if` here acts a lit
 
 A branch of the `import if` statement can end with a `::` signifying pragmas; this branch _must_ have the pragma `unsupported_target` with an error message attached. Other pragmas are not allowed in this position.
 
-There's one more difference compared to a regular `if` statement: `import if` is much stricter (and different) with regards to syntax. Although the condition expression can be anything the user wishes for (that is, as long as it can be evaluated at compile time), the body _must_ be separated with the "then" arrow `->` and a module path, rather than another expression. Note that module paths do not use the same syntax as expressions.
+There's one more difference compared to a regular `if` statement: `import if` is much stricter (and different) with regards to syntax. Although the condition expression can be anything the user wishes for (that is, as long as it can be evaluated at compile time), the body _must_ be separated with the "then" arrow `->` and be a module path, rather than another expression. Note that module paths do not use the same syntax as expressions.
 
 An idiomatic example of how to use conditional compilation for targeting different operating systems would look like so:
 ```
