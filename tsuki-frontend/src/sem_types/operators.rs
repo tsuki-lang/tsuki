@@ -14,7 +14,7 @@ impl<'s> SemTypes<'s> {
    /// Annotates a unary operator with types.
    pub(super) fn annotate_unary_operator(&mut self, ast: &mut Ast, node: NodeId) -> TypeLogEntry {
       let log_entry = self.annotate_node(ast, ast.first_handle(node), NodeContext::Expression);
-      let right = self.log.typ(log_entry);
+      let right = self.log.type_id(log_entry);
       let right_kind = self.types.kind(right);
       let typ = match ast.kind(node) {
          NodeKind::Not if right == self.builtin.t_bool => right,
@@ -34,8 +34,8 @@ impl<'s> SemTypes<'s> {
       let (left, right) = (ast.first_handle(node), ast.second_handle(node));
       let left_entry = self.annotate_node(ast, left, NodeContext::Expression);
       let right_entry = self.annotate_node(ast, right, NodeContext::Expression);
-      let left_type = self.log.typ(left_entry);
-      let right_type = self.log.typ(right_entry);
+      let left_type = self.log.type_id(left_entry);
+      let right_type = self.log.type_id(right_entry);
       let conversion = self.perform_implicit_conversion(ast, right, right_type, left_type);
       let left_type_kind = self.types.kind(left_type);
       let typ = match ast.kind(node) {

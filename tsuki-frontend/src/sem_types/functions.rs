@@ -129,7 +129,7 @@ impl<'s> SemTypes<'s> {
       );
 
       // Check that the body's return type is correct.
-      let body_type = self.log.typ(body_log);
+      let body_type = self.log.type_id(body_log);
       if !returns_unit && body_type != return_type {
          return Ok(self.type_mismatch(ast, node, return_type, body_type));
       }
@@ -168,14 +168,14 @@ impl<'s> SemTypes<'s> {
          let expected_type = self.symbols.type_id(parameters.formal[index]);
 
          let argument_log = self.annotate_node(ast, argument, NodeContext::Expression);
-         let provided_type = self.log.typ(argument_log);
+         let provided_type = self.log.type_id(argument_log);
 
          // Perform implicit conversions on arguments.
          let argument_log = self
             .perform_implicit_conversion(ast, node, provided_type, expected_type)
             .unwrap_or(argument_log);
          // If there's a mismatch after the conversion, error.
-         let provided_type = self.log.typ(argument_log);
+         let provided_type = self.log.type_id(argument_log);
          if provided_type != expected_type {
             last_error = Some(self.type_mismatch(ast, argument, expected_type, provided_type));
          }

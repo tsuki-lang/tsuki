@@ -52,7 +52,7 @@ impl<'s> SemTypes<'s> {
          if ast.kind(branch) == NodeKind::IfBranch {
             let condition = ast.first_handle(branch);
             let condition_entry = self.annotate_node(ast, condition, context);
-            let condition_type = self.log.typ(condition_entry);
+            let condition_type = self.log.type_id(condition_entry);
             if !self.types.kind(condition_type).is_bool() {
                self.emit_error(
                   ErrorKind::IfConditionMustBeBool,
@@ -61,7 +61,7 @@ impl<'s> SemTypes<'s> {
             }
          }
          let body_entry = self.annotate_statement_list(ast, branch, context);
-         let body_type = self.log.typ(body_entry);
+         let body_type = self.log.type_id(body_entry);
          if context == NodeContext::Expression {
             match typ {
                None => typ = Some(body_type),
@@ -89,7 +89,7 @@ impl<'s> SemTypes<'s> {
    pub(super) fn annotate_while(&mut self, ast: &mut Ast, node: NodeId) -> TypeLogEntry {
       let condition_node = ast.first_handle(node);
       let condition_entry = self.annotate_node(ast, condition_node, NodeContext::Expression);
-      let condition_type = self.log.typ(condition_entry);
+      let condition_type = self.log.type_id(condition_entry);
       if !self.types.kind(condition_type).is_bool() {
          return self.error(ast, condition_node, ErrorKind::WhileConditionMustBeBool);
       }

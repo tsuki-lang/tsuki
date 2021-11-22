@@ -441,7 +441,7 @@ impl TypeLog {
    }
 
    /// Returns the type stored in the log entry.
-   pub fn typ(&self, entry: TypeLogEntry) -> TypeId {
+   pub fn type_id(&self, entry: TypeLogEntry) -> TypeId {
       self.types[entry.0]
    }
 

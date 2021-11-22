@@ -194,7 +194,7 @@ impl<'s> SemTypes<'s> {
                NodeContext::Statement
             },
          );
-         let typ = self.log.typ(log_entry);
+         let typ = self.log.type_id(log_entry);
          let type_kind = self.types.kind(typ);
          // For expressions, we have some special cases.
          if !type_kind.is_statement() {
@@ -215,7 +215,7 @@ impl<'s> SemTypes<'s> {
       // Nodes in expression context inherit their type from the last expression statement in
       // the list.
       if let Some(log) = last_log {
-         self.annotate(ast, node, self.log.typ(log))
+         self.annotate(ast, node, self.log.type_id(log))
       } else {
          self.annotate(ast, node, self.builtin.t_statement)
       }

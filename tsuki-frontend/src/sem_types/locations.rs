@@ -50,9 +50,9 @@ impl<'s> SemTypes<'s> {
       // TODO: Pointers and assigning values to them.
       let (left, right) = (ast.first_handle(node), ast.second_handle(node));
       let left_entry = self.annotate_location(ast, left)?;
-      let left_type = self.log.typ(left_entry);
+      let left_type = self.log.type_id(left_entry);
       let right_entry = self.annotate_node(ast, right, NodeContext::Expression);
-      let right_type = self.log.typ(right_entry);
+      let right_type = self.log.type_id(right_entry);
       // Check types.
       if right_type != left_type {
          return Err(self.type_mismatch(ast, node, left_type, right_type));
@@ -108,13 +108,13 @@ impl<'s> SemTypes<'s> {
       // Annotate the value.
       let value_node = ast.second_handle(node);
       let value_log = self.annotate_node(ast, value_node, NodeContext::Expression);
-      let value_type = self.log.typ(value_log);
+      let value_type = self.log.type_id(value_log);
 
       // Check if the type matches if an explicit type was provided.
       let value_type = match expected_type {
          Some(typ) => {
             if let Some(log) = self.perform_implicit_conversion(ast, value_node, value_type, typ) {
-               self.log.typ(log)
+               self.log.type_id(log)
             } else {
                let expected_name = self.types.name(typ).to_owned();
                let value_name = self.types.name(value_type).to_owned();
