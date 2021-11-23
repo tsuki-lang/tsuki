@@ -13,7 +13,7 @@ import @std.macros as _
 
 macro my_macro(ctx: macros.Context): macros.AnyResolvedNode
 :: macros.position(:call)
-
+   _  # do things
 ```
 
 The task of the macro is to transform the nodes found in the environment into a final node. There are a few things to note here:
