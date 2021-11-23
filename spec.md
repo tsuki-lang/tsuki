@@ -1845,61 +1845,9 @@ pub import @std.math
 
 tsuki has a very limited model for conditional compilation, but one that's enough for most use cases.
 
-The only form of conditional compilation available, is conditionally importing a module:
-```
-import
-   if builtin.target_os == :windows -> some_module_windows
-   elif builtin.target_os == :linux -> some_module_linux
-   else -> :: unsupported_target("only Windows and Linux are supported")
-```
-This is done through the special `import if` statement. The `if` here acts a little bit differently from normal `if` statements – namely, a regular `if` statement will only evaluate the successful branch's body. `import if` however chooses modules to compile, rather than expressions to evaluate. To ensure that the code compiles on all platforms, `import if` will semantically analyze _all_ modules specified in the `if`'s branches, but will only compile the module whose condition has been satisfied. Additionally, each module must export the same set of symbols.
+The only form of conditional compilation available, is conditionally importing a module depending on the target OS.
 
-A branch of the `import if` statement can end with a `::` signifying pragmas; this branch _must_ have the pragma `unsupported_target` with an error message attached. Other pragmas are not allowed in this position.
-
-There's one more difference compared to a regular `if` statement: `import if` is much stricter (and different) with regards to syntax. Although the condition expression can be anything the user wishes for (that is, as long as it can be evaluated at compile time), the body _must_ be separated with the "then" arrow `->` and be a module path, rather than another expression. Note that module paths do not use the same syntax as expressions.
-
-An idiomatic example of how to use conditional compilation for targeting different operating systems would look like so:
-```
-example
-└── src
-    ├── greet.tsu
-    └── priv
-        ├── greet_linux.tsu
-        ├── greet_macos.tsu
-        ├── greet_other.tsu
-        └── greet_windows.tsu
-```
-
-File: src/priv/greet_windows.tsu
-```
-pub fn greet()
-   print("Hello, Windows user!")
-```
-File: src/priv/greet_linux.tsu
-```
-pub fn greet()
-   print("Hello, Linux user!")
-```
-File: src/priv/greet_macos.tsu
-```
-pub fn greet()
-   print("Hello, macOS user!")
-```
-File: src/priv/greet_unknown.tsu
-```
-pub fn greet()
-   print("Hello! I don't know what operating system you use.")
-```
-File: src/greet.tsu
-```
-pub import
-   if builtin.target_os == :windows -> priv.greet_windows
-   elif builtin.target_os == :linux -> priv.greet_linux
-   elif builtin.target_os == :macos -> priv.greet_macos
-   else -> priv.greet_unknown
-```
-
-Here, each module exports a single function, `greet()`, which greets the user with a different message, depending on which operating system the binary is compiled for.
+Which OS a given module is built for, is specified by appending `.<os name>` to the filename before the `.tsu` extension, eg. `example.windows.tsu`. All OS-specific modules are semantically checked during compilation, so if you have eg. `example.windows.tsu` and `example.linux.tsu`, _both_ will be checked, but only the one matching the target OS will be compiled to the final executable.
 
 ## Package management
 
