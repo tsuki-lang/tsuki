@@ -104,7 +104,7 @@ Union
 AtomSet
 Type
 ```
-While we're on the topic of functions, let's talk _calls_. Note that I have omitted nullary, unary, and binary operators. This is because they all desugar to calls, and by the time we arrive to macro evaluation, they are no longer part of the AST. Instead we substitute them with calls:
+While we're on the topic of functions, let's talk _calls_. For API simplicity, untyped operators desugar to three different node kinds: `Nullary`, `Unary`, and `Binary`.
 ```
 # these are macro-exclusive, untyped, generalized versions of operators.
 # their extra is an atom specifying what operator the node refers to
