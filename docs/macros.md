@@ -239,12 +239,9 @@ Upon encountering invalid input, a macro can return an `:error` result with a `m
 
 Because tsuki's control flow analysis is quite simple (at least in the early stages), it cannot infer what values are possible for a given variable in a given branch of the program. This is why `unreachable()` exists; it's to mark these spots as unreachable, and if a given spot is reached, the program panics. But panicking is strictly forbidden inside macros, so the `@std.macros` module provides replacements for these common tasks.
 
-`AnyNode` (which is implemented by _all_ node kinds) provides a function `error`, whose sole purpose is to produce errors:
+`AnyNode` (which _all_ node kinds can convert to) provides a function `error`, whose sole purpose is to produce errors:
 ```
-impl[T] T
-where
-   T: AnyNode
-
+impl AnyNode
    fun error(self, message: String): macros.Error
       _  # details omitted
 ```
