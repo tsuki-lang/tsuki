@@ -16,7 +16,7 @@ macro my_macro(ctx: macros.Context[:call]): macros.Error!macros.AnyResolvedNode
 ```
 
 The task of the macro is to transform the nodes found in the environment into a final node. There are a few things to note here:
-- The `env` argument tells the macro about the context it's being called in, including the _full_ call site, and type system things like the expected return type.
+- The `ctx` argument tells the macro about the context it's being called in, including the _full_ call site, and type system things like the expected return type.
 - The type of this argument is `macros.Context[P]`. The `P` parameter is a `const macros.CallPosition`, which specifies _where_ the macro can be called.
    - For instance, `:call` signifies that the macro is called like a regular function, `my_macro(arg1, arg2)`.
    - Other positions include `:fun_pragma`, `:object_pragma`, `:union_pragma`, `:atom_pragma`, `:type_pragma`, and `:derive`.
