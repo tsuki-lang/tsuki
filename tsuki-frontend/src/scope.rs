@@ -1,5 +1,6 @@
 //! Scoping and symbols.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
 
@@ -121,48 +122,42 @@ impl Symbols {
    }
 }
 
-type SymbolMap = HashMap<String, SymbolId>;
-
 /// Represents a local scope.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ScopeId(NonZeroUsize);
-
-impl ScopeId {
-   /// Returns the index of the scope in a `Scopes`.
-   fn index(self) -> usize {
-      self.0.get() - 1
-   }
-}
 
 /// Struct for module and local scope management.
 pub struct Scopes {
-   // FIXME: Maybe there's a more cache-friendly way of storing scopes?
-   scopes: Vec<SymbolMap>,
+   scopes: HashMap<(ScopeId, Cow<'static, str>), SymbolId>,
+   scope_count: usize,
 }
 
 impl Scopes {
    /// Creates a new scope manager.
    pub fn new() -> Self {
-      Self { scopes: Vec::new() }
+      Self {
+         scopes: HashMap::new(),
+         scope_count: 1,
+      }
    }
 
    /// Creates a new scope and returns its ID.
    pub fn create_scope(&mut self) -> ScopeId {
-      let id = self.scopes.len() + 1;
-      self.scopes.push(SymbolMap::new());
+      let id = self.scope_count;
+      self.scope_count += 1;
       ScopeId(NonZeroUsize::new(id).unwrap())
    }
 
    /// Inserts a symbol to the scope, under the given identifier. If there already is a symbol with
    /// the given name, it's lost.
    pub fn insert(&mut self, scope: ScopeId, identifier: &str, symbol: SymbolId) {
-      let _ = self.scopes[scope.index()].insert(identifier.to_owned(), symbol);
+      let _ = self.scopes.insert((scope, Cow::Owned(identifier.to_owned())), symbol);
    }
 
    /// Retrieves a reference to the provided identifier in the given scope, or `None` if the
    /// identifier is not in the given scope.
    pub fn get(&self, scope: ScopeId, identifier: &str) -> Option<SymbolId> {
-      self.scopes[scope.index()].get(identifier).map(|id| *id)
+      self.scopes.get(&(scope, Cow::Borrowed(identifier))).map(|id| *id)
    }
 }
 

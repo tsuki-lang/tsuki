@@ -4,13 +4,15 @@
 //! scattered across the heap, which helps achieve better cache locality.
 //! This also works much better with the borrow checker.
 
+use std::collections::HashMap;
+
 use crate::common::Span;
 use crate::scope::{ScopeId, SymbolId};
 use crate::types::TypeId;
 
 /// A handle to a single node in the AST. The actual AST is not stored next to the handle for
 /// efficiency and appeasing the borrow checker.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NodeId(usize);
 
 impl NodeId {
@@ -46,7 +48,7 @@ pub struct Ast {
    /// around.
    types: Vec<TypeId>,
    /// Each AST node can introduce a new scope for looking up names.
-   scopes: Vec<Option<ScopeId>>,
+   scopes: HashMap<NodeId, ScopeId>,
 }
 
 impl Ast {
@@ -60,7 +62,7 @@ impl Ast {
          extra: Vec::new(),
          ancestors: Vec::new(),
          types: Vec::new(),
-         scopes: Vec::new(),
+         scopes: HashMap::new(),
       };
       // Create a Empty node at ID 0 so that if some invalid AST node reference is dumped, it'll
       // instead go to this Empty node.
@@ -79,7 +81,6 @@ impl Ast {
       self.extra.push(NodeData::None);
       self.ancestors.push(NodeId::null());
       self.types.push(TypeId::null());
-      self.scopes.push(None);
       NodeId(id)
    }
 
@@ -187,12 +188,16 @@ impl Ast {
 
    /// Returns the scope that is introduced by this node, or `None` if it doesn't introduce a scope.
    pub fn scope(&self, node: NodeId) -> Option<ScopeId> {
-      self.scopes[node.0]
+      self.scopes.get(&node).cloned()
    }
 
    /// Sets the scope that is introduced by the node.
    pub fn set_scope(&mut self, node: NodeId, scope: Option<ScopeId>) {
-      self.scopes[node.0] = scope;
+      if let Some(scope) = scope {
+         self.scopes.insert(node, scope);
+      } else {
+         self.scopes.remove(&node);
+      }
    }
 
    /// Duplicates the given node, and returns a handle to the new node.
