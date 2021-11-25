@@ -636,6 +636,8 @@ where
       if element == needle
          return i
 ```
+The optional expression passed to `return` must be placed on the same line as the `return` keyword, otherwise it's interpreted as a new statement.
+
 The type of `return` is `NoReturn`, because control flow does not go back to the place performing a `return`, so there can be no value there.
 
 # Panicking
