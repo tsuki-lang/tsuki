@@ -303,19 +303,25 @@ impl<'s> Parser<'s> {
          | TokenKind::Character(..)
          | TokenKind::String(..) => self.parse_literal(token),
          TokenKind::Identifier(..) => self.create_identifier(token),
+
          // Parentheses
          TokenKind::LeftParen => self.parentheses(token)?,
+
          // Nullary operators
          TokenKind::UpTo => self.nullary_operator(token, NodeKind::FullRange),
+
          // Unary prefix operators
          TokenKind::Not => self.unary_prefix(token, NodeKind::Not)?,
          TokenKind::Minus => self.unary_prefix(token, NodeKind::Neg)?,
          TokenKind::Tilde => self.unary_prefix(token, NodeKind::BitNot)?,
          TokenKind::Dot => self.unary_prefix(token, NodeKind::Member)?,
          TokenKind::Pointer => self.unary_prefix(token, NodeKind::Ref)?,
+
          // Control flow structures
          TokenKind::Do => self.parse_do_expression(Some(token))?,
          TokenKind::If => self.parse_if_expression(Some(token))?,
+         TokenKind::Return => self.parse_return(token)?,
+
          // Unknown tokens
          _ => self.error(ErrorKind::UnexpectedPrefixToken(token.kind), span),
       })
@@ -401,6 +407,22 @@ impl<'s> Parser<'s> {
       );
       self.ast.set_extra(node, NodeData::NodeList(branches));
 
+      Ok(node)
+   }
+
+   /// Parses a `return` expression.
+   fn parse_return(&mut self, token: Token) -> Result<NodeId, Error> {
+      let next = self.lexer.peek()?;
+      let right = if next.line() > token.line() {
+         // If the next token is placed on a new line, then we treat this `return` as one without
+         // an expression to return.
+         NodeId::null()
+      } else {
+         // Otherwise, we parse an expression.
+         self.parse_expression(0)?
+      };
+      let node = self.create_node_with_handle(NodeKind::Return, right);
+      self.ast.set_span(node, Span::join(&token.span, self.ast.span(right)));
       Ok(node)
    }
 
@@ -497,10 +519,12 @@ impl<'s> Parser<'s> {
          TokenKind::MulAssign => self.binary_operator(left, token, NodeKind::MulAssign)?,
          TokenKind::DivAssign => self.binary_operator(left, token, NodeKind::DivAssign)?,
          TokenKind::Push => self.binary_operator(left, token, NodeKind::Push)?,
+
          // Postfix unary operators
          TokenKind::Pointer => self.unary_postfix(left, token, NodeKind::Deref),
          TokenKind::Check => self.unary_postfix(left, token, NodeKind::Check),
          TokenKind::Unwrap => self.unary_postfix(left, token, NodeKind::Unwrap),
+
          // Other operators
          TokenKind::LeftParen => self.parse_call(left, token)?,
          TokenKind::LeftBracket => {
@@ -509,6 +533,7 @@ impl<'s> Parser<'s> {
          TokenKind::LeftBrace => {
             self.parse_index(left, token, TokenKind::RightBrace, NodeKind::IndexAlt)?
          }
+
          _ => self.error(ErrorKind::UnexpectedInfixToken(token.kind), span),
       })
    }
@@ -568,6 +593,16 @@ impl<'s> Parser<'s> {
          Span::join(&token.span, &self.span_all_nodes(&statements)),
       );
       self.ast.set_extra(node, NodeData::NodeList(statements));
+      Ok(node)
+   }
+
+   /// Parses a `break` statement.
+   fn parse_break(&mut self) -> Result<NodeId, Error> {
+      // TODO: Someday `break` could become an expression, but it would require Python-like
+      // `while..else` loops.
+      let token = self.lexer.next()?;
+      let node = self.ast.create_node(NodeKind::Break);
+      self.ast.set_span(node, token.span);
       Ok(node)
    }
 
@@ -722,6 +757,7 @@ impl<'s> Parser<'s> {
          TokenKind::Do => self.parse_do_expression(None)?,
          TokenKind::If => self.parse_if_expression(None)?,
          TokenKind::While => self.parse_while_loop()?,
+         TokenKind::Break => self.parse_break()?,
 
          // Expression statements
          _ => self.parse_expression(0)?,

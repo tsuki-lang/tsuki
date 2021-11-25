@@ -33,3 +33,23 @@ fun bar(x: Int)
       foo(x - 1)
 
 foo(0)
+
+# test return statement
+
+fun nop()
+   return
+
+nop()
+
+fun fac(n: Int): Int
+   var i = 0
+   var x = 1
+   while true
+      if i >= n
+         return x
+      x = x * i
+      i = i + 1
+   x
+
+
+__intrin_print_int32(fac(10))

@@ -32,6 +32,7 @@ pub enum TokenKind {
    Underscore,
    And,
    AtomK, // 'atom' keyword
+   Break,
    Catch,
    Derive,
    Do,
@@ -228,6 +229,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Underscore => "_",
             TokenKind::And => "and",
             TokenKind::AtomK => "atom",
+            TokenKind::Break => "break",
             TokenKind::Catch => "catch",
             TokenKind::Derive => "derive",
             TokenKind::Do => "do",
@@ -304,6 +306,7 @@ static KEYWORDS: phf::Map<&'static str, TokenKind> = phf::phf_map! {
    "_" => TokenKind::Underscore,
    "and" => TokenKind::And,
    "atom" => TokenKind::AtomK,
+   "break" => TokenKind::Break,
    "catch" => TokenKind::Catch,
    "derive" => TokenKind::Derive,
    "do" => TokenKind::Do,

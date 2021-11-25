@@ -437,6 +437,8 @@ pub enum NodeKind {
    IfBranch,   // `if`, `elif` branches in a single `if` statement
    ElseBranch, // the `else` branch in an `if` statement
    While,
+   Break,
+   Return,
 
    /*
     * Post-sem'check
