@@ -429,6 +429,39 @@ Note that `try` cannot be used as a statement. This has a few effects:
 - The result of `try` must be assigned to a variable, or otherwise treated as used (assigned to `_`, used as an argument, etc.)
 - The last statement in `try` must always be an expression.
 
+## `const` expressions
+
+`const` expressions can be used to force an expression into being constant.
+
+```
+# The value of the variable `x` is known at compile time.
+val x = const 4
+```
+The right-hand side of a `const` expression has the lowest possible precedence. As such, the expression `const 2 + 2` is equivalent to `const (2 + 2)`, and not `(const 2) + 2`.
+
+The return type of a `const` expression is [`const T {V}`](#const-t-v), where `T` is the type of the expression, and `V` is the value of the expression.
+
+Although the subset of types allowed in `const` is quite limited, it can be used for things like compile-time platform detection.
+```
+if const builtin.target_architecture == :x86_64
+   _  # do something x86_64-specific
+
+# Because, `builtin.target_architecture` is compile-time known anyways, the const expression can be
+# omitted from the if statement.
+if builtin.target_architecture == :x86_64
+   _
+```
+The `if` statements above will both be evaluated at compile-time, and all the `false` branches will be optimized out. This also works with `match`:
+```
+val os = match const builtin.target_os
+   :windows -> "Windows"
+   :linux -> "Linux"
+   :macos -> "macOS"
+   _ -> "exotic OS"
+
+print("Hello, " ~ os ~ " user!")
+```
+
 # Statements
 
 ## Expression statements
