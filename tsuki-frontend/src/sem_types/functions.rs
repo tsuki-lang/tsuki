@@ -115,6 +115,10 @@ impl<'s> SemTypes<'s> {
       let symbol_id = ast.symbol_id(name_node);
       let function_id = self.symbols.kind(symbol_id).unwrap_function();
 
+      // Before any analysis happens, set the current function to this one.
+      let previous_function = self.current_function;
+      self.current_function = Some(function_id);
+
       let return_type = self.functions.parameters(function_id).return_type;
 
       let returns_unit = self.types.kind(return_type).is_unit();
@@ -127,6 +131,8 @@ impl<'s> SemTypes<'s> {
             NodeContext::Expression
          },
       );
+
+      self.current_function = previous_function;
 
       // Check that the body's return type is correct.
       let body_type = self.log.type_id(body_log);

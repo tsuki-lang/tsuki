@@ -13,7 +13,7 @@ use smallvec::SmallVec;
 
 use crate::ast::{Ast, NodeId, NodeKind};
 use crate::common::{ErrorKind, Errors};
-use crate::functions::{register_intrinsics, Functions};
+use crate::functions::{register_intrinsics, FunctionId, Functions};
 use crate::scope::{ScopeId, ScopeStack, Scopes, Symbols};
 use crate::sem::{SemCommon, SemPass};
 use crate::types::{BuiltinTypes, TypeId, TypeLog, TypeLogEntry, Types};
@@ -36,6 +36,10 @@ pub(crate) struct SemTypes<'s> {
    /// The scope ID is used to determine where the given node is placed. The scope of the node's
    /// body is determined from the node's metadata.
    deferred: SmallVec<[Vec<(NodeId, NodeContext)>; 4]>,
+
+   /// The function that is currently being compiled.
+   /// `None` if at the top level.
+   current_function: Option<FunctionId>,
 }
 
 /// Values borrowed to `SemTypes`, used during its construction.
@@ -88,6 +92,7 @@ impl<'s> SemTypes<'s> {
          scope_stack,
          module_scope,
          deferred: SmallVec::new(),
+         current_function: None,
       }
    }
 
@@ -276,6 +281,7 @@ impl<'s> SemTypes<'s> {
          NodeKind::Do => self.annotate_do(ast, node, context),
          NodeKind::If => self.annotate_if(ast, node, context),
          NodeKind::While => self.annotate_while(ast, node),
+         NodeKind::Return => self.annotate_return(ast, node),
 
          // Declarations
          NodeKind::Val | NodeKind::Var => self.annotate_variable_declaration(ast, node).into(),

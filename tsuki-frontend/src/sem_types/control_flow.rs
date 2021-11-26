@@ -96,4 +96,34 @@ impl<'s> SemTypes<'s> {
       let _ = self.annotate_statement_list(ast, node, NodeContext::Statement);
       self.annotate(ast, node, self.builtin.t_statement)
    }
+
+   /// Annotates a `return` statement.
+   pub(super) fn annotate_return(&mut self, ast: &mut Ast, node: NodeId) -> TypeLogEntry {
+      // `return` can only be used in a function.
+      if let Some(function_id) = self.current_function {
+         let expected_return_type = self.functions.parameters(function_id).return_type;
+         let value_node = ast.first_handle(node);
+         let return_log = if value_node != NodeId::null() {
+            // For `return`s that do actually return something, the path is straightforward.
+            self.annotate_node(ast, value_node, NodeContext::Expression)
+         } else {
+            // For `return`s that _don't_ return a value, we need to duplicate the empty node such
+            // that it gets a unique ID that we can attach the unit type to.
+            let value_node = ast.duplicate(value_node);
+            ast.set_first_handle(node, value_node);
+            self.annotate(ast, value_node, self.builtin.t_unit)
+         };
+         let provided_return_type = self.log.type_id(return_log);
+         let return_log = self
+            .perform_implicit_conversion(ast, node, provided_return_type, expected_return_type)
+            .unwrap_or(return_log);
+         let provided_type = self.log.type_id(return_log);
+         if provided_type != expected_return_type {
+            return self.type_mismatch(ast, node, expected_return_type, provided_type);
+         }
+         self.annotate(ast, node, self.builtin.t_noreturn)
+      } else {
+         self.error(ast, node, ErrorKind::ReturnOutsideOfFunction)
+      }
+   }
 }

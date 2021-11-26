@@ -201,7 +201,7 @@ impl Ast {
    }
 
    /// Duplicates the given node, and returns a handle to the new node.
-   fn duplicate(&mut self, node: NodeId) -> NodeId {
+   pub fn duplicate(&mut self, node: NodeId) -> NodeId {
       let new = self.create_node(self.kind(node));
       self.set_span(new, self.span(node).clone());
       self.set_first(new, self.first(node));

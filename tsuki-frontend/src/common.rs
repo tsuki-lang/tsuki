@@ -304,6 +304,8 @@ pub enum ErrorKind {
    WhileConditionMustBeBool,
    #[error("expression cannot be called; make sure it is a function")]
    ExpressionCannotBeCalled,
+   #[error("`return` cannot be used outside of a function")]
+   ReturnOutsideOfFunction,
 
    /*
     * Internal errors
