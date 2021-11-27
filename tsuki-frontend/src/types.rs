@@ -18,7 +18,7 @@ pub struct Types {
 }
 
 /// A unique ID representing a type.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TypeId(usize);
 
 impl TypeId {
@@ -107,6 +107,11 @@ impl TypeKind {
    /// Returns whether the type kind represents an invalid type.
    pub fn is_invalid(&self) -> bool {
       matches!(self, TypeKind::Missing | TypeKind::Error)
+   }
+
+   /// Returns whether the type kind is the `NoReturn` type.
+   pub fn is_noreturn(&self) -> bool {
+      matches!(self, TypeKind::NoReturn)
    }
 
    /// Returns whether the type kind is the unit type.

@@ -27,7 +27,7 @@ impl<'s> SemTypes<'s> {
       ast.convert_preserve(
          node,
          match context {
-            NodeContext::Expression => NodeKind::DoExpression,
+            NodeContext::Expression(_) => NodeKind::DoExpression,
             NodeContext::Statement => NodeKind::DoStatement,
          },
       );
@@ -62,7 +62,7 @@ impl<'s> SemTypes<'s> {
          }
          let body_entry = self.annotate_statement_list(ast, branch, context);
          let body_type = self.log.type_id(body_entry);
-         if context == NodeContext::Expression {
+         if let NodeContext::Expression(_) = context {
             match typ {
                None => typ = Some(body_type),
                Some(typ) if body_type != typ => {
@@ -78,7 +78,7 @@ impl<'s> SemTypes<'s> {
       ast.convert_preserve(
          node,
          match context {
-            NodeContext::Expression => NodeKind::IfExpression,
+            NodeContext::Expression(_) => NodeKind::IfExpression,
             NodeContext::Statement => NodeKind::IfStatement,
          },
       );
@@ -88,7 +88,11 @@ impl<'s> SemTypes<'s> {
    /// Annotates a `while` loop.
    pub(super) fn annotate_while(&mut self, ast: &mut Ast, node: NodeId) -> TypeLogEntry {
       let condition_node = ast.first_handle(node);
-      let condition_entry = self.annotate_node(ast, condition_node, NodeContext::Expression);
+      let condition_entry = self.annotate_node(
+         ast,
+         condition_node,
+         NodeContext::expression_of_type(self.builtin.t_bool),
+      );
       let condition_type = self.log.type_id(condition_entry);
       if !self.types.kind(condition_type).is_bool() {
          return self.error(ast, condition_node, ErrorKind::WhileConditionMustBeBool);
@@ -105,7 +109,11 @@ impl<'s> SemTypes<'s> {
          let value_node = ast.first_handle(node);
          let return_log = if value_node != NodeId::null() {
             // For `return`s that do actually return something, the path is straightforward.
-            self.annotate_node(ast, value_node, NodeContext::Expression)
+            self.annotate_node(
+               ast,
+               value_node,
+               NodeContext::expression_of_type(expected_return_type),
+            )
          } else {
             // For `return`s that _don't_ return a value, we need to duplicate the empty node such
             // that it gets a unique ID that we can attach the unit type to.
@@ -113,10 +121,6 @@ impl<'s> SemTypes<'s> {
             ast.set_first_handle(node, value_node);
             self.annotate(ast, value_node, self.builtin.t_unit)
          };
-         let provided_return_type = self.log.type_id(return_log);
-         let return_log = self
-            .perform_implicit_conversion(ast, node, provided_return_type, expected_return_type)
-            .unwrap_or(return_log);
          let provided_type = self.log.type_id(return_log);
          if provided_type != expected_return_type {
             return self.type_mismatch(ast, node, expected_return_type, provided_type);

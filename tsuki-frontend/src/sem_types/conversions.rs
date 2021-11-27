@@ -99,7 +99,7 @@ impl<'s> SemTypes<'s> {
 
    /// Attempts to convert the type `from` to type `to`. If an implicit conversion is not possible,
    /// returns `None`. Otherwise returns the converted type ID.
-   pub(super) fn perform_implicit_conversion(
+   pub(super) fn try_perform_implicit_conversion(
       &mut self,
       ast: &mut Ast,
       node: NodeId,
@@ -113,6 +113,11 @@ impl<'s> SemTypes<'s> {
       // Otherwise, compare their kinds for various traits.
       let from_kind = self.types.kind(from);
       let to_kind = self.types.kind(to);
+
+      // NoReturn conversions
+      if from_kind.is_noreturn() {
+         return Some(self.log.push(to, node));
+      }
 
       // Widening integer conversions
       if from_kind.is_integer() && to_kind.is_integer() {
@@ -137,5 +142,17 @@ impl<'s> SemTypes<'s> {
       }
 
       None
+   }
+
+   /// Performs an implicit conversion without failing.
+   pub(super) fn perform_implicit_conversion(
+      &mut self,
+      ast: &mut Ast,
+      node: NodeId,
+      from_log: TypeLogEntry,
+      to: TypeId,
+   ) -> TypeLogEntry {
+      let from = self.log.type_id(from_log);
+      self.try_perform_implicit_conversion(ast, node, from, to).unwrap_or(from_log)
    }
 }

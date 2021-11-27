@@ -13,7 +13,7 @@ impl<'s> SemTypes<'s> {
 
    /// Annotates a unary operator with types.
    pub(super) fn annotate_unary_operator(&mut self, ast: &mut Ast, node: NodeId) -> TypeLogEntry {
-      let log_entry = self.annotate_node(ast, ast.first_handle(node), NodeContext::Expression);
+      let log_entry = self.annotate_node(ast, ast.first_handle(node), NodeContext::expression());
       let right = self.log.type_id(log_entry);
       let right_kind = self.types.kind(right);
       let typ = match ast.kind(node) {
@@ -32,11 +32,11 @@ impl<'s> SemTypes<'s> {
    /// Annotates a binary operator with types.
    pub(super) fn annotate_binary_operator(&mut self, ast: &mut Ast, node: NodeId) -> TypeLogEntry {
       let (left, right) = (ast.first_handle(node), ast.second_handle(node));
-      let left_entry = self.annotate_node(ast, left, NodeContext::Expression);
-      let right_entry = self.annotate_node(ast, right, NodeContext::Expression);
+      let left_entry = self.annotate_node(ast, left, NodeContext::expression());
       let left_type = self.log.type_id(left_entry);
+      let right_entry = self.annotate_node(ast, right, NodeContext::expression_of_type(left_type));
       let right_type = self.log.type_id(right_entry);
-      let conversion = self.perform_implicit_conversion(ast, right, right_type, left_type);
+      let conversion = self.try_perform_implicit_conversion(ast, right, right_type, left_type);
       let left_type_kind = self.types.kind(left_type);
       let typ = match ast.kind(node) {
          // Arithmetic operators always evaluate to the same type as the LHS.

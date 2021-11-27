@@ -51,7 +51,8 @@ impl<'s> SemTypes<'s> {
       let (left, right) = (ast.first_handle(node), ast.second_handle(node));
       let left_entry = self.annotate_location(ast, left)?;
       let left_type = self.log.type_id(left_entry);
-      let right_entry = self.annotate_node(ast, right, NodeContext::Expression);
+      let right_entry = self.annotate_node(ast, right, NodeContext::expression_of_type(left_type));
+      let right_entry = self.perform_implicit_conversion(ast, node, right_entry, left_type);
       let right_type = self.log.type_id(right_entry);
       // Check types.
       if right_type != left_type {
@@ -72,7 +73,7 @@ impl<'s> SemTypes<'s> {
          return Err(self.error(ast, left, ErrorKind::CannotAssignImmutableLocation));
       }
       Ok(match context {
-         NodeContext::Expression => self.annotate(ast, node, left_type),
+         NodeContext::Expression(_) => self.annotate(ast, node, left_type),
          NodeContext::Statement => self.annotate(ast, node, self.builtin.t_statement),
       })
    }
@@ -107,13 +108,15 @@ impl<'s> SemTypes<'s> {
 
       // Annotate the value.
       let value_node = ast.second_handle(node);
-      let value_log = self.annotate_node(ast, value_node, NodeContext::Expression);
+      let value_log = self.annotate_node(ast, value_node, NodeContext::Expression(expected_type));
       let value_type = self.log.type_id(value_log);
 
       // Check if the type matches if an explicit type was provided.
       let value_type = match expected_type {
          Some(typ) => {
-            if let Some(log) = self.perform_implicit_conversion(ast, value_node, value_type, typ) {
+            if let Some(log) =
+               self.try_perform_implicit_conversion(ast, value_node, value_type, typ)
+            {
                self.log.type_id(log)
             } else {
                let expected_name = self.types.name(typ).to_owned();

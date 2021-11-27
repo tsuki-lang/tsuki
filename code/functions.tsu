@@ -51,5 +51,15 @@ fun fac(n: Int): Int
       i = i + 1
    x
 
-
 __intrin_print_int32(fac(10))
+
+# Tests for implicit conversion from NoReturn to any other type.
+fun straightforward_return(): Int
+   return 1
+
+fun return_from_if(x: Int): Int
+   if x == 1
+      return 1
+   else
+      return 2
+

@@ -56,8 +56,21 @@ pub(crate) struct SemTypesBorrows<'s> {
 /// Specifies whether a node should be annotated in expression or statement context.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum NodeContext {
-   Expression,
+   Expression(
+      /// The expected type of the expression.
+      Option<TypeId>,
+   ),
    Statement,
+}
+
+impl NodeContext {
+   fn expression() -> Self {
+      Self::Expression(None)
+   }
+
+   fn expression_of_type(type_id: TypeId) -> Self {
+      Self::Expression(Some(type_id))
+   }
 }
 
 impl<'s> SemTypes<'s> {
@@ -188,13 +201,12 @@ impl<'s> SemTypes<'s> {
          // proper expressions rather than statements. They are also not subject to triggering the
          // UnusedValue error, as the resulting value _is_ actually used - it's the result of the
          // statement list.
-         let is_last_expression =
-            ast.is_last_child(node, index) && context == NodeContext::Expression;
+         let is_last = ast.is_last_child(node, index);
          let log_entry = self.annotate_node(
             ast,
             child,
-            if is_last_expression {
-               NodeContext::Expression
+            if is_last {
+               context
             } else {
                NodeContext::Statement
             },
@@ -203,7 +215,7 @@ impl<'s> SemTypes<'s> {
          let type_kind = self.types.kind(typ);
          // For expressions, we have some special cases.
          if !type_kind.is_statement() {
-            if is_last_expression {
+            if is_last {
                // Trailing expressions get assigned to the `last_log`, so that we know what the
                // result of the statement list is.
                last_log = Some(log_entry);
@@ -214,13 +226,16 @@ impl<'s> SemTypes<'s> {
          }
       });
       // Statement lists in expression context must always have a trailing expression.
-      if context == NodeContext::Expression && last_log.is_none() {
-         return self.error(ast, node, ErrorKind::MissingResult);
-      }
-      // Nodes in expression context inherit their type from the last expression statement in
-      // the list.
-      if let Some(log) = last_log {
-         self.annotate(ast, node, self.log.type_id(log))
+      if let NodeContext::Expression(expected_type) = context {
+         if let Some(last_log) = last_log {
+            if let Some(expected_type) = expected_type {
+               self.perform_implicit_conversion(ast, node, last_log, expected_type)
+            } else {
+               last_log
+            }
+         } else {
+            self.error(ast, node, ErrorKind::MissingResult)
+         }
       } else {
          self.annotate(ast, node, self.builtin.t_statement)
       }
@@ -228,7 +243,7 @@ impl<'s> SemTypes<'s> {
 
    /// Annotates the given AST node.
    fn annotate_node(&mut self, ast: &mut Ast, node: NodeId, context: NodeContext) -> TypeLogEntry {
-      match ast.kind(node) {
+      let log = match ast.kind(node) {
          // Literals
          | NodeKind::True
          | NodeKind::False
@@ -289,7 +304,17 @@ impl<'s> SemTypes<'s> {
 
          // Other nodes are invalid (or not implemented yet).
          other => self.error(ast, node, ErrorKind::SemTypesInvalidAstNode(other)),
-      }
+      };
+
+      // In case the node's context is an expression with some return type provided, perform
+      // implicit conversions such that the node's type matches the expected type.
+      let log = if let NodeContext::Expression(Some(expected_type)) = context {
+         self.perform_implicit_conversion(ast, node, log, expected_type)
+      } else {
+         log
+      };
+
+      log
    }
 }
 

@@ -128,7 +128,7 @@ impl<'s> SemTypes<'s> {
          if returns_unit {
             NodeContext::Statement
          } else {
-            NodeContext::Expression
+            NodeContext::expression_of_type(return_type)
          },
       );
 
@@ -173,12 +173,16 @@ impl<'s> SemTypes<'s> {
          let parameters = self.functions.parameters(function_id);
          let expected_type = self.symbols.type_id(parameters.formal[index]);
 
-         let argument_log = self.annotate_node(ast, argument, NodeContext::Expression);
+         let argument_log = self.annotate_node(
+            ast,
+            argument,
+            NodeContext::expression_of_type(expected_type),
+         );
          let provided_type = self.log.type_id(argument_log);
 
          // Perform implicit conversions on arguments.
          let argument_log = self
-            .perform_implicit_conversion(ast, node, provided_type, expected_type)
+            .try_perform_implicit_conversion(ast, node, provided_type, expected_type)
             .unwrap_or(argument_log);
          // If there's a mismatch after the conversion, error.
          let provided_type = self.log.type_id(argument_log);
