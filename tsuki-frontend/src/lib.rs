@@ -16,6 +16,7 @@ use lexer::Lexer;
 use sem::{AnalyzeOptions, Ir};
 use types::{DefaultTypes, FloatSize, IntegerSize};
 
+#[derive(Debug, Clone, Copy)]
 pub struct DebugOptions {
    pub dump_source: bool,
    pub dump_ast_pre_sem: bool,

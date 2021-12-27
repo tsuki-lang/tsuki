@@ -25,6 +25,10 @@ struct Options {
    #[structopt(short = "m", long, name = "main file")]
    main_file: PathBuf,
 
+   /// Only check the code for validity, without compiling it.
+   #[structopt(long)]
+   check: bool,
+
    /// The optimization level to use when compiling.
    #[structopt(long, name = "level", default_value = "essential")]
    optimize: OptimizationLevel,
@@ -74,17 +78,18 @@ fn unwrap_errors<T>(r: Result<T, Errors>) -> T {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
    let options = Options::from_args();
+   let frontend_debug_options = tsuki_frontend::DebugOptions {
+      dump_source: options.dump_source,
+      dump_ast_pre_sem: options.dump_ast_pre_sem,
+      dump_ast_post_sem: options.dump_ast_post_sem,
+   };
    let backend = LlvmBackend::new(LlvmBackendConfig {
       cache_dir: &options.cache_dir.unwrap_or(std::env::current_dir()?.join("bin")),
       package_name: &options.package_name,
       // TODO: Cross-compilation.
       target_triple: None,
       optimization_level: options.optimize,
-      frontend_debug_options: tsuki_frontend::DebugOptions {
-         dump_source: options.dump_source,
-         dump_ast_pre_sem: options.dump_ast_pre_sem,
-         dump_ast_post_sem: options.dump_ast_post_sem,
-      },
+      frontend_debug_options,
       backend_debug_options: tsuki_backend_llvm::DebugOptions {
          dump_ir: options.dump_llvm_ir,
       },
@@ -98,10 +103,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       options.main_file,
       source,
    ));
-   let object = unwrap_errors(backend.compile(source_file));
 
-   let executable = ExecutableFile::link(backend, &[object])?;
-   executable.run(&[])?;
+   if options.check {
+      let _ = unwrap_errors(tsuki_frontend::analyze(
+         &source_file,
+         &frontend_debug_options,
+      ));
+   } else {
+      let object = unwrap_errors(backend.compile(source_file));
+      let executable = ExecutableFile::link(backend, &[object])?;
+      executable.run(&[])?;
+   }
 
    Ok(())
 }

@@ -170,4 +170,9 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
 
       call.try_as_basic_value().either(|value| value, |_void| self.generate_unit_literal().into())
    }
+
+   /// Generates code for a `return` expression.
+   pub(crate) fn generate_return(&self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
+      todo!()
+   }
 }
