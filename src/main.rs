@@ -111,8 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       ));
    } else {
       let object = unwrap_errors(backend.compile(source_file));
-      let executable = ExecutableFile::link(backend, &[object])?;
-      executable.run(&[])?;
+      let _executable = ExecutableFile::link(backend, &[object])?;
    }
 
    Ok(())
