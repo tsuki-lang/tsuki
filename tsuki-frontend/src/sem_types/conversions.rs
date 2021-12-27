@@ -116,7 +116,7 @@ impl<'s> SemTypes<'s> {
 
       // NoReturn conversions
       if from_kind.is_noreturn() {
-         return Some(self.log.push(to, node));
+         return Some(self.annotate(ast, node, to));
       }
 
       // Widening integer conversions

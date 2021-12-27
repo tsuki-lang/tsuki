@@ -170,8 +170,11 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
       if is_expression {
          let typ = branches[0].result.unwrap().get_type();
          let phi = self.builder.build_phi(typ, "ifresult");
-         for Branch { body, result, .. } in branches {
-            phi.add_incoming(&[(&result.unwrap(), body)]);
+         for Branch {
+            end_block, result, ..
+         } in branches
+         {
+            phi.add_incoming(&[(&result.unwrap(), end_block)]);
          }
          // It's a bit strange that `phi`'s function for this is not called `as_basic_value_enum`.
          Some(phi.as_basic_value())

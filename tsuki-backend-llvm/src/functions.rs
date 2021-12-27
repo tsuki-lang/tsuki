@@ -7,7 +7,8 @@ use inkwell::module::Module;
 use inkwell::types::{BasicType, BasicTypeEnum, FunctionType};
 use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue};
 use smallvec::SmallVec;
-use tsuki_frontend::ast::NodeId;
+use tsuki_frontend::ast::{NodeId, NodeKind};
+use tsuki_frontend::astdump;
 use tsuki_frontend::functions::FunctionId;
 use tsuki_frontend::sem::Ir;
 
@@ -173,6 +174,23 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
 
    /// Generates code for a `return` expression.
    pub(crate) fn generate_return(&self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
-      todo!()
+      astdump::dump_ast(&self.source, &ir.ast, Some(&ir.types), node);
+
+      // Finish off the current basic block with a `ret` instruction.
+      let return_value = ir.ast.first_handle(node);
+      let result_value = if ir.ast.kind(return_value) != NodeKind::Empty {
+         self.builder.build_return(Some(&self.generate_expression(ir, return_value)));
+         let result_type = ir.ast.type_id(node);
+         self.get_type(&ir.types, result_type)
+      } else {
+         self.builder.build_return(None);
+         self.unit_type.into()
+      };
+      // Then, begin a new basic block such that if there's any unreachable code past this block,
+      // its terminator will be contained in this new block.
+      let unreachable_block = self.context.append_basic_block(self.function.value, "unreachable");
+      self.builder.position_at_end(unreachable_block);
+
+      result_value.const_zero()
    }
 }

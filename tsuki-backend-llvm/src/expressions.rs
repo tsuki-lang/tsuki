@@ -211,7 +211,8 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
          // Control flow
          NodeKind::DoExpression => self.generate_do(ir, node).unwrap(),
          NodeKind::IfExpression => self.generate_if(ir, node).unwrap(),
-         NodeKind::CallFunction => self.generate_call(ir, node), // TODO
+         NodeKind::CallFunction => self.generate_call(ir, node),
+         NodeKind::Return => self.generate_return(ir, node),
 
          // Intrinsics
          NodeKind::WidenUint | NodeKind::WidenInt => self.generate_integer_conversion(ir, node),

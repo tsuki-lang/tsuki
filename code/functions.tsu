@@ -63,3 +63,5 @@ fun return_from_if(x: Int): Int
    else
       return 2
 
+fun assign_return_to_variable(x: Int)
+   val x: Int = return
