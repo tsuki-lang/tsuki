@@ -212,6 +212,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
          NodeKind::DoExpression => self.generate_do(ir, node).unwrap(),
          NodeKind::IfExpression => self.generate_if(ir, node).unwrap(),
          NodeKind::CallFunction => self.generate_call(ir, node),
+         NodeKind::Break => self.generate_break(ir, node),
          NodeKind::Return => self.generate_return(ir, node),
 
          // Intrinsics

@@ -12,5 +12,6 @@ while true
    b = b + 1
 
 # Check that `break` can be used as an expression.
+__intrin_print_int32(123)
 while true
    val yes: Int = break

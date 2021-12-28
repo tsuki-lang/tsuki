@@ -99,6 +99,7 @@ impl<'s> SemTypes<'s> {
       }
 
       let scope = self.scope_stack.push(self.scopes.create_scope());
+      ast.set_scope(node, Some(scope));
       self.scopes.set_breakable(scope);
       let _ = self.annotate_statement_list(ast, node, NodeContext::Statement);
       self.scope_stack.pop();

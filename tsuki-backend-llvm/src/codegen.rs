@@ -1,7 +1,9 @@
 //! Common code generation state.
 
+use std::collections::HashMap;
 use std::fmt;
 
+use inkwell::basic_block::BasicBlock;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
@@ -10,6 +12,7 @@ use inkwell::types::StructType;
 use inkwell::values::{BasicValueEnum, FunctionValue};
 use tsuki_frontend::ast::{NodeId, NodeKind};
 use tsuki_frontend::common::SourceFile;
+use tsuki_frontend::scope::ScopeId;
 use tsuki_frontend::sem::Ir;
 
 use crate::functions::Function;
@@ -29,6 +32,13 @@ pub struct CodeGen<'src, 'c, 'pm> {
 
    pub(crate) function: Function<'c>,
    pub(crate) variables: Variables<'c>,
+
+   /// This map stores a list of blocks to which unconditional jumps have to be appended, as a
+   /// result of `break` expressions.
+   ///
+   /// The second `usize` in the tuple key is required to allow for multiple `break`s in one
+   /// breaking scope.
+   pub(crate) break_blocks: HashMap<(ScopeId, usize), BasicBlock<'c>>,
 
    pub(crate) unit_type: StructType<'c>,
 }
@@ -52,6 +62,8 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
          function,
          variables: Variables::new(),
 
+         break_blocks: HashMap::new(),
+
          unit_type: context.struct_type(&[], false),
       };
       state.builder.position_at_end(state.function.entry_block);
@@ -68,6 +80,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
          function,
          variables: Variables::new(),
          unit_type: self.unit_type,
+         break_blocks: HashMap::new(),
          ..*self
       }
    }

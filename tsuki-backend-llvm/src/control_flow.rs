@@ -4,6 +4,7 @@ use inkwell::basic_block::BasicBlock;
 use inkwell::values::{BasicValueEnum, IntValue};
 use smallvec::SmallVec;
 use tsuki_frontend::ast::{NodeId, NodeKind};
+use tsuki_frontend::scope::ScopeId;
 use tsuki_frontend::sem::Ir;
 
 use crate::codegen::CodeGen;
@@ -219,7 +220,41 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
       self.builder.position_at_end(body_end_block);
       self.builder.build_unconditional_branch(condition_block);
 
+      let scope = ir.ast.scope(node).unwrap();
+      self.generate_break_jumps(scope, end_block);
+
       // Continue generating code at the end block.
       self.builder.position_at_end(end_block);
+   }
+
+   /// Generates jumps at the ends of blocks, that are results of `break`s of the breaking scope
+   /// with the given ID.
+   fn generate_break_jumps(&mut self, scope: ScopeId, end_block: BasicBlock<'c>) {
+      let builder = self.context.create_builder();
+      let keys: SmallVec<[(ScopeId, usize); 4]> =
+         self.break_blocks.keys().filter(|(scope_id, _)| *scope_id == scope).copied().collect();
+      for key in keys {
+         let block = self.break_blocks.remove(&key).unwrap();
+         builder.position_at_end(block);
+         builder.build_unconditional_branch(end_block);
+      }
+   }
+
+   /// Generates code for a `break` expression.
+   pub(crate) fn generate_break(&mut self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
+      // Save the current block in the break_blocks table, such that it can be later referred to
+      // by the enclosing `while` loop.
+      let target_scope = ir.ast.scope(node).expect("Break node with no scope in IR");
+      let id = self.break_blocks.len();
+      let break_block = self.builder.get_insert_block().unwrap();
+      self.break_blocks.insert((target_scope, id), break_block);
+
+      // Continue generating in an unreachable block with no predecessors.
+      let unreachable_block = self.context.append_basic_block(self.function.value, "unreachable");
+      self.builder.position_at_end(unreachable_block);
+
+      // Return a dummy value as a result of `break` being an expression.
+      let result_type = self.get_type(&ir.types, ir.ast.type_id(node));
+      result_type.const_zero()
    }
 }
