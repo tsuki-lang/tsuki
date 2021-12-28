@@ -43,11 +43,20 @@ cmake .. \
    -D LLVM_ENABLE_ASSERTIONS=1 \
    -D LLVM_TARGETS_TO_BUILD=X86 \
    -G Ninja
+# To reduce memory usage during the process of compiling LLVM, clang with the mold linker can be
+# used. Grab mold here:
+# https://github.com/rui314/mold
+# And add the flags:
+# -D CMAKE_C_COMPILER=clang
+# -D CMAKE_CXX_COMPILER=clang++
+# -D CMAKE_CXX_LINK_FLAGS=-fuse-ld=mold
+# As far as I know it's not possible to use mold with gcc.
 
 # IMPORTANT:
-# Open a task manager or system monitor. You're going to want to look after your memory usage.
-# If it starts growing rapidly, cancel the build and use --parallel 1.
-# Linking uses up a lot of memory, so it's better to let it run a single linker at a time.
+# When not using clang+mold, open a task manager or system monitor. You're going to want to look
+# after your memory usage. If it starts growing rapidly, cancel the build and use --parallel 1.
+# Linking with GNU ld uses up a lot of memory, so it's better to let it run a single linker at a
+# time.
 cmake --build . --target install --parallel 8
 ```
 
