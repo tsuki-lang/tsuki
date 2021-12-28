@@ -55,10 +55,12 @@ cargo run
 ## Using the compiler
 
 While still in its early stages, the compiler is able to compile arbitrary user code into a working executable. The most basic usage of the compiler would be:
+```sh
+$ tsuki --package-name main --package-root src --main-file src/main.tsu
+# or, abbreviated:
+$ tsuki -p main -r src -m src/main.tsu
 ```
-tsuki -p package_name path/to/code.tsu
-```
-`package_name` currently only specifies the name of the output file, but might be used for other things in the future, such as mangling and/or debug information.
+`package_name` specifies the name of the output file, and is also used for mangling.
 
 Refer to the code examples in `code` to see what's currently implemented or being worked on.
 
