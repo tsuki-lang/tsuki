@@ -63,11 +63,3 @@ $ tsuki -p main -r src -m src/main.tsu
 `package_name` specifies the name of the output file, and is also used for mangling.
 
 Refer to the code examples in `code` to see what's currently implemented or being worked on.
-
-## Other notes
-
-### Nim version
-
-tsuki used to be an embeddable scripting language for Nim. I'm bad with coming up with names, and the old tsuki wasn't finished anyways, so I decided to reuse the name for this new project. The overall syntax is similar, with minor tweaks and the addition of static typing (and features related to it).
-
-If you'd like to check out the source code of the Nim version, it's kept on the [nim-version](tree/nim-version) branch of this repository. Feel free to fork it, expand upon it, and maybe even finish it. I think a general-purpose embeddable scripting language would be a nice addition to the Nim ecosystem, but I've moved on from using Nim as my main language, so if anybody wants to carry that torch – feel free to do so.
