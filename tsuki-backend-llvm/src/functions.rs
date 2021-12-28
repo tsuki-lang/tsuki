@@ -8,7 +8,6 @@ use inkwell::types::{BasicType, BasicTypeEnum, FunctionType};
 use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue};
 use smallvec::SmallVec;
 use tsuki_frontend::ast::{NodeId, NodeKind};
-use tsuki_frontend::astdump;
 use tsuki_frontend::functions::FunctionId;
 use tsuki_frontend::sem::Ir;
 
@@ -173,8 +172,6 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
 
    /// Generates code for a `return` expression.
    pub(crate) fn generate_return(&mut self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
-      astdump::dump_ast(&self.source, &ir.ast, Some(&ir.types), node);
-
       // Finish off the current basic block with a `ret` instruction.
       let return_value = ir.ast.first_handle(node);
       let result_value = if ir.ast.kind(return_value) != NodeKind::Empty {

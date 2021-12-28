@@ -17,6 +17,10 @@ use crate::variables::Variables;
 
 /// Code generation state shared across functions.
 pub struct CodeGen<'src, 'c, 'pm> {
+   // This field may be unused as its primary purpose currently is debugging. Production code should
+   // not contain any `astdump::dump_ast`s or such, so this field will remain mostly unused.
+   // This will change once debug info generation is implemented.
+   #[allow(unused)]
    pub(crate) source: &'src SourceFile,
    pub(crate) context: &'c Context,
    pub(crate) module: &'pm Module<'c>,
