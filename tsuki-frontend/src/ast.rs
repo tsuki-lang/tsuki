@@ -191,7 +191,7 @@ impl Ast {
       self.scopes.get(&node).cloned()
    }
 
-   /// Sets the scope that is introduced by the node.
+   /// Sets the scope that is introduced by (or, in case of `break`, broken by) the node.
    pub fn set_scope(&mut self, node: NodeId, scope: Option<ScopeId>) {
       if let Some(scope) = scope {
          self.scopes.insert(node, scope);

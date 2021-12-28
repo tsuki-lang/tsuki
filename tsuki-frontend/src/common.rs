@@ -306,6 +306,8 @@ pub enum ErrorKind {
    ExpressionCannotBeCalled,
    #[error("`return` cannot be used outside of a function")]
    ReturnOutsideOfFunction,
+   #[error("`break` cannot be used outside of a loop")]
+   BreakOutsideOfLoop,
 
    /*
     * Internal errors

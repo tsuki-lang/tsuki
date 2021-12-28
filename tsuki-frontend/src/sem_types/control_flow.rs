@@ -97,8 +97,33 @@ impl<'s> SemTypes<'s> {
       if !self.types.kind(condition_type).is_bool() {
          return self.error(ast, condition_node, ErrorKind::WhileConditionMustBeBool);
       }
+
+      let scope = self.scope_stack.push(self.scopes.create_scope());
+      self.scopes.set_breakable(scope);
       let _ = self.annotate_statement_list(ast, node, NodeContext::Statement);
+      self.scope_stack.pop();
+
       self.annotate(ast, node, self.builtin.t_statement)
+   }
+
+   /// Annotates a `break` statement.
+   pub(super) fn annotate_break(&mut self, ast: &mut Ast, node: NodeId) -> TypeLogEntry {
+      // Find out which scope the `break` is breaking.
+      // This is later stored in the `break` node's second child.
+      let mut break_scope = None;
+      for scope in self.scope_stack.iter().rev() {
+         if self.scopes.is_breakable(scope) {
+            break_scope = Some(scope);
+         }
+      }
+      if break_scope.is_none() {
+         return self.error(ast, node, ErrorKind::BreakOutsideOfLoop);
+      }
+
+      let break_scope = break_scope.unwrap();
+      ast.set_scope(node, Some(break_scope));
+
+      self.annotate(ast, node, self.builtin.t_noreturn)
    }
 
    /// Annotates a `return` statement.

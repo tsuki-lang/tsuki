@@ -296,6 +296,7 @@ impl<'s> SemTypes<'s> {
          NodeKind::Do => self.annotate_do(ast, node, context),
          NodeKind::If => self.annotate_if(ast, node, context),
          NodeKind::While => self.annotate_while(ast, node),
+         NodeKind::Break => self.annotate_break(ast, node),
          NodeKind::Return => self.annotate_return(ast, node),
 
          // Declarations

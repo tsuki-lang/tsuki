@@ -1,7 +1,7 @@
 //! Scoping and symbols.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::num::NonZeroUsize;
 
 use crate::ast::NodeId;
@@ -128,7 +128,8 @@ pub struct ScopeId(NonZeroUsize);
 
 /// Struct for module and local scope management.
 pub struct Scopes {
-   scopes: HashMap<(ScopeId, Cow<'static, str>), SymbolId>,
+   symbols: HashMap<(ScopeId, Cow<'static, str>), SymbolId>,
+   breakable_scopes: HashSet<ScopeId>,
    scope_count: usize,
 }
 
@@ -136,7 +137,8 @@ impl Scopes {
    /// Creates a new scope manager.
    pub fn new() -> Self {
       Self {
-         scopes: HashMap::new(),
+         symbols: HashMap::new(),
+         breakable_scopes: HashSet::new(),
          scope_count: 1,
       }
    }
@@ -151,13 +153,23 @@ impl Scopes {
    /// Inserts a symbol to the scope, under the given identifier. If there already is a symbol with
    /// the given name, it's lost.
    pub fn insert(&mut self, scope: ScopeId, identifier: &str, symbol: SymbolId) {
-      let _ = self.scopes.insert((scope, Cow::Owned(identifier.to_owned())), symbol);
+      let _ = self.symbols.insert((scope, Cow::Owned(identifier.to_owned())), symbol);
    }
 
    /// Retrieves a reference to the provided identifier in the given scope, or `None` if the
    /// identifier is not in the given scope.
    pub fn get(&self, scope: ScopeId, identifier: &str) -> Option<SymbolId> {
-      self.scopes.get(&(scope, Cow::Borrowed(identifier))).map(|id| *id)
+      self.symbols.get(&(scope, Cow::Borrowed(identifier))).map(|id| *id)
+   }
+
+   /// Returns whether a scope is breakable.
+   pub fn is_breakable(&self, scope: ScopeId) -> bool {
+      self.breakable_scopes.contains(&scope)
+   }
+
+   /// Marks a scope as breakable.
+   pub fn set_breakable(&mut self, scope: ScopeId) {
+      self.breakable_scopes.insert(scope);
    }
 }
 
@@ -198,5 +210,10 @@ impl ScopeStack {
          }
       }
       None
+   }
+
+   /// Returns an iterator over all scopes on the stack, from bottom to top.
+   pub fn iter(&self) -> impl DoubleEndedIterator<Item = ScopeId> + '_ {
+      self.scopes.iter().copied()
    }
 }

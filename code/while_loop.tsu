@@ -10,3 +10,7 @@ while true
       break
    a = a + 2
    b = b + 1
+
+# Check that `break` can be used as an expression.
+while true
+   val yes: Int = break

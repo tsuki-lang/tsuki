@@ -320,6 +320,7 @@ impl<'s> Parser<'s> {
          // Control flow structures
          TokenKind::Do => self.parse_do_expression(Some(token))?,
          TokenKind::If => self.parse_if_expression(Some(token))?,
+         TokenKind::Break => self.parse_break(token)?,
          TokenKind::Return => self.parse_return(token)?,
 
          // Unknown tokens
@@ -407,6 +408,13 @@ impl<'s> Parser<'s> {
       );
       self.ast.set_extra(node, NodeData::NodeList(branches));
 
+      Ok(node)
+   }
+
+   /// Parses a `break` expression.
+   fn parse_break(&mut self, token: Token) -> Result<NodeId, Error> {
+      let node = self.ast.create_node(NodeKind::Break);
+      self.ast.set_span(node, token.span);
       Ok(node)
    }
 
@@ -596,16 +604,6 @@ impl<'s> Parser<'s> {
       Ok(node)
    }
 
-   /// Parses a `break` statement.
-   fn parse_break(&mut self) -> Result<NodeId, Error> {
-      // TODO: Someday `break` could become an expression, but it would require Python-like
-      // `while..else` loops.
-      let token = self.lexer.next()?;
-      let node = self.ast.create_node(NodeKind::Break);
-      self.ast.set_span(node, token.span);
-      Ok(node)
-   }
-
    /// Parses a comma-separated parameter list, like `(a: Int, b: Int, c, d: Int)`.
    fn parse_parameter_list(
       &mut self,
@@ -757,7 +755,6 @@ impl<'s> Parser<'s> {
          TokenKind::Do => self.parse_do_expression(None)?,
          TokenKind::If => self.parse_if_expression(None)?,
          TokenKind::While => self.parse_while_loop()?,
-         TokenKind::Break => self.parse_break()?,
 
          // Expression statements
          _ => self.parse_expression(0)?,
