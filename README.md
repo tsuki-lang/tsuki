@@ -34,7 +34,15 @@ cd llvm-12.0.1.src
 mkdir -p build
 cd build
 # If doing a release build, remove LLVM_ENABLE_ASSERTIONS, and set CMAKE_BUILD_TYPE to Release.
-cmake .. -DCMAKE_INSTALL_PREFIX=$LLVM_SYS_120_PREFIX -DLLVM_ENABLE_ASSERTIONS=1 -DCMAKE_BUILD_TYPE=Debug -G Ninja
+# Also, if compiling for other platforms such as aarch64, change the target in LLVM_TARGETS_TO_BUILD.
+# You can find a list of all available targets, as well as some other build options, here:
+# https://llvm.org/docs/GettingStarted.html#local-llvm-configuration
+cmake .. \
+   -D CMAKE_INSTALL_PREFIX=$LLVM_SYS_120_PREFIX \
+   -D CMAKE_BUILD_TYPE=Debug \
+   -D LLVM_ENABLE_ASSERTIONS=1 \
+   -D LLVM_TARGETS_TO_BUILD=X86 \
+   -G Ninja
 
 # IMPORTANT:
 # Open a task manager or system monitor. You're going to want to look after your memory usage.
