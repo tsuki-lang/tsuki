@@ -1278,7 +1278,7 @@ fun obtain_shape(): Shape
 
 val shape = obtain_shape()
 val maybe_rectangle = shape.as_variant[Shape.Rectangle]
-print(maybe_rectangle)  # Error(:incorrect_variant)
+print(maybe_rectangle)  # None
 ```
 Once a concrete variant is obtained, its fields can be accessed like tuple fields. However, the variant type is _distinct_ from the tuple type with the same fields, and will not convert to it.
 ```
