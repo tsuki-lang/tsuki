@@ -222,9 +222,9 @@ Following the rule of short-circuit evaluation, the second operand is not evalua
 # Note that for this to work, `update` and `draw` must share the same return type.
 val test: !() = update() and draw()
 # This also works for optionals.
-print(Option[()]:nil and Option[()]:nil)            # :nil
-print(Option[()]:some(()) and Option[()]:nil)       # :nil
-print(Option[()]:some(()) and Option[()]:some(()))  # :some(())
+print(Nil[()] and Nil[()])  # Nil
+print(Some(()) and Nil[()])  # Nil
+print(Some(()) and Some(()))  # Some(())
 ```
 
 ## `do` expressions
@@ -246,7 +246,7 @@ The `if..elif..else` expression evaluates a boolean condition, and if it's `true
 ```
 import @std.io
 
-val name = stdin.read_line()?
+val name = stdin.read_line?
 print(
    if name == "Mark"
       "Oh hi Mark"
@@ -351,24 +351,23 @@ match name
 ```
 Strings and Atoms cannot be used with ranges, because the interaction between the lower and upper bound doesn't make obvious sense.
 
-A more advanced use case for `match` would be unpacking unions. Unions carry extra data with them, and union patterns allow for binding the values to variables.
+A more advanced use case for `match` would be unpacking unions. Unions variants carry extra data with them, and union patterns allow for binding the values to variables.
 ```
 union Shape
-   :rectangle(Float, Float, Float, Float)
-   :circle(Float, Float, Float)
+   Rectangle(Float, Float, Float, Float)
+   Circle(Float, Float, Float)
 
-val rect = Shape:rectangle(32, 32, 64, 64)
+val rect = Shape.Rectangle(32, 32, 64, 64)
 match rect
-   :rectangle(x, y, width, height) ->
+   Shape.Rectangle(x, y, width, height) ->
       print("Rectangle")
       print("X: " ~ x.to_string() ~ "  Y: " ~ y.to_string())
       print(width.to_string() ~ "x" ~ height.to_string())
-   :circle(x, y, radius) ->
+   Shape.Circle(x, y, radius) ->
       print("Circle")
       print("X: " ~ x.to_string() ~ "  Y: " ~ y.to_string())
       print("radius: " ~ radius.to_string())
 ```
-`match` is the only way of retrieving the variant data from unions.
 
 TODO: Flesh out patterns.
 
@@ -391,7 +390,7 @@ fun try_example(): !()
 
 ## `try` expressions
 
-`try` expressions enable usage of the `?` operator. By default, all functions that return a result act as if they were wrapped in an implicit `try` block.
+`try` expressions enable usage of the `?` operator. By default, all functions that return a result act as if they are wrapped in an implicit `try` block.
 
 Using the `?` operator on an error result in a `try` block will break out of the block, and the block's result value will be the error result.
 ```
@@ -488,7 +487,7 @@ The type of a variable can be specified explicitly by using a `:` after the vari
 val x: Int32 = 1
 ```
 
-Variable names can be shadowed, as that allows for greater ergonomics. The variable declared last in the innermost block is always used when resolving shadowed names.
+Variable names can be shadowed, as that allows for greater ergonomics. The variable declared last in the innermost scope is always used when resolving shadowed names.
 
 ## Scope
 
@@ -534,15 +533,15 @@ while i < 10 -> i += 1
 
 A `while` loop is also capable of iterating over a condition that produces optionals as its result. Enter `while val`:
 ```
-var bytes = "hello".bytes()
-while val b = bytes.next()
+var bytes = "hello".bytes
+while val b = bytes.next
    print(b)
 ```
 The above example is expanded to the following:
 ```
-var bytes = "hello".bytes()
+var bytes = "hello".bytes
 while true
-   if val b = bytes.next()
+   if val b = bytes.next
       print(b)
    else
       break
@@ -749,11 +748,11 @@ tsuki has two floating point types: `Float32` and `Float64`. These are signed, I
 
 For user convenience, integer literals get converted to floating point literals whenever possible.
 
-The operators `+`, `-`, `*`, and `/` work as defined in the standard. There's one extra operator, `**`, which is the exponentiation operator. It accepts an integer or floating-point exponent on its right hand side and, for the expression `x ** n`, returns `x` multiplied by itself `n` times. When `n` is a constant, the compiler expands the expression to `n` multiplications without involving a loop.
+The operators `+`, `-`, `*`, and `/` work as defined in the standard. There's one extra operator, `**`, which is the exponentiation operator. It accepts an integer or floating-point exponent on its right hand side and, for the expression `x ** n`, returns `x` multiplied by itself `n` times. When `n` is a `const` integer, the compiler expands the expression to `n` multiplications without involving a loop.
 
-`impl`s containing extra operations, such as square roots and trigonometry, may be found in the `std.math` module.
+`impl`s containing extra operations, such as square roots and trigonometry, can be found in the `std.math` module.
 
-The `Float` alias exists as a reasonable default, with a default bit size of 32 bits.
+The `Float` alias exists as a reasonable default, with a bit size of 32 bits.
 
 ## `Atom`
 
@@ -803,9 +802,15 @@ atom Key
    :shift = "Shift"
    :left = "←"
 ```
-This pretty string representation can be accessed by using the `to_pretty()` function.
+This pretty string representation can be accessed by using the `to_string` function.
 ```
-print((Key:left).to_pretty)  # ←
+print(Key:left.to_string)  # ←
+```
+When an atom is used as an error, this pretty representation is used when printing the error.
+
+The raw name, as declared in the source code, can be obtained by using the `name` function.
+```
+print(Key:left.name)  # :left
 ```
 
 Pretty representations can be combined with integer representations.
@@ -817,6 +822,20 @@ atom Key :: int(Uint8)
    10 :shift = "Shift"
    20 :left = "←"
 ```
+
+All atoms defined in subsets are _ordered_, which means that they can be compared using the `<` and `<=` operators. Atoms that do not have an explicit integer representation, as well as atoms with an integer representation that do not have holes in them, are also `Ordinal`, which means that they have a preceding and succeeding atom. These can be retrieved by using the `pred` (short for *pred*ecessor) and `succ` (short for for *succ*essor) functions:
+```
+atom Letters
+   :a
+   :b
+   :c
+
+print(:a.succ)  # Some(:b)
+print(:b.succ)  # Some(:c)
+print(:c.succ)  # Nil
+print(:c.pred)  # Some(:b)
+```
+For more information on `Ordinal`, refer to the standard library documentation.
 
 ## `Char`
 
@@ -845,10 +864,6 @@ var iter = "\x00\xFF".bytes
 print(iter.next)  # 0
 print(iter.next)  # 255
 ```
-The `byte_at()` function can also be used to retrieve a single byte from the string:
-```
-print("\x00\xFF".byte_at(0))  # 0
-```
 
 `String`s can be concatenated using the `~` concatenation operator:
 ```
@@ -857,13 +872,13 @@ print("Hello, " ~ "world!")  # Hello, world!
 
 ## Optionals
 
-An optional type is a type whose value can be `nil`, or something meaningful. Values cannot be `nil` unless wrapped in this type.
+An optional type is a type whose value can be either `nil`, or something meaningful. Values cannot be `nil` unless wrapped in this type.
 
 An optional is written like `?T`, where `T` is the value type. The standard library name for optionals is `Optional[T]`.
 
-As already mentioned, optionals can be initialized to `nil`:
+As already mentioned, optionals can be initialized to `Nil`:
 ```
-val opt: ?Int = nil
+val opt: ?Int = Nil
 val correct: ?Int = 3
 ```
 
@@ -886,16 +901,19 @@ if val ok = correct
 
 The above syntax is sugar for using the previously mentioned `Optional[T]` type. This type is defined like so:
 ```
-union Optional[T]
-   :some(T)
-   :nil
+pub union Optional[T]
+   Some(T)
+   Nil
+
+pub type Some[T] = Optional[T].Some
+pub type Nil[T] = Optional[T].Nil
 ```
 Thus, optionals can be used with `match` by using the variant names explicitly. The same can be said about constructing optionals.
 ```
-val a = :some(123)
+val a = Some(123)
 match a
-   :some(x) -> print(x)
-   :nil -> print("there's no value! :(")
+   Some(x) -> print(x)
+   Nil -> print("there's no value! :(")
 ```
 
 ## Results
@@ -909,15 +927,15 @@ For a given result type `E!T`, both `E` and `T` are implicitly convertible to th
 The type `E!T` desugars to the standard library type `Result[E, T]`, which is defined like so:
 ```
 union Result[E, T]
-   :error(E)
-   :ok(T)
+   Error(E)
+   Ok(T)
 ```
 
 `match` can be used with `Result[E, T]` to unwrap errors explicitly:
 ```
 match "123a".parse_int
-   :ok(_) -> unreachable()
-   :error(error) -> match error
+   Ok(_) -> unreachable()
+   Error(error) -> match error
       :overflow -> print("No, that's not it.")
       :invalid_character -> print("Yup, that's right.")
       _ -> _
@@ -1018,7 +1036,7 @@ print(slice.at(0))  # 1
 print(slice.at(1))  # 2
 print(slice.at(2))  # 3
 # print(slice.at(3))  # error: index out of bounds
-print(slice.get(3))  # :nil
+print(slice.get(3))  # Nil
 ```
 Out of bounds access with `at()` is checked at runtime and results in a panic. `get()` returns an optional containing the value, if there is a value.
 
@@ -1034,8 +1052,8 @@ Arrays are slices, so the usual `slice()`, `at()`, and `get()` methods can be us
 ```
 print(pi_digits.slice(0..3))  # ^[3, 1, 4, 1]
 print(pi_digits.at(0))        # 3
-print(pi_digits.get(0))       # :some(3)
-print(pi_digits.at(200))      # :nil
+print(pi_digits.get(0))       # Some(3)
+print(pi_digits.at(200))      # Nil
 ```
 
 For a resizable array type, the standard library `Seq[T]` can be used. For an associative array type with arbitrary key types, the standard library `Table[K, V]` can be used.
@@ -1195,7 +1213,7 @@ When an object instance goes out of scope, we say it's _dropped_. An object impl
 The trait is defined like so:
 ```
 trait Drop
-   fun var drop()
+   fun drop(self: ^var Self)
 ```
 
 Here's an example implementation of the trait:
@@ -1211,7 +1229,7 @@ object Dropper
 
 impl Drop for Dropper
    fun drop()
-      print("Dropping " ~ .id.to_string())
+      print("Dropping " ~ .id.to_string)
 
 val d = Dropper {}
 val e = Dropper {}
@@ -1225,26 +1243,66 @@ The order of dropping objects in variables is from last to first declared variab
 
 ## Unions
 
-A union is a type, tagged with a _kind atom_, containing a single, dynamically-chosen value from a fixed set of possible variants. tsuki unions are akin to C unions, but with an extra type tag present.
+A union is a type that namespaces a specific set of types, and whose value at runtime may be one of these types. In type system lingo this is known as a _sum type_.
 
 A union is declared using the `union` keyword, followed by the name of the union, continued with a block containing all the possible variant tuples of the union with their types.
 
 ```
 union Shape
-   :rectangle(Float, Float, Float, Float)  # x, y, width, height
-   :circle(Float, Float, Float)  # x, y, radius
+   Rectangle(Float, Float, Float, Float)  # x, y, width, height
+   Circle(Float, Float, Float)  # x, y, radius
 ```
 
-A union can then be initialized using the union initialization syntax: the union type, followed by the an atom literal specifying the variant, followed by the variant values in parentheses.
+A union variant can be initialized using the union initialization syntax: the union type, followed by the subtype specifying the variant, followed by the variant values in parentheses.
+```
+var my_shape = Shape.Rectangle(32, 32, 64, 64)
+```
+
+Note that each union variant is a _real type_, and as such, can be specified as the return type from functions, passed around in variables, implemented, and so on.
+```
+fun make_rectangle(x, y, width, height: Float): Shape.Rectangle
+   Shape.Rectangle(x, y, width, height)
+```
+Each of the union's variant types is a subtype of the union type, so it can be converted to the union type for free.
+```
+fun print_shape(shape: Shape)
+   print(shape)
+
+# The result of make_rectangle (whose type is Shape.Rectangle) is implicitly converted to a Shape.
+print_shape(make_rectangle(16, 16, 32, 32))
+```
+The union type itself implements `AsVariant[T]` for all of its variants.
+```
+fun obtain_shape(): Shape
+   Shape.Circle(16, 16, 16)
+
+val shape = obtain_shape()
+val maybe_rectangle = shape.as_variant[Shape.Rectangle]
+print(maybe_rectangle)  # Error(:incorrect_variant)
+```
+Once a concrete variant is obtained, its fields can be accessed like tuple fields. However, the variant type is _distinct_ from the tuple type with the same fields, and will not convert to it.
+```
+val rectangle = Shape.Rectangle(16, 16, 32, 32)
+print(("width: ", rectangle._2))
+```
+
+A union can also have variants that do not contain values. Though, if _no_ variants at all contain values, then it's probably better to use an [atom](#atoms).
+```
+union MyOption[T]
+   Some(T)
+   Nil
+```
+
+Each of the union's variant types can be brought into global scope by using a type alias. This is done for optionals and results, for more convenient usage.
 
 ```
-var my_shape = Shape:rectangle(32, 32, 64, 64)
-```
+pub type Rectangle = Shape.Rectangle
 
-If the union type can be inferred trivially, it may be omitted:
-```
-fun make_rectangle(x, y, w, h: Float): Shape
-   :rectangle(x, y, w, h)
+# in the standard library prelude:
+pub type Some[T] = Optional[T].Some
+pub type Nil[T] = Optional[T].Nil
+pub type Ok[E, T] = Result[E, T].Ok
+pub type Error[E, T] = Result[E, T].Error
 ```
 
 The [`match` expression](#match-expression) can be used to execute code blocks depending on union variants. See its section for more information.
@@ -1297,9 +1355,7 @@ impl MyTrait for MyObject
 ```
 The first variant defines functions on `MyObject`, not implementing any traits. The second variant implements the trait `MyTrait` for the `MyObject` type.
 
-Functions with the `self` parameter are referred to as _instance functions_.
-
-Types defined on types are referred to as _associated types_.
+Functions with the `self` parameter are referred to as _instance functions_. Types defined on types are referred to as _associated types_.
 
 `impl` blocks can have generic types and constraints attached to them.
 ```
@@ -1309,7 +1365,7 @@ where
    T: Add[T] + Zero
 
    fun sum(self): T
-      var accumulator = T.zero()
+      var accumulator = T.zero
       for i in .items()
          accumulator += i
       accumulator
@@ -1321,6 +1377,10 @@ val strings = ["a", "bc", "d"]
 ```
 
 `impl` blocks are bound to modules, rather than types - if an `impl` block appears in a module different to where the type was declared, that module has to be imported alongside the module declaring the type for all functions to be available.
+
+Implementing a trait from an external package on a type from an external package is forbidden, as it might break assumptions that the library author wanted to provide the users with. For example, it is not possible to implement `Ordinal` on the standard library `String` type, because a) it wouldn't make sense, and b) the string type is not ordinal, and we shouldn't pretend it is, as all other code operates on that assumption.
+
+It is however possible to augment types from external packages with implementations of locally defined traits, and locally defined methods.
 
 ### `Self`
 
