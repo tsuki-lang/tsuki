@@ -43,13 +43,12 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
       let symbol_node = ir.ast.first_handle(node);
       let symbol = ir.ast.symbol_id(symbol_node);
 
-      let alloca =
-         self.variables.borrow().get(symbol).expect("reference to undeclared variable in IR");
+      let alloca = self.variables.get(symbol).expect("reference to undeclared variable in IR");
       self.builder.build_load(alloca, ir.symbols.name(symbol))
    }
 
    /// Generates code for variable declarations.
-   pub(crate) fn generate_variable_declaration(&self, ir: &Ir, node: NodeId) {
+   pub(crate) fn generate_variable_declaration(&mut self, ir: &Ir, node: NodeId) {
       let symbol_node = ir.ast.first_handle(node);
       let symbol = ir.ast.symbol_id(symbol_node);
 
@@ -65,17 +64,21 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
       let alloca = builder.build_alloca(value.get_type(), ir.symbols.name(symbol));
       self.builder.build_store(alloca, value);
 
-      self.variables.borrow_mut().insert(symbol, alloca);
+      self.variables.insert(symbol, alloca);
    }
 
    /// Generates code for `AssignDiscard`.
-   pub(crate) fn generate_discarding_assignment(&self, ir: &Ir, node: NodeId) {
+   pub(crate) fn generate_discarding_assignment(&mut self, ir: &Ir, node: NodeId) {
       let value_node = ir.ast.first_handle(node);
       let _ = self.generate_expression(ir, value_node);
    }
 
    /// Generates code for assignments to variables.
-   pub(crate) fn generate_assignment(&self, ir: &Ir, node: NodeId) -> Option<BasicValueEnum<'c>> {
+   pub(crate) fn generate_assignment(
+      &mut self,
+      ir: &Ir,
+      node: NodeId,
+   ) -> Option<BasicValueEnum<'c>> {
       // When the assignment is not an expression, we do a little optimization where we don't
       // generate the load
       let result_type = ir.ast.type_id(node);
@@ -86,7 +89,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
          NodeKind::Variable => {
             let symbol_node = ir.ast.first_handle(target_node);
             let symbol = ir.ast.symbol_id(symbol_node);
-            self.variables.borrow().get(symbol).expect("reference to undeclared variable in IR")
+            self.variables.get(symbol).expect("reference to undeclared variable in IR")
          }
          _ => unreachable!(),
       };

@@ -1,6 +1,5 @@
 //! Common code generation state.
 
-use std::cell::RefCell;
 use std::fmt;
 
 use inkwell::builder::Builder;
@@ -25,7 +24,7 @@ pub struct CodeGen<'src, 'c, 'pm> {
    pub(crate) pass_manager: &'pm PassManager<FunctionValue<'c>>,
 
    pub(crate) function: Function<'c>,
-   pub(crate) variables: RefCell<Variables<'c>>,
+   pub(crate) variables: Variables<'c>,
 
    pub(crate) unit_type: StructType<'c>,
 }
@@ -47,7 +46,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
          pass_manager,
 
          function,
-         variables: RefCell::new(Variables::new()),
+         variables: Variables::new(),
 
          unit_type: context.struct_type(&[], false),
       };
@@ -63,14 +62,14 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
       Self {
          builder: self.context.create_builder(),
          function,
-         variables: RefCell::new(Variables::new()),
+         variables: Variables::new(),
          unit_type: self.unit_type,
          ..*self
       }
    }
 
    /// Generates code for an arbitrary node.
-   pub fn generate_statement(&self, ir: &Ir, node: NodeId) {
+   pub fn generate_statement(&mut self, ir: &Ir, node: NodeId) {
       match ir.ast.kind(node) {
          // Control flow
          NodeKind::Pass => (),

@@ -10,7 +10,7 @@ use crate::codegen::CodeGen;
 
 impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    /// Generates code for a list of statements.
-   pub(crate) fn generate_statements(&self, ir: &Ir, node: NodeId) {
+   pub(crate) fn generate_statements(&mut self, ir: &Ir, node: NodeId) {
       ir.ast.walk_node_list(node, |_ast, _index, node| {
          self.generate_statement(ir, node);
       });
@@ -18,7 +18,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
 
    /// Generates code for a list of statements with a tail expression.
    pub(crate) fn generate_statements_with_tail_expression(
-      &self,
+      &mut self,
       ir: &Ir,
       node: NodeId,
    ) -> BasicValueEnum<'c> {
@@ -41,7 +41,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    ///
    /// If the node is a `DoExpression`, returns `Some` with the tail expression. Otherwise
    /// if the kind is `DoStatement`, returns `None`.
-   pub(crate) fn generate_do(&self, ir: &Ir, node: NodeId) -> Option<BasicValueEnum<'c>> {
+   pub(crate) fn generate_do(&mut self, ir: &Ir, node: NodeId) -> Option<BasicValueEnum<'c>> {
       match ir.ast.kind(node) {
          NodeKind::DoExpression => Some(self.generate_statements_with_tail_expression(ir, node)),
          NodeKind::DoStatement => {
@@ -55,7 +55,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    /// Generates code for an `if` expression or an `if` statement.
    ///
    /// Return value behavior is similar to `generate_do`.
-   pub(crate) fn generate_if(&self, ir: &Ir, node: NodeId) -> Option<BasicValueEnum<'c>> {
+   pub(crate) fn generate_if(&mut self, ir: &Ir, node: NodeId) -> Option<BasicValueEnum<'c>> {
       /// This local struct stores information about the condition of an `if` branch.
       struct Condition<'c> {
          block: BasicBlock<'c>,
@@ -184,7 +184,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for a `while` loop.
-   pub(crate) fn generate_while(&self, ir: &Ir, node: NodeId) {
+   pub(crate) fn generate_while(&mut self, ir: &Ir, node: NodeId) {
       // Save the start block for generating the initial `br label %condition` instruction.
       let start_block = self.builder.get_insert_block().unwrap();
 

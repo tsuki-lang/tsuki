@@ -29,13 +29,13 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for boolean negation.
-   fn generate_boolean_negation(&self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
+   fn generate_boolean_negation(&mut self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
       let right = self.generate_expression(ir, ir.ast.first_handle(node));
       self.builder.build_not(right.into_int_value(), "nottmp").as_basic_value_enum()
    }
 
    /// Generates code for integer or float negation.
-   fn generate_number_negation(&self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
+   fn generate_number_negation(&mut self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
       let right = self.generate_expression(ir, ir.ast.first_handle(node));
       let typ = ir.ast.type_id(node);
       let kind = ir.types.kind(typ);
@@ -52,7 +52,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
 
    /// Generates the LHS and RHS of a binary operator.
    fn generate_binary_operation(
-      &self,
+      &mut self,
       ir: &Ir,
       node: NodeId,
    ) -> (BasicValueEnum<'c>, BasicValueEnum<'c>) {
@@ -63,7 +63,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for integer math.
-   fn generate_integer_math(&self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
+   fn generate_integer_math(&mut self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
       // TODO: Panic on overflow. This can be done using LLVM's arithmetic intrinsics that return
       // an aggregate {T, i1}, where the second field is a flag signifying whether overflow occured.
       let (left_value, right_value) = self.generate_binary_operation(ir, node);
@@ -85,7 +85,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
       math.as_basic_value_enum()
    }
 
-   fn generate_float_math(&self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
+   fn generate_float_math(&mut self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
       let (left_value, right_value) = self.generate_binary_operation(ir, node);
       let (left, right) = (
          left_value.into_float_value(),
@@ -102,7 +102,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for integer and floating-point math operations.
-   fn generate_math(&self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
+   fn generate_math(&mut self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
       let typ = ir.types.kind(ir.ast.type_id(node));
       if typ.is_integer() {
          self.generate_integer_math(ir, node)
@@ -114,7 +114,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for an integer type conversion (`WidenUint` or `WidenInt`).
-   fn generate_integer_conversion(&self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
+   fn generate_integer_conversion(&mut self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
       let inner = ir.ast.first_handle(node);
       let inner_value = self.generate_expression(ir, inner).into_int_value();
       let dest_type = self.get_type(&ir.types, ir.ast.type_id(node)).into_int_type();
@@ -127,7 +127,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for a boolean comparison.
-   fn generate_boolean_comparison(&self, ir: &Ir, node: NodeId) -> IntValue<'c> {
+   fn generate_boolean_comparison(&mut self, ir: &Ir, node: NodeId) -> IntValue<'c> {
       let (left_value, right_value) = self.generate_binary_operation(ir, node);
       let (left, right) = (left_value.into_int_value(), right_value.into_int_value());
       let predicate = match ir.ast.kind(node) {
@@ -139,7 +139,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for an integer comparison.
-   fn generate_integer_comparison(&self, ir: &Ir, node: NodeId) -> IntValue<'c> {
+   fn generate_integer_comparison(&mut self, ir: &Ir, node: NodeId) -> IntValue<'c> {
       let (left_value, right_value) = self.generate_binary_operation(ir, node);
       let (left, right) = (left_value.into_int_value(), right_value.into_int_value());
       let left_type = ir.ast.type_id(ir.ast.first_handle(node));
@@ -161,7 +161,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for integer comparisons.
-   fn generate_comparison(&self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
+   fn generate_comparison(&mut self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
       let left_node = ir.ast.first_handle(node);
       let typ = ir.types.kind(ir.ast.type_id(left_node));
       if typ.is_integer() {
@@ -177,7 +177,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for any expression node.
-   pub(crate) fn generate_expression(&self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
+   pub(crate) fn generate_expression(&mut self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
       match ir.ast.kind(node) {
          // Literals
          NodeKind::True | NodeKind::False => self.generate_boolean_literal(ir, node).into(),
@@ -224,7 +224,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for a function call-like intrinsic.
-   fn generate_call_like_intrinsic(&self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
+   fn generate_call_like_intrinsic(&mut self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
       let arguments = ir.ast.extra(node).unwrap_node_list();
       match ir.ast.kind(node) {
          kind @ (NodeKind::PrintInt32 | NodeKind::PrintFloat32) => {

@@ -117,7 +117,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
       let function = Function::from_value(function);
 
       // Create a new CodeGen for generating the function's body.
-      let code_gen = self.for_function(function);
+      let mut code_gen = self.for_function(function);
 
       // Copy all the parameters into allocas.
       // I don't think this is _too_ terrible performance-wise, mem2reg will hopefully optimize
@@ -134,8 +134,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
          code_gen.builder.build_store(alloca, parameter);
          allocas.push(alloca);
          // Also, store the alloca in the code generator's variables list.
-         let mut variables = code_gen.variables.borrow_mut();
-         variables.insert(symbol_id, alloca);
+         code_gen.variables.insert(symbol_id, alloca);
       }
 
       // Generate the function's body.
@@ -152,7 +151,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for a function call.
-   pub(crate) fn generate_call(&self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
+   pub(crate) fn generate_call(&mut self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
       // Get the function we want to call.
       let callee_node = ir.ast.first_handle(node);
       let symbol_id = ir.ast.symbol_id(callee_node);
@@ -173,13 +172,14 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    }
 
    /// Generates code for a `return` expression.
-   pub(crate) fn generate_return(&self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
+   pub(crate) fn generate_return(&mut self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
       astdump::dump_ast(&self.source, &ir.ast, Some(&ir.types), node);
 
       // Finish off the current basic block with a `ret` instruction.
       let return_value = ir.ast.first_handle(node);
       let result_value = if ir.ast.kind(return_value) != NodeKind::Empty {
-         self.builder.build_return(Some(&self.generate_expression(ir, return_value)));
+         let value = self.generate_expression(ir, return_value);
+         self.builder.build_return(Some(&value));
          let result_type = ir.ast.type_id(node);
          self.get_type(&ir.types, result_type)
       } else {
