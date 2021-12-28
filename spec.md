@@ -136,7 +136,7 @@ not ~ - () [] . ^ ..
 
 The following infix operators are available. The list is sorted by precedence, where top is biggest precedence, and bottom is lowest precedence. Lines with more than one operator contain operators of equal precedence.
 ```
-() [] . ^ ? as
+() [] . ^ ?
 **
 * / << >> & | ^^
 + - ~
@@ -214,36 +214,18 @@ print(yes)  # 1
 ```
 Following the rule of short-circuit evaluation, the second operand is not evaluated if the value is unwrapped successfully.
 
-Analogic behavior for `and` does not currently exist.
-
-## `is` operator
-
-The `is` operator may be used to check whether a certain value is of a given type, or whether two different type aliases resolve to the same type.
-
+`and` can also be used on optionals and results. For instance:
 ```
-val a = 1
-assert(a is Int)
-
-type MyInt = Int
-assert(MyInt is Int)
+# If `update()` fails, its error variant is returned. Otherwise, `draw()` is executed, and if _it_
+# fails, _its_ error variant is returned. If both sides succeed, the right side's successful variant
+# is returned.
+# Note that for this to work, `update` and `draw` must share the same return type.
+val test: !() = update() and draw()
+# This also works for optionals.
+print(Option[()]:nil and Option[()]:nil)            # :nil
+print(Option[()]:some(()) and Option[()]:nil)       # :nil
+print(Option[()]:some(()) and Option[()]:some(()))  # :some(())
 ```
-
-## `as` operator
-
-The `as` operator is used for converting types explicitly. When used with concrete types, it's syntax sugar for calling the `convert` method on a value's `As[T]` trait. When used with traits, it can be used for selecting which trait a method should come from.
-
-```
-val x = Int32.parse(stdin.read_line()?)
-val y = x as Float32
-```
-Is sugar for:
-```
-val y = (x as As[Float32]).convert()
-```
-
-Unlike most other operators, `as` expects a type on the right-hand side, as opposed to another expression of lower precedence.
-
-TODO: Fallible conversions? Maybe a `TryAs` and a corresponding `as?` operator?
 
 ## `do` expressions
 
@@ -316,8 +298,8 @@ if val n = num
 The above code expands to the following:
 ```
 val num: ?Int = nil
-if (num as Unwrap).has_value()
-   val n = (num as Unwrap).unwrap()
+if Unwrap.has_value(num)
+   val n = Unwrap.unwrap(num)
    do
       print("will not execute")
 ```
@@ -589,7 +571,7 @@ The `for` loop is then expanded to a regular `while` loop:
 ```
 do
    var <iterator> = iterator
-   while val <variables> = (<iterator> as Iterator).next()
+   while val <variables> = Iterator.next(<iterator>)
       <loop body>
 ```
 Note that all the variables within angle brackets `<>` are not actually visible anywhere, they exist here solely for visualization purposes.
@@ -753,9 +735,9 @@ These functions return an optional wrapping the final type, which must be unwrap
 
 Arithmetic operators panic on overflow. `add_checked`, `add_wrapping`, `add_saturating`, and friends may be used to protect against panicking.
 
-When choosing a bitsize and signedness of an integral type in a typical application, generally stick to `Int32` for "normal" integers; if an integer cannot be negative, eg. an image size needs to be stored, use `Uint32`. Use 64-bit sizes only when needed, such as when storing timestamps.
+When choosing a bit size and signedness of an integral type in a typical application, generally stick to `Int32` for "normal" integers; if an integer cannot be negative, eg. an image size needs to be stored, use `Uint32`. Use 64-bit sizes only when needed, such as when storing timestamps.
 
-The `Int` and `Uint` aliases exist as reasonable defaults with a default bitsize of 32 bits, which may be configured using a compiler switch.
+The `Int` and `Uint` aliases exist as reasonable defaults with a default bit size of 32 bits.
 
 The `Size` alias is an unsigned integer that can be used as a valid size or index into a slice. The size of this type is platform-dependent; on 32-bit machines it's `Uint32`, on 64-bit machines it's `Uint64`.
 
@@ -771,7 +753,7 @@ The operators `+`, `-`, `*`, and `/` work as defined in the standard. There's on
 
 `impl`s containing extra operations, such as square roots and trigonometry, may be found in the `std.math` module.
 
-The `Float` alias exists as a reasonable default, with a default bitsize of 32 bits. This size can be changed using a compiler switch.
+The `Float` alias exists as a reasonable default, with a default bit size of 32 bits.
 
 ## `Atom`
 
@@ -1010,7 +992,7 @@ val excl = 1..<5
 val incl = excl.to_inclusive
 print(incl)  # 1..4
 ```
-The `to_inclusive` function returns a range with the upper bound replaced with `(.upper as Ordinal).pred`.
+The `to_inclusive` function returns a range with the upper bound replaced with `Ordinal.pred(.upper)`.
 
 ## Slices
 
@@ -1042,7 +1024,7 @@ Out of bounds access with `at()` is checked at runtime and results in a panic. `
 
 ## `Array[N, T]`
 
-`Array[N, T]` is an _owned static_ array type. It's static because its size cannot be changed, and it's allocated on the stack, making it much cheaper than `Seq[T]`.
+`Array[N, T]` is an _owned static_ array type. It's static because its size cannot be changed, and it's allocated on the stack.
 
 Initializing a new array is done using the `[]` prefix:
 ```
@@ -1056,64 +1038,7 @@ print(pi_digits.get(0))       # :some(3)
 print(pi_digits.at(200))      # :nil
 ```
 
-## `Seq[T]`
-
-`Seq[T]`, or a _sequence_, is an _owned dynamic_ array type; it can be created using `Seq[T].new()`, or, more simply, by using the `~` prefix operator on an `Array[N, T]`:
-```
-val names = ~["Jon", "John", "Josh"]
-```
-
-The usual slice operators may be used on sequences.
-
-```
-print(names.at(0))        # Jon
-print(names.slice(0..1))  # ^["Jon", "John"]
-```
-
-Sequences do not implement `Copy`, and implement `Dup` if `T` implements `Dup`. This means that copies of sequences have to be made explicitly:
-```
-# String implements Dup, so we can create a copy of `names`.
-var my_names = names.dup
-```
-The `push()` function can be used to append elements to a sequence.
-```
-my_names.push("Johnny")
-```
-
-## `Table[K, V]`
-
-`Table[K, V]`, or a _table_, is an associative array type. It maps arbitrarily-typed keys to arbitrarily-typed values. Other languages also call this type `Dictionary`, `Map`, `HashMap`.
-
-A table can be initialized using the `:[]` prefix. `=` is used for separating keys from values.
-```
-val numbers = :[
-   # here we create a mapping from Strings to Floats
-   "pi" = 3.141592654,
-   "tau" = 6.283185307,
-   "e" = 2.718281828,
-]
-assert(numbers is Table[String, Float])
-```
-Note that the `=` in a table constructor does not correspond to the assignment operator. In fact, the precedence of the left-hand side expression is a single level higher than assignments, so if the result of an assignment is to be used as a key, the assignment must be surrounded with parentheses.
-```
-var a = 1
-val table = :[
-   (a = 2) = 3,
-   a = 4,
-]
-```
-"Clever" code like this should be avoided though, because it hinders readability.
-
-Tables can be indexed using the `at()` and `get()` functions.
-```
-print(numbers.at("pi"))  # 3.141592654
-print(numbers.get("hahaha now i've got you"))  # :nil
-```
-
-Values in tables may be modified by using the `set()` function.
-```
-numbers.set("half", 0.5)
-```
+For a resizable array type, the standard library `Seq[T]` can be used. For an associative array type with arbitrary key types, the standard library `Table[K, V]` can be used.
 
 ## `rc T`, and `rc var T`
 
@@ -1575,7 +1500,6 @@ Several built-in traits exist that allow for overloading existing operators. Her
 | binary `==` | `Equal` | `equal` | value equality |
 | binary `<` | `Less` | `less` | ordered relation |
 | binary `<=` | `LessEqual` | `less_equal` | |
-| binary `as` | `As` | `convert` | safe conversion to a different type |
 
 Other operators are not user-overloadable (such as `and`, `or`, `?`), or derived from other operators (such as `>` and `>=`, derived from `<` and `<=` by flipping the arguments around).
 
@@ -1606,7 +1530,7 @@ trait Unwrap
 
 ### Calling functions from specific traits
 
-Sometimes, two functions from different traits can share the same name. In these cases the `a as T` notation can be used to select the implementation of trait `T` on `a`.
+Sometimes, two functions from different traits can share the same name. In these cases the method can be qualified explicitly, as a member of the trait.
 
 ```
 trait ExampleA
@@ -1627,8 +1551,8 @@ impl ExampleB for Example
 
 val e = Example {}
 # e.my_method()  # error: ambiguous call; resolves to more than one function
-(e as ExampleA).my_method()  # Called on ExampleA
-(e as ExampleB).my_method()  # Called on ExampleB
+ExampleA.my_method(e)  # called on ExampleA
+ExampleB.my_method(e)  # called on ExampleB
 ```
 
 ## `const T {V}`
