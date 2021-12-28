@@ -599,9 +599,9 @@ As with all control flow blocks, the single-line `->` notation is supported.
 for i in (1..10).countup -> print(i)
 ```
 
-## `break` statement
+## `break` expression
 
-The `break` statement can be used inside of `while` and `for` loops to jump past the loop, thus, ending the iteration.
+The `break` expression can be used inside of `while` and `for` loops to jump past the loop, thus, ending the iteration.
 
 The following program will read integers from `stdin` and print them incremented by 1, until something that can't be parsed as a number is entered.
 ```
