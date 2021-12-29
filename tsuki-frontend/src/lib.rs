@@ -11,10 +11,18 @@ mod sem_literals;
 mod sem_types;
 pub mod types;
 
+use std::path::PathBuf;
+
 use common::{Errors, SourceFile};
 use lexer::Lexer;
-use sem::{AnalyzeOptions, Ir};
+use sem::{AnalyzeOptions as SemOptions, Ir};
 use types::{DefaultTypes, FloatSize, IntegerSize};
+
+/// Options for loading source files.
+pub struct AnalyzeOptions<'s> {
+   pub file: &'s SourceFile,
+   pub std_path: PathBuf,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct DebugOptions {
@@ -34,13 +42,14 @@ impl Default for DebugOptions {
 }
 
 /// Parses and analyzes a source file. Returns the fully analyzed, typed IR.
-pub fn analyze(file: &SourceFile, debug: &DebugOptions) -> Result<Ir, Errors> {
+pub fn analyze(options: AnalyzeOptions, debug: &DebugOptions) -> Result<Ir, Errors> {
+   let AnalyzeOptions { file, .. } = options;
    let SourceFile { source, .. } = file;
    let lexer = Lexer::new(file);
    let (ast, root_node) = parser::parse(lexer)?;
 
    if debug.dump_source {
-      eprintln!(":: Source code");
+      eprintln!("## Source code");
       eprintln!("{}", source);
       eprintln!();
    }
@@ -53,12 +62,12 @@ pub fn analyze(file: &SourceFile, debug: &DebugOptions) -> Result<Ir, Errors> {
    }
 
    if debug.dump_ast_pre_sem {
-      eprintln!(":: AST (pre-sem)");
+      eprintln!("## AST (pre-sem)");
       astdump::dump_ast(file, &ast, None, root_node);
       eprintln!();
    }
 
-   let ir = sem::analyze(AnalyzeOptions {
+   let ir = sem::analyze(SemOptions {
       file,
       ast,
       root_node,
@@ -70,7 +79,7 @@ pub fn analyze(file: &SourceFile, debug: &DebugOptions) -> Result<Ir, Errors> {
    })?;
 
    if debug.dump_ast_post_sem {
-      eprintln!(":: AST (post-sem)");
+      eprintln!("## AST (post-sem)");
       astdump::dump_ast(file, &ir.ast, Some(&ir.types), root_node);
       eprintln!();
    }
