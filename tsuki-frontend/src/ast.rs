@@ -434,6 +434,21 @@ pub enum NodeKind {
    // - first: the type of the parameters
    // - extra: Identifier nodes, the names of the parameters
    NamedParameters,
+   // Type alias declaration `type A = B`.
+   // - first: TypeName
+   // - second: the type to alias, optional
+   Type,
+   // The name of a declared type.
+   // - first: Identifier - the name, as brought into scope
+   // - extra: optional generic parameters
+   TypeName,
+
+   // Modifiers
+   // ---------
+   // List of pragmas `:: a(x), b(y)`.
+   // - first: name or function signature or whatever the pragmas apply to
+   // - extra: the pragmas (Call nodes)
+   Pragmas,
 
    // Control flow
    Pass, // `_` statement
