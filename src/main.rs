@@ -15,7 +15,7 @@ struct Options {
    cache_dir: Option<PathBuf>,
 
    /// The name of the package. This is used for controlling the object file's name.
-   #[structopt(short = "p", long, name = "name")]
+   #[structopt(short = "p", long)]
    package_name: String,
 
    /// The `src` directory of the package.
@@ -27,7 +27,7 @@ struct Options {
    std_path: PathBuf,
 
    /// The root source file. Must be located in the package root.
-   #[structopt(short = "m", long, name = "main file")]
+   #[structopt(short = "m", long)]
    main_file: PathBuf,
 
    /// Only check the code for validity, without compiling it.
