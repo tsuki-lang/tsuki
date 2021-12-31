@@ -12,7 +12,6 @@ use crate::common::{Error, ErrorKind, SourceFile, Span};
 #[repr(u8)]
 pub enum TokenKind {
    // Literals
-   Nil,
    True,
    False,
    /// Integer and float tokens store the actual number behind them in the source string, so as not
@@ -197,7 +196,6 @@ impl fmt::Display for TokenKind {
          f,
          "{}",
          match self {
-            TokenKind::Nil => "nil",
             TokenKind::True => "true",
             TokenKind::False => "false",
             TokenKind::Integer(_) => "<integer literal>",

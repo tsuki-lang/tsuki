@@ -17,6 +17,7 @@ enum Prefix {
    Formal,
    Return,
    Type,
+   Constraint,
 }
 
 fn print_indentation(depth: usize) {
@@ -118,7 +119,8 @@ fn dump_node(s: &State, node: NodeId, depth: usize, prefix: Option<Prefix>) {
       | NodeKind::Index
       | NodeKind::IndexAlt
       | NodeKind::Val
-      | NodeKind::Var => {
+      | NodeKind::Var
+      | NodeKind::Type => {
          let (left, right) = (ast.first_handle(node), ast.second_handle(node));
          dump_node(s, left, depth + 1, Some(Prefix::L));
          dump_node(s, right, depth + 1, Some(Prefix::R));
@@ -132,6 +134,11 @@ fn dump_node(s: &State, node: NodeId, depth: usize, prefix: Option<Prefix>) {
          let (left, right) = (ast.first_handle(node), ast.second_handle(node));
          dump_node(s, left, depth + 1, Some(Prefix::Generic));
          dump_node(s, right, depth + 1, Some(Prefix::Formal));
+      }
+      NodeKind::ConstrainedType => {
+         let (left, right) = (ast.first_handle(node), ast.second_handle(node));
+         dump_node(s, left, depth + 1, Some(Prefix::Type));
+         dump_node(s, right, depth + 1, Some(Prefix::Constraint));
       }
       | NodeKind::Check
       | NodeKind::Unwrap
@@ -149,6 +156,8 @@ fn dump_node(s: &State, node: NodeId, depth: usize, prefix: Option<Prefix>) {
       | NodeKind::FormalParameters
       | NodeKind::NamedParameters
       | NodeKind::Variable
+      | NodeKind::Pragmas
+      | NodeKind::TypeName
       | NodeKind::WidenInt
       | NodeKind::WidenUint
       | NodeKind::WidenFloat => {
@@ -158,7 +167,9 @@ fn dump_node(s: &State, node: NodeId, depth: usize, prefix: Option<Prefix>) {
             left,
             depth + 1,
             Some(match kind {
-               NodeKind::Check | NodeKind::Unwrap | NodeKind::Deref => Prefix::L,
+               NodeKind::Check | NodeKind::Unwrap | NodeKind::Deref | NodeKind::Pragmas => {
+                  Prefix::L
+               }
                | NodeKind::Not
                | NodeKind::Neg
                | NodeKind::BitNot
@@ -168,6 +179,7 @@ fn dump_node(s: &State, node: NodeId, depth: usize, prefix: Option<Prefix>) {
                NodeKind::IfBranch | NodeKind::While => Prefix::Cond,
                NodeKind::FormalParameters => Prefix::Return,
                NodeKind::NamedParameters => Prefix::Type,
+               NodeKind::TypeName => Prefix::Name,
                | NodeKind::Variable
                | NodeKind::Return
                | NodeKind::WidenInt

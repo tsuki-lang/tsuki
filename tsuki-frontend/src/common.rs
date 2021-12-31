@@ -261,6 +261,8 @@ pub enum ErrorKind {
    ExpectedCommaOrColon(TokenKind),
    #[error("function parameter list expected, but got '{0}'")]
    FunctionParametersExpected(TokenKind),
+   #[error("pragma argument list expected, but got '{0}'")]
+   PragmaArgsExpected(TokenKind),
 
    /*
     * Sem'check errors

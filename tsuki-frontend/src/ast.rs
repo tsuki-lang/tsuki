@@ -345,7 +345,6 @@ pub enum NodeKind {
    Error,
 
    // Literals
-   Nil,
    True,
    False,
    Integer,
@@ -442,13 +441,18 @@ pub enum NodeKind {
    // - first: Identifier - the name, as brought into scope
    // - extra: optional generic parameters
    TypeName,
+   // A constrained type, as part of a `where` declaration or a `type` in a trait.
+   // - first: Identifier - the name
+   // - second: the optional constraint.
+   ConstrainedType,
 
    // Modifiers
    // ---------
    // List of pragmas `:: a(x), b(y)`.
    // - first: name or function signature or whatever the pragmas apply to
-   // - extra: the pragmas (Call nodes)
+   // - extra: Pragma - the pragmas
    Pragmas,
+   Pragma, // a single pragma application `name(a, b, c)`
 
    // Control flow
    Pass, // `_` statement
