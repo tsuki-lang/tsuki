@@ -692,7 +692,7 @@ This type can be automatically converted into any other type. Thanks to this pro
 atom Error
    :nil_option
 
-fun some_or_error[T](opt: ?T) !T
+fun some_or_error[T](opt: ?T): !T
    val v = opt or return :nil_option
    v
 ```
