@@ -6,6 +6,7 @@ mod functions;
 mod locations;
 mod lookups;
 mod operators;
+mod types;
 
 use std::path::Path;
 
