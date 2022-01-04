@@ -162,7 +162,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
 
       // Generate code for all the arguments.
       let mut arguments = SmallVec::<[BasicValueEnum<'c>; 8]>::new();
-      for &argument in ir.ast.extra(node).unwrap_node_list() {
+      for &argument in ir.ast.extra(node).as_node_list().unwrap() {
          arguments.push(self.generate_expression(ir, argument));
       }
       let call = self.builder.build_call(function, &arguments, "calltmp");

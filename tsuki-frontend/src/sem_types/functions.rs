@@ -44,8 +44,8 @@ impl<'s> SemTypes<'s> {
 
       // Slurp all the parameters up into a vector.
       let mut parameters = SmallVec::new();
-      for i in 0..ast.extra(formal_parameters_node).unwrap_node_list().len() {
-         let named_parameters = ast.extra(formal_parameters_node).unwrap_node_list()[i];
+      for i in 0..ast.extra(formal_parameters_node).as_node_list().unwrap().len() {
+         let named_parameters = ast.extra(formal_parameters_node).as_node_list().unwrap()[i];
          let type_node = ast.first_handle(named_parameters);
          let (_, typ) = self.lookup_type(ast, type_node)?;
          ast.walk_node_list_mut(named_parameters, |ast, _, name_node| {
@@ -156,7 +156,7 @@ impl<'s> SemTypes<'s> {
       ast.convert_to_symbol(callee_node, symbol_id);
 
       // Check if we have the right amount of arguments.
-      let given_parameter_count = ast.extra(node).unwrap_node_list().len();
+      let given_parameter_count = ast.extra(node).as_node_list().unwrap().len();
       let declared_parameter_count = self.functions.parameters(function_id).formal.len();
       if given_parameter_count != declared_parameter_count {
          return Ok(self.error(

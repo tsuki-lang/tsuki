@@ -3,7 +3,7 @@
 use crate::ast::{Ast, NodeId};
 use crate::common::ErrorKind;
 use crate::scope::SymbolId;
-use crate::types::{TypeId, TypeLogEntry, TypeLogResult};
+use crate::types::{TypeLogEntry, TypeLogResult};
 
 use super::SemTypes;
 
@@ -28,8 +28,8 @@ impl<'s> SemTypes<'s> {
 
       // Interpret pragmas.
       if let Some(pragmas) = pragmas {
-         for i in 0..ast.extra(pragmas).unwrap_node_list().len() {
-            let pragma = ast.extra(pragmas).unwrap_node_list()[i];
+         for i in 0..ast.extra(pragmas).as_node_list().unwrap().len() {
+            let pragma = ast.extra(pragmas).as_node_list().unwrap()[i];
             aliased_type = self.type_alias_pragma(ast, pragma, aliased_type)?;
          }
       }

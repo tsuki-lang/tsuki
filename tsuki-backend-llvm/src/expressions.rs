@@ -19,13 +19,13 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
    /// Generates code for an integer literal.
    fn generate_integer_literal(&self, ir: &Ir, node: NodeId) -> IntValue<'c> {
       let typ = self.get_type(&ir.types, ir.ast.type_id(node)).into_int_type();
-      typ.const_int(ir.ast.extra(node).unwrap_uint(), false)
+      typ.const_int(ir.ast.extra(node).as_uint().unwrap(), false)
    }
 
    /// Generates code for a float literal.
    fn generate_float_literal(&self, ir: &Ir, node: NodeId) -> FloatValue<'c> {
       let typ = self.get_type(&ir.types, ir.ast.type_id(node)).into_float_type();
-      typ.const_float(ir.ast.extra(node).unwrap_float())
+      typ.const_float(ir.ast.extra(node).as_float().unwrap())
    }
 
    /// Generates code for boolean negation.
@@ -226,7 +226,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
 
    /// Generates code for a function call-like intrinsic.
    fn generate_call_like_intrinsic(&mut self, ir: &Ir, node: NodeId) -> BasicValueEnum<'c> {
-      let arguments = ir.ast.extra(node).unwrap_node_list();
+      let arguments = ir.ast.extra(node).as_node_list().unwrap();
       match ir.ast.kind(node) {
          kind @ (NodeKind::PrintInt32 | NodeKind::PrintFloat32) => {
             // This is not the, um, cleanest... piece of code here, but it'll get replaced
