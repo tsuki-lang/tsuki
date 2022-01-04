@@ -314,6 +314,8 @@ pub enum ErrorKind {
    EmptyTypeAlias,
    #[error("unknown pragma '{0}'")]
    UnknownPragma(String),
+   #[error("invalid built-in type name")]
+   InvalidBuiltinTypeName,
 
    /*
     * Internal errors

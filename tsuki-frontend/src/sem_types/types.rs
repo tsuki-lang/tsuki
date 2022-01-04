@@ -1,8 +1,8 @@
 //! Type declarations.
 
-use crate::ast::{Ast, NodeId};
+use crate::ast::{Ast, NodeId, NodeKind};
 use crate::common::ErrorKind;
-use crate::scope::SymbolId;
+use crate::scope::{SymbolId, SymbolKind};
 use crate::types::{TypeLogEntry, TypeLogResult};
 
 use super::SemTypes;
@@ -40,7 +40,7 @@ impl<'s> SemTypes<'s> {
       // Add the alias to scope.
       self.add_to_scope(name, aliased_type);
 
-      todo!()
+      Ok(self.annotate(ast, node, self.builtin.t_statement))
    }
 
    /// Interprets a pragma for a type alias declaration.
@@ -48,16 +48,71 @@ impl<'s> SemTypes<'s> {
       &mut self,
       ast: &mut Ast,
       pragma: NodeId,
-      aliased_type: Option<SymbolId>,
+      #[allow(unused)] mut aliased_type: Option<SymbolId>,
    ) -> Result<Option<SymbolId>, TypeLogEntry> {
       let name_identifier = ast.first_handle(pragma);
       let name = self.common.get_source_range_from_node(ast, name_identifier);
-
       match name {
-         "compiler_builtin_type" => (), // TODO
+         "compiler_builtin_type" => {
+            aliased_type = Some(self.pragma_compiler_builtin_type(ast, pragma)?);
+         }
          other => return Err(self.error(ast, pragma, ErrorKind::UnknownPragma(other.into()))),
       }
-
       Ok(aliased_type)
+   }
+
+   fn pragma_expect_arguments(
+      &mut self,
+      ast: &Ast,
+      pragma: NodeId,
+      count: usize,
+   ) -> Result<(), TypeLogEntry> {
+      let nodes = ast.extra(pragma).as_node_list().unwrap();
+      if nodes.len() != 1 {
+         return Err(self.error(
+            ast,
+            pragma,
+            ErrorKind::NArgumentsExpected(count, nodes.len()),
+         ));
+      }
+      Ok(())
+   }
+
+   /// Handles the `compiler_builtin_type` pragma: creates a new symbol for a built-in type.
+   fn pragma_compiler_builtin_type(
+      &mut self,
+      ast: &mut Ast,
+      pragma: NodeId,
+   ) -> Result<SymbolId, TypeLogEntry> {
+      let nodes = ast.extra(pragma).as_node_list().unwrap();
+      self.pragma_expect_arguments(ast, pragma, 1)?;
+      let name_node = nodes[0];
+      if ast.kind(name_node) != NodeKind::Atom {
+         return Err(self.error(ast, name_node, ErrorKind::InvalidBuiltinTypeName));
+      }
+      let name = self.common.get_source_range_from_node(ast, name_node);
+      let typ = match name {
+         "noreturn" => self.builtin.t_noreturn,
+         "bool" => self.builtin.t_bool,
+         "uint8" => self.builtin.t_uint8,
+         "uint16" => self.builtin.t_uint16,
+         "uint32" => self.builtin.t_uint32,
+         "uint64" => self.builtin.t_uint64,
+         "int8" => self.builtin.t_int8,
+         "int16" => self.builtin.t_int16,
+         "int32" => self.builtin.t_int32,
+         "int64" => self.builtin.t_int64,
+         "float32" => self.builtin.t_float32,
+         "float64" => self.builtin.t_float64,
+         "size" => self.builtin.t_size,
+         _ => return Err(self.error(ast, name_node, ErrorKind::InvalidBuiltinTypeName)),
+      };
+      let symbol = self.symbols.create(
+         self.types.name(typ),
+         pragma,
+         self.builtin.t_type,
+         SymbolKind::Type(typ),
+      );
+      Ok(symbol)
    }
 }

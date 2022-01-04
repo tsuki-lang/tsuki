@@ -103,6 +103,9 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
          NodeKind::Val | NodeKind::Var => self.generate_variable_declaration(ir, node),
          NodeKind::AssignDiscard => self.generate_discarding_assignment(ir, node),
          NodeKind::Fun => self.generate_function(ir, node),
+         // TODO: Remove type aliases from the IR, as they do not serve any purpose for the code
+         // generation stage.
+         NodeKind::Type => (),
 
          // Expressions
          NodeKind::Assign => {
