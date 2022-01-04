@@ -61,12 +61,16 @@ impl<'s> SemTypes<'s> {
    ///
    /// The node can be any valid type as parsed by the parser. If the type is a generic type,
    /// then instantiations will be performed.
-   pub(super) fn lookup_type(&mut self, ast: &Ast, node: NodeId) -> Result<TypeId, TypeLogEntry> {
+   pub(super) fn lookup_type(
+      &mut self,
+      ast: &Ast,
+      node: NodeId,
+   ) -> Result<(SymbolId, TypeId), TypeLogEntry> {
       match ast.kind(node) {
          NodeKind::Identifier => {
             let symbol = self.lookup_identifier(ast, node)?;
             if let SymbolKind::Type(id) = self.symbols.kind(symbol) {
-               Ok(*id)
+               Ok((symbol, *id))
             } else {
                let name = self.symbols.name(symbol).to_owned();
                Err(self.error(ast, node, ErrorKind::SymbolIsNotAType(name)))

@@ -6,6 +6,7 @@ mod functions;
 mod locations;
 mod lookups;
 mod operators;
+mod pragmas;
 mod types;
 
 use std::path::Path;
@@ -34,7 +35,7 @@ pub(crate) struct SemTypes<'s> {
    module_scope: ScopeId,
    /// A stack of vectors of nodes to be sem'checked after the module's done being checked.
    ///
-   /// The scope ID is used to determine where the given node is placed. The scope of the node's
+   /// The node ID is used to determine where the given node is placed. The scope of the node's
    /// body is determined from the node's metadata.
    deferred: SmallVec<[Vec<(NodeId, NodeContext)>; 4]>,
 
@@ -303,6 +304,7 @@ impl<'s> SemTypes<'s> {
          // Declarations
          NodeKind::Val | NodeKind::Var => self.annotate_variable_declaration(ast, node).into(),
          NodeKind::Fun => self.annotate_function_declaration(ast, node).into(),
+         NodeKind::Type => self.annotate_type_alias(ast, node).into(),
 
          // Other nodes are invalid (or not implemented yet).
          other => self.error(ast, node, ErrorKind::SemTypesInvalidAstNode(other)),

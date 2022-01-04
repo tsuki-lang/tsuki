@@ -310,6 +310,10 @@ pub enum ErrorKind {
    ReturnOutsideOfFunction,
    #[error("`break` cannot be used outside of a loop")]
    BreakOutsideOfLoop,
+   #[error("type alias does not alias any type. try adding `= YourType`")]
+   EmptyTypeAlias,
+   #[error("unknown pragma '{0}'")]
+   UnknownPragma(String),
 
    /*
     * Internal errors

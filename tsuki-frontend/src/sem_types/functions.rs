@@ -47,7 +47,7 @@ impl<'s> SemTypes<'s> {
       for i in 0..ast.extra(formal_parameters_node).unwrap_node_list().len() {
          let named_parameters = ast.extra(formal_parameters_node).unwrap_node_list()[i];
          let type_node = ast.first_handle(named_parameters);
-         let typ = self.lookup_type(ast, type_node)?;
+         let (_, typ) = self.lookup_type(ast, type_node)?;
          ast.walk_node_list_mut(named_parameters, |ast, _, name_node| {
             // Make each parameter have its own identifier in the function body.
             // Semantically, function parameters are just variables, introduced by some
@@ -70,7 +70,7 @@ impl<'s> SemTypes<'s> {
       // Look up what the return type should be.
       let return_type_node = ast.first_handle(formal_parameters_node);
       let return_type = if ast.kind(return_type_node) != NodeKind::Empty {
-         self.lookup_type(ast, return_type_node)?
+         self.lookup_type(ast, return_type_node)?.1
       } else {
          // In case no return type is provided, default to the unit type `()`.
          self.builtin.t_unit
