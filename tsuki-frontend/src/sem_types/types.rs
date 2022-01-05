@@ -3,7 +3,7 @@
 use crate::ast::{Ast, NodeId, NodeKind};
 use crate::common::ErrorKind;
 use crate::scope::{SymbolId, SymbolKind};
-use crate::types::{TypeLogEntry, TypeLogResult};
+use crate::types::{TypeInfo, TypeKind, TypeLogEntry, TypeLogResult};
 
 use super::SemTypes;
 
@@ -21,7 +21,13 @@ impl<'s> SemTypes<'s> {
       // Interpret the right-hand side.
       let mut aliased_type = if rhs != NodeId::null() {
          // TODO: Check constraints.
-         Some(self.lookup_type(ast, rhs)?.0)
+         let underlying_type = self.lookup_type(ast, rhs)?;
+         let alias = self.types.create_type(TypeInfo {
+            name,
+            kind: TypeKind::Alias(underlying_type),
+         });
+         let symbol = self.symbols.create(name, node, self.builtin.t_type, SymbolKind::Type(alias));
+         Some(symbol)
       } else {
          None
       };
@@ -40,7 +46,8 @@ impl<'s> SemTypes<'s> {
       // Add the alias to scope.
       self.add_to_scope(name, aliased_type);
 
-      Ok(self.annotate(ast, node, self.builtin.t_statement))
+      let declaration_type = self.create_declaration_type(aliased_type);
+      Ok(self.annotate(ast, node, declaration_type))
    }
 
    /// Interprets a pragma for a type alias declaration.
@@ -61,6 +68,7 @@ impl<'s> SemTypes<'s> {
       Ok(aliased_type)
    }
 
+   /// Raises an error if a pragma does not have the provided number of arguments.
    fn pragma_expect_arguments(
       &mut self,
       ast: &Ast,

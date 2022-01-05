@@ -98,7 +98,7 @@ impl<'s> SemTypes<'s> {
          NodeKind::VariableType => {
             let name_node = ast.first_handle(left_node);
             let type_node = ast.second_handle(left_node);
-            let (_, typ) = self.lookup_type(ast, type_node)?;
+            let typ = self.lookup_type(ast, type_node)?;
             (name_node, Some(typ))
          }
          _ => (left_node, None),

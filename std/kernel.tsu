@@ -8,21 +8,21 @@
 # The kernel is loaded by the compiler before any other code in a given file, and must not be
 # imported manually.
 
-type NoReturn :: compiler_builtin_type(:noreturn)
+pub type NoReturn :: compiler_builtin_type(:noreturn)
 
-type Bool :: compiler_builtin_type(:bool)
+pub type Bool :: compiler_builtin_type(:bool)
 
-type Uint8 :: compiler_builtin_type(:uint8)
-type Uint16 :: compiler_builtin_type(:uint16)
-type Uint32 :: compiler_builtin_type(:uint32)
-type Uint64 :: compiler_builtin_type(:uint64)
+pub type Uint8 :: compiler_builtin_type(:uint8)
+pub type Uint16 :: compiler_builtin_type(:uint16)
+pub type Uint32 :: compiler_builtin_type(:uint32)
+pub type Uint64 :: compiler_builtin_type(:uint64)
 
-type Int8 :: compiler_builtin_type(:int8)
-type Int16 :: compiler_builtin_type(:int16)
-type Int32 :: compiler_builtin_type(:int32)
-type Int64 :: compiler_builtin_type(:int64)
+pub type Int8 :: compiler_builtin_type(:int8)
+pub type Int16 :: compiler_builtin_type(:int16)
+pub type Int32 :: compiler_builtin_type(:int32)
+pub type Int64 :: compiler_builtin_type(:int64)
 
-type Float32 :: compiler_builtin_type(:float32)
-type Float64 :: compiler_builtin_type(:float64)
+pub type Float32 :: compiler_builtin_type(:float32)
+pub type Float64 :: compiler_builtin_type(:float64)
 
-type Size :: compiler_builtin_type(:size)
+pub type Size :: compiler_builtin_type(:size)

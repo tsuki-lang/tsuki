@@ -16,9 +16,9 @@ use smallvec::SmallVec;
 use crate::ast::{Ast, NodeId, NodeKind};
 use crate::common::{ErrorKind, Errors};
 use crate::functions::{register_intrinsics, FunctionId, Functions};
-use crate::scope::{ScopeId, ScopeStack, Scopes, Symbols};
+use crate::scope::{ScopeId, ScopeStack, Scopes, SymbolId, Symbols};
 use crate::sem::{SemCommon, SemPass};
-use crate::types::{BuiltinTypes, TypeId, TypeLog, TypeLogEntry, Types};
+use crate::types::{BuiltinTypes, TypeId, TypeInfo, TypeKind, TypeLog, TypeLogEntry, Types};
 
 pub(crate) struct SemTypes<'s> {
    common: &'s SemCommon<'s>,
@@ -166,6 +166,14 @@ impl<'s> SemTypes<'s> {
             self.scope_stack.pop();
          }
       }
+   }
+
+   /// Creates a new type that represents a declaration.
+   fn create_declaration_type(&mut self, symbol: SymbolId) -> TypeId {
+      self.types.create_type(TypeInfo {
+         name: &format!("declaration({})", symbol.id()),
+         kind: TypeKind::Declaration(symbol),
+      })
    }
 
    /// Annotates a literal with a concrete type.

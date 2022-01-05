@@ -103,6 +103,9 @@ pub enum TypeKind {
    Integer(IntegerSize),
    Float(FloatSize),
    Char,
+
+   /// An alias for the type of the given ID.
+   Alias(TypeId),
 }
 
 impl TypeKind {

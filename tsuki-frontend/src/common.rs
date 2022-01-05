@@ -263,6 +263,8 @@ pub enum ErrorKind {
    FunctionParametersExpected(TokenKind),
    #[error("pragma argument list expected, but got '{0}'")]
    PragmaArgsExpected(TokenKind),
+   #[error("`pub` must be followed by a declaration")]
+   PubMustBeFollowedByDeclaration,
 
    /*
     * Sem'check errors

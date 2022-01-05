@@ -838,6 +838,22 @@ impl<'s> Parser<'s> {
       Ok(typ)
    }
 
+   /// Parses a `pub` symbol declaration.
+   fn parse_pub_declaration(&mut self) -> Result<NodeId, Error> {
+      let pub_token = self.lexer.next()?;
+      let next_token = self.lexer.peek()?;
+      let inner = match next_token.kind {
+         TokenKind::Fun | TokenKind::Type => self.parse_statement()?,
+         _ => {
+            let span = Span::join(&pub_token.span, &next_token.span);
+            self.error(ErrorKind::PubMustBeFollowedByDeclaration, span)
+         }
+      };
+      let node = self.create_node_with_handle(NodeKind::Pub, inner);
+      self.ast.set_span(node, Span::join(&pub_token.span, self.ast.span(inner)));
+      Ok(node)
+   }
+
    /// Parses a statement.
    fn parse_statement(&mut self) -> Result<NodeId, Error> {
       let token_kind = self.lexer.peek()?.kind.clone();
@@ -846,6 +862,7 @@ impl<'s> Parser<'s> {
          TokenKind::Val | TokenKind::Var => self.parse_variable_declaration()?,
          TokenKind::Fun => self.parse_function_declaration()?,
          TokenKind::Type => self.parse_type_alias_declaraction()?,
+         TokenKind::Pub => self.parse_pub_declaration()?,
 
          // Control flow
          TokenKind::Underscore => self.parse_pass()?,

@@ -445,6 +445,7 @@ pub enum NodeKind {
    // - first: Identifier - the name
    // - second: the optional constraint.
    ConstrainedType,
+   Pub, // `pub` visibility declaration
 
    // Modifiers
    // ---------

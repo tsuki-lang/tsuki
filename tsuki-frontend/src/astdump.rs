@@ -158,6 +158,7 @@ fn dump_node(s: &State, node: NodeId, depth: usize, prefix: Option<Prefix>) {
       | NodeKind::Variable
       | NodeKind::Pragmas
       | NodeKind::TypeName
+      | NodeKind::Pub
       | NodeKind::WidenInt
       | NodeKind::WidenUint
       | NodeKind::WidenFloat => {
@@ -182,6 +183,7 @@ fn dump_node(s: &State, node: NodeId, depth: usize, prefix: Option<Prefix>) {
                NodeKind::TypeName => Prefix::Name,
                | NodeKind::Variable
                | NodeKind::Return
+               | NodeKind::Pub
                | NodeKind::WidenInt
                | NodeKind::WidenUint
                | NodeKind::WidenFloat => Prefix::X,

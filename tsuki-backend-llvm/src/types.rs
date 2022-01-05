@@ -50,6 +50,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
          TypeKind::Integer(_) => self.get_integer_type(types, typ).as_basic_type_enum(),
          TypeKind::Float(_) => self.get_float_type(types, typ).as_basic_type_enum(),
          TypeKind::Char => todo!(),
+         TypeKind::Alias(alias) => self.get_type(types, *alias),
       }
    }
 }
