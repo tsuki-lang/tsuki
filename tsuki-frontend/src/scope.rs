@@ -9,7 +9,7 @@ use crate::functions::FunctionId;
 use crate::types::TypeId;
 
 /// An ID uniquely identifying a symbol.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SymbolId(usize);
 
 impl SymbolId {
@@ -130,6 +130,7 @@ pub struct ScopeId(NonZeroUsize);
 pub struct Scopes {
    symbols: HashMap<(ScopeId, Cow<'static, str>), SymbolId>,
    breakable_scopes: HashSet<ScopeId>,
+   public_symbols: HashSet<SymbolId>,
    scope_count: usize,
 }
 
@@ -139,6 +140,7 @@ impl Scopes {
       Self {
          symbols: HashMap::new(),
          breakable_scopes: HashSet::new(),
+         public_symbols: HashSet::new(),
          scope_count: 1,
       }
    }
@@ -170,6 +172,11 @@ impl Scopes {
    /// Marks a scope as breakable.
    pub fn set_breakable(&mut self, scope: ScopeId) {
       self.breakable_scopes.insert(scope);
+   }
+
+   /// Marks the given symbol as public.
+   pub fn set_public(&mut self, symbol: SymbolId) {
+      self.public_symbols.insert(symbol);
    }
 }
 

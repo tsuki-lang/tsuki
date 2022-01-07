@@ -149,7 +149,7 @@ impl TypeKind {
       self.is_invalid()
          || matches!(
             self,
-            TypeKind::Statement | TypeKind::Unit | TypeKind::NoReturn
+            TypeKind::Statement | TypeKind::Declaration(_) | TypeKind::Unit | TypeKind::NoReturn
          )
    }
 

@@ -251,6 +251,20 @@ impl Ast {
       self.set_span(node, span);
    }
 
+   /// Unwraps a node from its container.
+   ///
+   /// The child node is expected to be stored in the `first` of the provided node.
+   pub fn unwrap(&mut self, node: NodeId) {
+      let child = self.first_handle(node);
+      self.convert_preserve(node, self.kind(child));
+      self.set_span(node, self.span(child).clone());
+      self.set_first(node, self.first(child));
+      self.set_second(node, self.second(child));
+      self.set_extra(node, self.extra(child).clone());
+      self.set_type_id(node, self.type_id(child));
+      self.set_scope(node, self.scope(child));
+   }
+
    /// Returns an iterator over all node handles in the AST.
    pub fn node_handles(&self) -> NodeHandles {
       NodeHandles {

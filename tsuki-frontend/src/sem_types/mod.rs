@@ -313,6 +313,7 @@ impl<'s> SemTypes<'s> {
          NodeKind::Val | NodeKind::Var => self.annotate_variable_declaration(ast, node).into(),
          NodeKind::Fun => self.annotate_function_declaration(ast, node).into(),
          NodeKind::Type => self.annotate_type_alias(ast, node).into(),
+         NodeKind::Pub => self.annotate_pub(ast, node),
 
          // Other nodes are invalid (or not implemented yet).
          other => self.error(ast, node, ErrorKind::SemTypesInvalidAstNode(other)),
