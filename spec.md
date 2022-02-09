@@ -1057,7 +1057,7 @@ Arrays are slices, so the usual `slice()`, `at()`, and `get()` methods can be us
 print(pi_digits.slice(0..3))  # ^[3, 1, 4, 1]
 print(pi_digits.at(0))        # 3
 print(pi_digits.get(0))       # Some(3)
-print(pi_digits.at(200))      # Nil
+print(pi_digits.at(200))      # panic: out of bounds
 ```
 
 For a resizable array type, the standard library `Seq[T]` can be used. For an associative array type with arbitrary key types, the standard library `Table[K, V]` can be used.
