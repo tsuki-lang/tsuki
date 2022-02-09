@@ -405,6 +405,10 @@ let os = match const builtin.target_os
 print("Hello, " ~ os ~ " user!")
 ```
 
+## `impl` operator
+
+The `impl` infix operator checks whether a type implements a trait. It can only be used in `where` clauses to constrain generic types.
+
 # Statements
 
 ## Expression statements
@@ -609,8 +613,7 @@ The `return` expression allows for exiting from a function early. In functions r
 
 ```
 fun find[T](haystack: Seq[T], needle: T): Size
-where
-   T: Equal
+where T impl Equal
 
    for (element, i) in haystack.items.enumerate
       if element == needle
@@ -1342,8 +1345,8 @@ Functions with the `self` parameter are referred to as _instance functions_. Typ
 ```
 impl[N, T] Array[N, T]
 where
-   N: const Size,
-   T: Add[T] + Zero
+   N impl const Size and
+   T impl Add[T] + Zero
 
    fun sum(self): T
       let var accumulator = T.zero
@@ -1479,7 +1482,7 @@ The above code defines a trait `Animal` that requires the implementing type to h
 Traits can be used as generic constraints:
 ```
 fun make_it_speak[T](animal: ^T)
-where T: Animal
+where T impl Animal
    animal.speak()
 ```
 
@@ -1514,7 +1517,7 @@ trait Animal
 When instantiating generic traits with associated types, the associated types are provided after generic types, using `K = V` syntax.
 ```
 fun add_two[T](x: T): Int
-where T: Add[Int, Ret = Int]
+where T impl Add[Int, Ret = Int]
    x + 2
 ```
 
@@ -1603,13 +1606,13 @@ It might be hard to grasp the concept just by looking at these abstract words, s
 ```
 object Array2D[W, H, T]
 where
-   W: const Size,
-   H: const Size
+   W impl const Size and
+   H impl const Size
 
    var inner: Self.Inner
 
 impl[W, H, T] Array2D[W, H, T]
-where T: Dup
+where T impl Dup
    type Inner = Array[W * H, T]
 
    fun new(default_value: T): Self
@@ -1651,9 +1654,10 @@ Normally, generic parameters can accept any type. For the sake of early type che
 To allow for calling functions on these symbols, the generic type has to be constrained using traits. Generic constraints are specified after the declaration, before pragmas, using the `where` keyword:
 ```
 fun add_two[T](x: T): T.Ret
-where T: Add[Int]
+where T impl Add[Int]
    x + 2
 ```
+The constraint is a compile-time evaluated expression. It is the only place where the special `impl` operator can be used.
 
 Calling a generic function or using a generic object with explicit types uses the same syntax as generic parameters.
 ```
@@ -1669,9 +1673,7 @@ impl[T] Seq[T]
 These generic parameters are used to provide generic _arguments_ to types. Constraints for generic parameters in `impl` blocks are inferred automatically, so it's only required to specify a master set of constraints wherever the implemented type is declared:
 ```
 object Vec2[T]
-where
-   T: Default
-
+where T impl Default
    var x, y: T
 
 # Here, the T is inferred to have the Default constraint.
@@ -1685,8 +1687,7 @@ impl[T] Vec2[T]
 Additional constraints can be specified after the `impl` block's implemented type. This can be used to only enable certain sets of functions when a generic parameter implements some trait:
 ```
 impl[T] Add[Self] for Vec2[T]
-where
-   T: Add[T]
+where T impl Add[T]
 
    type Result = Self
 
