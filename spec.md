@@ -1079,6 +1079,25 @@ r = 3
 print(r^)  # 3
 ```
 
+Boxes do not share the same lifetime checking limitations as pointers, as their lifetime is automatically extended to be as long as is needed to keep all references to one `box` valid.
+
+```
+let var b: ?box Int = Nil
+do
+   # Perfectly legit, because the box's lifetime is extended.
+   let c = box 1
+   b = c
+
+# Same here.
+fun box_me_an_int(): box Int
+   let b = box 1
+   b
+let i = box_me_an_int()
+print(i^)  # 1
+```
+
+The exact mechanism used is currently unspecified. TODO: specify
+
 ## Tuples
 
 Tuples are values that bind many differently typed values together. A tuple type is specified using the following syntax:
