@@ -289,25 +289,24 @@ let s =
 
 ### `if let`
 
-It is possible to use an optional's presence as a condition for an `if` expression, using the special `if let` construction:
+It is possible to match against a single refutable pattern using the special `if let` construction:
 ```
-let num: ?Int = nil
-if let n = num
+let num: ?Int = Nil
+if let Some(n) = num
    print("will not execute")
 ```
 The above code expands to the following:
 ```
-let num: ?Int = nil
-if Unwrap.has_value(num)
-   let n = Unwrap.unwrap(num)
-   do
-      print("will not execute")
+let num: ?Int = Nil
+match num
+   Some(n) -> print("will not execute")
+   Nil -> _
 ```
 
-It's possible to chain multiple `if let`s in one if statement, by separating the required values with a comma.
+It's possible to chain multiple `if let`s in one if statement, by using commas.
 
 ```
-if let address = user.home_address, let city = address.city
+if let Some(address) = user.home_address, let Some(city) = address.city
    print("Hello, " ~ city ~ "!")
 ```
 
@@ -315,7 +314,7 @@ As can be seen on the example above, subsequent `let` declarations may depend on
 
 ## `match` expressions
 
-`match` allows for a simple form of pattern matching. tsuki's pattern matching is nowhere near as sophisticated as the one found in functional languages, but still provides a reasonable level of ergonomics while keeping the implementation straightforward.
+`match` allows for matching values against a set of refutable [patterns](#patterns).
 
 The most basic `match`ing subject is a number:
 ```
@@ -325,51 +324,14 @@ match n
    2..4 ->
       let x = n + 2
       print(x)
-   # the matched value can be captured using ||
-   5..<10 |value| -> print(value)
+   # the matched value can be captured using || after the arrow
+   5..<10 -> |value| print(value)
    _ -> print("something else")
 ```
 
-The `_` wildcard pattern matches any value. Patterns are evaluated from top to bottom, so if the wildcard pattern were at the top, all the other branches would be unreachable.
+Patterns are evaluated from top to bottom, so if the wildcard pattern were at the top, all the other branches would be unreachable.
 
-Since the wildcard pattern expects any valid variable name, it can also be used to bind its matched values to variables.
-
-It's also possible to match other primitive subjects, such as Strings or Atoms:
-```
-let a = :apple
-match a
-   :orange -> print("The purpose of the columns")
-   :apple -> print("One a day keeps the doctor away")
-   :banana -> print("slamma")
-   _ -> _
-
-let name = "John"
-match name
-   "Mark" -> print("Oh, hi Mark")
-   "Gabe" -> print("Am I really doing the same joke again?")
-   n -> print("Hello, " ~ n)
-```
-Strings and Atoms cannot be used with ranges, because the interaction between the lower and upper bound doesn't make obvious sense.
-
-A more advanced use case for `match` would be unpacking unions. Unions variants carry extra data with them, and union patterns allow for binding the values to variables.
-```
-union Shape
-   Rectangle(Float, Float, Float, Float)
-   Circle(Float, Float, Float)
-
-let rect = Shape.Rectangle(32, 32, 64, 64)
-match rect
-   Shape.Rectangle(x, y, width, height) ->
-      print("Rectangle")
-      print("X: " ~ x.to_string() ~ "  Y: " ~ y.to_string())
-      print(width.to_string() ~ "x" ~ height.to_string())
-   Shape.Circle(x, y, radius) ->
-      print("Circle")
-      print("X: " ~ x.to_string() ~ "  Y: " ~ y.to_string())
-      print("radius: " ~ radius.to_string())
-```
-
-TODO: Flesh out patterns.
+Refer to the [pattern](#patterns) documentation for more details on what can be matched.
 
 ## `?` operator
 
@@ -538,14 +500,14 @@ while i < 10 -> i += 1
 A `while` loop is also capable of iterating over a condition that produces optionals as its result. Enter `while let`:
 ```
 let var bytes = "hello".bytes
-while let b = bytes.next
+while let Some(b) = bytes.next
    print(b)
 ```
 The above example is expanded to the following:
 ```
 let var bytes = "hello".bytes
 while true
-   if let b = bytes.next
+   if let Some(b) = bytes.next
       print(b)
    else
       break
@@ -597,7 +559,7 @@ while true
    write("Enter a number: ")
    let number = stdin.read_line?
    write('\n')
-   if let number = Int.parse(number)
+   if let Ok(number) = Int.parse(number)
       print(number + 1)
    else
       break
@@ -896,10 +858,10 @@ if correct.has_value
    print("The unwrapped value is: " ~ ok.to_string)
 ```
 
-As mentioned previously in the "`if` expressions" section, there exists a shorthand for checking and unwrapping an optional, called `if let`:
+Optionals can be unwrapped using a shorthand `if let`:
 
 ```
-if let ok = correct
+if let Some(ok) = correct
    print("The unwrapped value is: " ~ ok.to_string)
 ```
 
@@ -1597,16 +1559,6 @@ trait Add[R]
    fun add(self: ^Self, rhs: R): Self.Ret
 ```
 
-#### The `Unwrap` trait
-
-The `Unwrap` trait is used to overload `if let` declarations. It's defined like so:
-```
-trait Unwrap
-   type Inner
-   fun has_value(self: ^Self): bool
-   fun unwrap(self: Self): Inner
-```
-
 ### Calling functions from specific traits
 
 Sometimes, two functions from different traits can share the same name. In these cases the method can be qualified explicitly, as a member of the trait.
@@ -1745,6 +1697,90 @@ where
       }
 ```
 In the example above, `Vec2[T]` will only overload the `+` operator if `T` implements the `Add[T]` trait.
+
+# Patterns
+
+In places where variables are bound, such as `let`, `match`, `for`, etc., patterns are used to match on the structural (and numeric) properties of values.
+
+There exist two kinds of patterns:
+- Irrefutable - patterns that always match
+- Refutable - patterns that match in only some cases
+
+Some patterns are always irrefutable, some patterns are always refutable, and some patterns are irrefutable only if they are built out of other irrefutable patterns. This property is discussed per each type of pattern.
+
+The refutability of patterns decides on where the pattern may be used. Refer to the documentation of individual constructs using patterns for more details.
+
+## Wildcard
+
+```
+_
+```
+This pattern is simply written down as an underscore `_`. It matches all values and immediately discards them. Because it matches all values, it is irrefutable.
+
+## Variable
+
+```
+name
+var name
+```
+The variable pattern matches against any value and binds it to an optionally mutable (specified with `var`) named variable. Because it matches all values, it is irrefutable.
+
+## Literal
+
+```
+1
+true
+:my_atom
+"a string literal"
+```
+Literal patterns match against any literal except floats. The match succeeds if the value being matched is equal to the literal in the pattern. Because matching can fail, literal patterns are refutable.
+
+## Range
+
+```
+1..10
+1..<50
+'a'..'z'
+:a..:z
+```
+Range patterns match against literal ranges of values. The `..` or `..<` operators can be used. The matched literals have to be of an ordinal type (numbers, characters, and ordinal atom _subsets_, but not the `Atom` type). The match succeeds if the range contains the value being matched. Because the value can fall outside this range, matching can fail, so range patterns are refutable.
+
+## Value
+
+```
+val x
+val (stdin.read_line?)
+```
+
+It is possible to match against dynamically computed values by using the `val` pattern. This pattern behaves similarly to the literal pattern, except an arbitrary value is checked for equality. Because this check can fail, value patterns are irrefutable.
+
+## Tuple
+
+```
+(a, b, c)
+(1, _, 1..10)
+```
+
+Tuple patterns match against the fields of tuples. A tuple pattern succeeds if each of the individual fields' patterns succeeds. If all field patterns are irrefutable, the tuple pattern itself is irrefutable. Otherwise the pattern is refutable as one of the fields can fail to match.
+
+## Union variant
+
+```
+Nil
+Some(x)
+Shape.Circle(x, y, 10)
+```
+
+Union variant patterns are similar to tuple patterns, but they also check that the variant of a union is the one specified in the pattern. Because the union may not actually hold this variant, union variant patterns are always refutable.
+
+## Object
+
+```
+MyObject { x = 1, y = y }
+MyObject { y, _ }
+MyObject { x = 1, _ }
+```
+Object patterns match on individual object fields. The right hand side of each field's `=` contains a pattern that the field should be matched against. Omitting the `=` is equivalent to `field = field`, ie. binding a new immutable variable whose name is the same as the field's. As with tuples, an object pattern is only irrefutable if all of the fields' patterns are irrefutable. Otherwise it is refutable.
 
 # Modules
 
