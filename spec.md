@@ -101,9 +101,9 @@ This is enforced by the compiler to keep a consistent coding style across variou
 
 The following identifiers are reserved as _keywords_:
 ```
-_ and as atom auto dependency derive do elif else for fun getters if impl
-import in is let macro match move not object or pub rc return self try type
-uninit union where while var
+_ and as atom auto box dependency derive do elif else for fun getters if impl
+import in is let macro match move not object or pub return self try type uninit
+union where while var
 ```
 TODO: This list of keywords is constantly changing as the language spec is refined, and may currently be imprecise. It should be updated once the compiler is finished.
 
@@ -949,7 +949,7 @@ There's also an error handling syntax sugar, which can be found in the [`?` oper
 
 ## Pointers
 
-Pointers allow for passing _locations_ by reference. They differ from `rc` in that unlike an `rc`, a pointer is not owned. To maintain memory safety, each pointer has an associated lifetime; this lifetime corresponds to the scope where a pointer's original value originates from. The pointer must not outlive the underlying value, and this is enforced at compile-time. TODO: How?
+Pointers allow for passing _locations_ by reference. They differ from `box` in that unlike an `box`, a pointer is not owned. To maintain memory safety, each pointer has an associated lifetime; this lifetime corresponds to the scope where a pointer's original value originates from. The pointer must not outlive the underlying value, and this is enforced at compile-time. TODO: How?
 
 A mutable pointer type is written as `^var T`. An immutable pointer type is written as `^T`. The standard library aliases for both types of pointers are `PtrVar[T]` and `Ptr[T]`, respectively.
 
@@ -1062,23 +1062,19 @@ print(pi_digits.at(200))      # Nil
 
 For a resizable array type, the standard library `Seq[T]` can be used. For an associative array type with arbitrary key types, the standard library `Table[K, V]` can be used.
 
-## `rc T`, and `rc var T`
+## `box T`, and `box var T`
 
-`rc T` is a smart pointer that allows for multiple ownership of a single value. Usually a value can only have a single owner; with `rc T` however a value can be owned by _multiple_ locations, through the use of _reference-counting_.
-
-An `rc T` stores a reference count alongside the actual data. Copying an `rc T` increments that reference count by 1, and dropping an `rc T` decrements the reference count by 1. The inner value is dropped and the rc's heap memory is freed once the count reaches 0.
-
-tsuki's reference counting differs from most languages, in that increments and decrements of the reference count are optimized out by the compiler whenever possible. In fact, an `rc T` may even be downgraded into a plain stack or heap allocation, if the compiler can prove that copies of the `rc T` do not exit the scope in which the `rc T` was created.
+`box T` is a shared pointer that allows for multiple ownership of a single value. Usually a value can only have a single owner; with `box T` however a value can be owned by _multiple_ locations.
 
 ```
-# The `rc` operator can be used to create an rc value.
-let r = rc 1
-# An rc's inner value is immutable by default.
-# r = 2  # error: rc cannot be implicitly converted to ^var T
+# The `box` operator can be used to create an box value.
+let r = box 1
+# An box's inner value is immutable by default.
+# r = 2  # error: box cannot be implicitly converted to ^var T
 
-# The mutable alternative to rc is rc var:
-let r = rc var 1
-# Unlike rc, its inner value can be modified.
+# The mutable alternative to box is box var:
+let r = box var 1
+# Unlike box, its inner value can be modified.
 r = 3
 print(r^)  # 3
 ```
@@ -1416,10 +1412,10 @@ impl Example
 ```
 
 By default, what `self` can be is deduced from how the function uses it.
-- If the function only ever reads from `self`, it will accept any pointer (`^Self`, `^var Self`, `rc Self`, and `rc var Self`).
-- If the function mutates `self`, it will only accept mutable pointers (`^var Self` and `rc var Self`).
-- If the function duplicates `self` to an outer location, it will only accept owned pointers (`rc Self` and `rc var Self`).
-- If the function mutates `self` OR duplicates `self` to an outer location whose type is a mutable, owned pointer, it will only accept `rc var Self`.
+- If the function only ever reads from `self`, it will accept any pointer (`^Self`, `^var Self`, `box Self`, and `box var Self`).
+- If the function mutates `self`, it will only accept mutable pointers (`^var Self` and `box var Self`).
+- If the function duplicates `self` to an outer location, it will only accept owned pointers (`box Self` and `box var Self`).
+- If the function mutates `self` OR duplicates `self` to an outer location whose type is a mutable, owned pointer, it will only accept `box var Self`.
 
 Note that this inference only works for `self` which is a pointer. To move `self` into the function, an explicit type annotation must be used:
 ```
@@ -1431,10 +1427,10 @@ impl Example
 If reliance on this inference mechanism is unwanted, an explicit type annotation can also be used with all the pointer types to `Self`.
 ```
 impl Example
-   fun explicit_pointer(self: ^Self) -> ()          # accepts ^Self, ^var Self, rc Self, rc var Self
-   fun explicit_pointer_var(self: ^var Self) -> ()  # accepts ^var Self, rc var Self
-   fun explicit_rc(self: rc Self) -> ()             # accepts rc Self, rc var Self
-   fun explicit_rc_var(self: rc var Self) -> ()     # accepts rc var Self
+   fun explicit_pointer(self: ^Self) -> ()          # accepts ^Self, ^var Self, box Self, box var Self
+   fun explicit_pointer_var(self: ^var Self) -> ()  # accepts ^var Self, box var Self
+   fun explicit_box(self: box Self) -> ()           # accepts box Self, box var Self
+   fun explicit_box_var(self: box var Self) -> ()   # accepts box var Self
 ```
 Do note that these are the _only_ types `self` is allowed to be. Specifying a `self` whose type is not one of the above is an error.
 
