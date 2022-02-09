@@ -525,10 +525,8 @@ A `for` loop is syntactic sugar over a `while` loop. The syntax of a `for` loop 
 ```
 for x in iterator
    _
-for (x, y, z) in iterator
-   _
 ```
-where `x, y, z` are the _loop variables_, and `iterator` is the _iterator_ the loop should use.
+where `x` is the _loop variable_ (an irrefutable pattern), and `iterator` is the _iterator_ the loop should use.
 
 The iterator must implement the `Iterator` trait, which is defined like so:
 ```
