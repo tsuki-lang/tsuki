@@ -6,7 +6,7 @@ use crate::functions::FunctionId;
 use crate::scope::{SymbolId, SymbolKind};
 use crate::types::{TypeId, TypeLogEntry};
 
-use super::SemTypes;
+use super::{NodeContext, SemTypes};
 
 impl<'s> SemTypes<'s> {
    // The difference between `find` and `lookup` is simple: `find` returns an Option,
@@ -82,5 +82,16 @@ impl<'s> SemTypes<'s> {
    pub(super) fn add_to_scope(&mut self, name: &str, symbol: SymbolId) {
       let scope = self.scope_stack.top();
       self.scopes.insert(scope, name, symbol);
+   }
+
+   /// Annotates a `pub` declaration.
+   pub(super) fn annotate_pub(&mut self, ast: &mut Ast, node: NodeId) -> TypeLogEntry {
+      let inner = ast.first_handle(node);
+      let inner = self.annotate_node(ast, inner, NodeContext::Statement);
+      let typ = self.log.type_id(inner);
+      let symbol_id = self.types.kind(typ).as_declaration().unwrap();
+      self.scopes.set_public(symbol_id);
+      ast.unwrap(node);
+      inner
    }
 }

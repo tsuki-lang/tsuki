@@ -43,12 +43,14 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
          TypeKind::Missing => panic!("get_type called with missingtype"),
          TypeKind::Error => panic!("get_type called with errortype"),
          TypeKind::Statement => panic!("get_type called with statement type"),
+         TypeKind::Declaration(id) => panic!("get_type called with declaration({:?}) type", id),
          TypeKind::Type => panic!("get_type called with type type"),
          TypeKind::Unit | TypeKind::NoReturn => self.unit_type.as_basic_type_enum(),
          TypeKind::Bool => self.context.bool_type().as_basic_type_enum(),
          TypeKind::Integer(_) => self.get_integer_type(types, typ).as_basic_type_enum(),
          TypeKind::Float(_) => self.get_float_type(types, typ).as_basic_type_enum(),
          TypeKind::Char => todo!(),
+         TypeKind::Alias(alias) => self.get_type(types, *alias),
       }
    }
 }

@@ -7,7 +7,7 @@ use std::cmp::Ordering;
 use std::ops::Range;
 
 use crate::ast::NodeId;
-use crate::scope::{ScopeId, Scopes, SymbolKind, Symbols};
+use crate::scope::{ScopeId, Scopes, SymbolId, SymbolKind, Symbols};
 
 /// Data-oriented type storage.
 pub struct Types {
@@ -87,6 +87,8 @@ pub enum TypeKind {
    Error,
    /// The statement type is assigned to AST nodes that do not return a value, such as loops.
    Statement,
+   /// The declaration type is assigned to AST nodes that introduce a symbol into scope.
+   Declaration(SymbolId),
    /// `type` is the type of all type symbols. It can't be instantiated by user code.
    Type,
    /// The unit type is a type with a single value `()`. It is the default return type for
@@ -101,6 +103,9 @@ pub enum TypeKind {
    Integer(IntegerSize),
    Float(FloatSize),
    Char,
+
+   /// An alias for the type of the given ID.
+   Alias(TypeId),
 }
 
 impl TypeKind {
@@ -144,7 +149,7 @@ impl TypeKind {
       self.is_invalid()
          || matches!(
             self,
-            TypeKind::Statement | TypeKind::Unit | TypeKind::NoReturn
+            TypeKind::Statement | TypeKind::Declaration(_) | TypeKind::Unit | TypeKind::NoReturn
          )
    }
 
@@ -161,6 +166,15 @@ impl TypeKind {
       match self {
          TypeKind::Float(size) => *size,
          _ => panic!("unwrap_float called on a type kind that is not a float"),
+      }
+   }
+
+   /// Returns `Some(symbol_id)` if the type kind represents a declaration, or `None` if it doesn't.
+   pub fn as_declaration(&self) -> Option<SymbolId> {
+      if let Self::Declaration(v) = self {
+         Some(*v)
+      } else {
+         None
       }
    }
 }

@@ -261,6 +261,10 @@ pub enum ErrorKind {
    ExpectedCommaOrColon(TokenKind),
    #[error("function parameter list expected, but got '{0}'")]
    FunctionParametersExpected(TokenKind),
+   #[error("pragma argument list expected, but got '{0}'")]
+   PragmaArgsExpected(TokenKind),
+   #[error("`pub` must be followed by a declaration")]
+   PubMustBeFollowedByDeclaration,
 
    /*
     * Sem'check errors
@@ -308,6 +312,12 @@ pub enum ErrorKind {
    ReturnOutsideOfFunction,
    #[error("`break` cannot be used outside of a loop")]
    BreakOutsideOfLoop,
+   #[error("type alias does not alias any type. try adding `= YourType`")]
+   EmptyTypeAlias,
+   #[error("unknown pragma '{0}'")]
+   UnknownPragma(String),
+   #[error("invalid built-in type name")]
+   InvalidBuiltinTypeName,
 
    /*
     * Internal errors

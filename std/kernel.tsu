@@ -1,0 +1,28 @@
+# tsuki standard library
+# Copyright (C) 2021 liquidev
+# Licensed under the MIT license. Check the LICENSE file in the repository root for details.
+
+# The kernel is arguably the most important piece of source code in the standard library.
+# It provides definitions for primitive types, as well as compiler-supported types such as optionals
+# and results.
+# The kernel is loaded by the compiler before any other code in a given file, and must not be
+# imported manually.
+
+pub type NoReturn :: compiler_builtin_type(:noreturn)
+
+pub type Bool :: compiler_builtin_type(:bool)
+
+pub type Uint8 :: compiler_builtin_type(:uint8)
+pub type Uint16 :: compiler_builtin_type(:uint16)
+pub type Uint32 :: compiler_builtin_type(:uint32)
+pub type Uint64 :: compiler_builtin_type(:uint64)
+
+pub type Int8 :: compiler_builtin_type(:int8)
+pub type Int16 :: compiler_builtin_type(:int16)
+pub type Int32 :: compiler_builtin_type(:int32)
+pub type Int64 :: compiler_builtin_type(:int64)
+
+pub type Float32 :: compiler_builtin_type(:float32)
+pub type Float64 :: compiler_builtin_type(:float64)
+
+pub type Size :: compiler_builtin_type(:size)

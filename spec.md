@@ -101,9 +101,9 @@ This is enforced by the compiler to keep a consistent coding style across variou
 
 The following identifiers are reserved as _keywords_:
 ```
-_ and as atom auto dependency derive do elif else for fun getters if impl
-import in is macro match move not object or pub rc return self try type uninit
-union where while val var
+_ and as atom auto box dependency derive do elif else for fun getters if impl
+import in is let macro match move not object or pub return self try type uninit
+union where while var
 ```
 TODO: This list of keywords is constantly changing as the language spec is refined, and may currently be imprecise. It should be updated once the compiler is finished.
 
@@ -172,11 +172,11 @@ This is also where precedence comes in: if it's part of a statement, an expressi
 
 Infix tokens that continue a line must have an indentation level greater than the first token of the expression:
 ```
-val test = "hello" ~ " world "
+let test = "hello" ~ " world "
    ~ "this" ~ " is " ~ "a "
    ~ "test"
 # or
-val test = "hello" ~ " world " ~
+let test = "hello" ~ " world " ~
    "this" ~ " is " ~ "a " ~
    "test"
 ```
@@ -208,8 +208,8 @@ In case of `and`, if the first operand is `false`, the second operand is not eva
 
 The `or` operator can be used to safely unwrap an optional or a result while providing a default value, in case a value is not present, or an error occured. For results, the error is discarded.
 ```
-val nope: ?Int = nil
-val yes = nope or 1
+let nope: ?Int = nil
+let yes = nope or 1
 print(yes)  # 1
 ```
 Following the rule of short-circuit evaluation, the second operand is not evaluated if the value is unwrapped successfully.
@@ -220,7 +220,7 @@ Following the rule of short-circuit evaluation, the second operand is not evalua
 # fails, _its_ error variant is returned. If both sides succeed, the right side's successful variant
 # is returned.
 # Note that for this to work, `update` and `draw` must share the same return type.
-val test: !() = update() and draw()
+let test: !() = update() and draw()
 # This also works for optionals.
 print(Nil[()] and Nil[()])  # Nil
 print(Some(()) and Nil[()])  # Nil
@@ -233,7 +233,7 @@ The `do` expression evaluates a block of code and returns the result of the last
 
 ```
 print(do
-   val x = 1
+   let x = 1
    x + 2)  # 3
 ```
 
@@ -246,7 +246,7 @@ The `if..elif..else` expression evaluates a boolean condition, and if it's `true
 ```
 import @std.io
 
-val name = stdin.read_line?
+let name = stdin.read_line?
 print(
    if name == "Mark"
       "Oh hi Mark"
@@ -269,7 +269,7 @@ print(
 
 In some cases the parser may get confused if the starting token of an `if` expression is an infix token:
 ```
-val s =
+let s =
    if my_thing
       (x + 2).sin()
    else
@@ -279,7 +279,7 @@ Due to the rules of continuing expressions on other lines, this will be interpre
 
 Multiline bodies with `->` can be achieved by using it together with `do`.
 ```
-val s =
+let s =
    if my_thing -> do
       print("abc")
       (x + 2).sin()
@@ -287,89 +287,51 @@ val s =
       0.0
 ```
 
-### `if val`
+### `if let`
 
-It is possible to use an optional's presence as a condition for an `if` expression, using the special `if val` construction:
+It is possible to match against a single refutable pattern using the special `if let` construction:
 ```
-val num: ?Int = nil
-if val n = num
+let num: ?Int = Nil
+if let Some(n) = num
    print("will not execute")
 ```
 The above code expands to the following:
 ```
-val num: ?Int = nil
-if Unwrap.has_value(num)
-   val n = Unwrap.unwrap(num)
-   do
-      print("will not execute")
+let num: ?Int = Nil
+match num
+   Some(n) -> print("will not execute")
+   Nil -> _
 ```
 
-It's possible to chain multiple `if val`s in one if statement, by separating the required values with a comma.
+It's possible to chain multiple `if let`s in one if statement, by using commas.
 
 ```
-if val address = user.home_address, val city = address.city
+if let Some(address) = user.home_address, let Some(city) = address.city
    print("Hello, " ~ city ~ "!")
 ```
 
-As can be seen on the example above, subsequent `val` declarations may depend on previous ones. If at least one declaration fails, the entire arm is considered `false` and the next `elif` or `else` arm (or no arm) is executed.
+As can be seen on the example above, subsequent `let` declarations may depend on previous ones. If at least one declaration fails, the entire arm is considered `false` and the next `elif` or `else` arm (or no arm) is executed.
 
 ## `match` expressions
 
-`match` allows for a simple form of pattern matching. tsuki's pattern matching is nowhere near as sophisticated as the one found in functional languages, but still provides a reasonable level of ergonomics while keeping the implementation straightforward.
+`match` allows for matching values against a set of refutable [patterns](#patterns).
 
 The most basic `match`ing subject is a number:
 ```
-val n = 10
+let n = 10
 match n
    1 -> print("JEDEN.")
    2..4 ->
-      val x = n + 2
+      let x = n + 2
       print(x)
-   # the matched value can be captured using ||
-   5..<10 |val| -> print(val)
+   # the matched value can be captured using || after the arrow
+   5..<10 -> |value| print(value)
    _ -> print("something else")
 ```
 
-The `_` wildcard pattern matches any value. Patterns are evaluated from top to bottom, so if the wildcard pattern were at the top, all the other branches would be unreachable.
+Patterns are evaluated from top to bottom, so if the wildcard pattern were at the top, all the other branches would be unreachable.
 
-Since the wildcard pattern expects any valid variable name, it can also be used to bind its matched values to variables.
-
-It's also possible to match other primitive subjects, such as Strings or Atoms:
-```
-val a = :apple
-match a
-   :orange -> print("The purpose of the columns")
-   :apple -> print("One a day keeps the doctor away")
-   :banana -> print("slamma")
-   _ -> _
-
-val name = "John"
-match name
-   "Mark" -> print("Oh, hi Mark")
-   "Gabe" -> print("Am I really doing the same joke again?")
-   n -> print("Hello, " ~ n)
-```
-Strings and Atoms cannot be used with ranges, because the interaction between the lower and upper bound doesn't make obvious sense.
-
-A more advanced use case for `match` would be unpacking unions. Unions variants carry extra data with them, and union patterns allow for binding the values to variables.
-```
-union Shape
-   Rectangle(Float, Float, Float, Float)
-   Circle(Float, Float, Float)
-
-val rect = Shape.Rectangle(32, 32, 64, 64)
-match rect
-   Shape.Rectangle(x, y, width, height) ->
-      print("Rectangle")
-      print("X: " ~ x.to_string() ~ "  Y: " ~ y.to_string())
-      print(width.to_string() ~ "x" ~ height.to_string())
-   Shape.Circle(x, y, radius) ->
-      print("Circle")
-      print("X: " ~ x.to_string() ~ "  Y: " ~ y.to_string())
-      print("radius: " ~ radius.to_string())
-```
-
-TODO: Flesh out patterns.
+Refer to the [pattern](#patterns) documentation for more details on what can be matched.
 
 ## `?` operator
 
@@ -384,7 +346,7 @@ fun fallible(x: Int): !Int
    else -> x + 4
 
 fun try_example(): !()
-   var x = fallible(2)?
+   let var x = fallible(2)?
    print(x)  # 6
 ```
 
@@ -394,15 +356,15 @@ fun try_example(): !()
 
 Using the `?` operator on an error result in a `try` block will break out of the block, and the block's result value will be the error result.
 ```
-val a = try
-   val num_string = stdin.read_line?
-   val num = Int32.parse(num_string)?
+let a = try
+   let num_string = stdin.read_line?
+   let num = Int32.parse(num_string)?
    num + 2
 print(a)
 ```
 In cases where the compiler has trouble figuring out what the error result's type is supposed to be, the `try` can be assigned to a variable with an explicit type specified.
 ```
-val a: IoError!() = try
+let a: IoError!() = try
    _  # do stuff
 ```
 
@@ -416,7 +378,7 @@ Note that `try` cannot be used as a statement. This has a few effects:
 
 ```
 # The value of the variable `x` is known at compile time.
-val x = const 4
+let x = const 4
 ```
 The right-hand side of a `const` expression has the lowest possible precedence. As such, the expression `const 2 + 2` is equivalent to `const (2 + 2)`, and not `(const 2) + 2`.
 
@@ -434,7 +396,7 @@ if builtin.target_architecture == :x86_64
 ```
 The `if` statements above will both be evaluated at compile-time, and all the `false` branches will be optimized out. This also works with `match`:
 ```
-val os = match const builtin.target_os
+let os = match const builtin.target_os
    :windows -> "Windows"
    :linux -> "Linux"
    :macos -> "macOS"
@@ -443,13 +405,17 @@ val os = match const builtin.target_os
 print("Hello, " ~ os ~ " user!")
 ```
 
+## `impl` operator
+
+The `impl` infix operator checks whether a type implements a trait. It can only be used in `where` clauses to constrain generic types.
+
 # Statements
 
 ## Expression statements
 
 The most basic type of statement in tsuki is an _expression statement_.
 
-An expression statement is made up of a single expression returning `()`. If the expression evaluates to a value of a different type, `val _ = expr` may be used to discard the result.
+An expression statement is made up of a single expression returning `()`. If the expression evaluates to a value of a different type, `let _ = expr` may be used to discard the result.
 
 The most basic example of an expression statement is a `print()`:
 ```
@@ -460,31 +426,35 @@ print("Hello, world!")
 
 tsuki distinguishes between two types of variables: immutable variables, and mutable variables.
 
-An immutable variable is created using the `val` keyword:
+Variables are introduced into scope using the `let` keyword:
 ```
-val x = 1
+let x = 1
 ```
-The variable can be read from, but not assigned to:
+The left-hand side of the `let` is the pattern that should be used for destructuring the value on
+the right. In this case, we simply want to bind the value `1` to a new name `x` so there's no
+complicated destructuring involved.
+
+Variables can be read from, but not assigned:
 ```
 print(x)  # 1
 # x = 3   # error
 ```
 
-To create a mutable variable, `var` can be used:
+To create a mutable variable that _can_ be assigned to, `var` can be used in the pattern:
 ```
-var x = 1
+let var x = 1
 x = 3
 print(x)  # 3
 ```
 Note that variables are also statically-typed, so trying to assign a value of a different type than the initial assignment is an error:
 ```
-var x = 1
+let var x = 1
 x = "Hello"  # error
 ```
 
 The type of a variable can be specified explicitly by using a `:` after the variable name:
 ```
-val x: Int32 = 1
+let x: Int32 = 1
 ```
 
 Variable names can be shadowed, as that allows for greater ergonomics. The variable declared last in the innermost scope is always used when resolving shadowed names.
@@ -494,11 +464,11 @@ Variable names can be shadowed, as that allows for greater ergonomics. The varia
 A given symbol (resolved identifier) is only accessible in the scope in which it's been declared. The scope of a symbol begins in the block it was declared in, and stretches until the end of that block. The symbol is also visible in all blocks inside of the block it was declared in.
 
 ```
-val x = 1  # global; visible everywhere
+let x = 1  # global; visible everywhere
 do
-   val y = 2  # only visible inside of this `do` block
+   let y = 2  # only visible inside of this `do` block
    do
-      val z = 3
+      let z = 3
       print((x, y, z))
    print((x, y))
 print(x)
@@ -517,7 +487,7 @@ Similarly to the `if` statement, `match` statements are functionally and syntact
 
 A `while` loop runs its block until the provided condition is `false`.
 ```
-var i = 0
+let var i = 0
 while i < 10
    print(i)
    i += 1
@@ -525,29 +495,29 @@ while i < 10
 
 Similarly to an `if` statement, `->` may be used to create a single-line loop.
 ```
-var i = 0
+let var i = 0
 while i < 10 -> i += 1
 ```
 
-### `while val`
+### `while let`
 
-A `while` loop is also capable of iterating over a condition that produces optionals as its result. Enter `while val`:
+A `while` loop is also capable of iterating over a condition that produces optionals as its result. Enter `while let`:
 ```
-var bytes = "hello".bytes
-while val b = bytes.next
+let var bytes = "hello".bytes
+while let Some(b) = bytes.next
    print(b)
 ```
 The above example is expanded to the following:
 ```
-var bytes = "hello".bytes
+let var bytes = "hello".bytes
 while true
-   if val b = bytes.next
+   if let Some(b) = bytes.next
       print(b)
    else
       break
 ```
 
-Similarly to `if val`, `while val` can be chained by separating the `val` declarations with commas.
+Similarly to `if let`, `while let` can be chained by separating the `let` declarations with commas.
 
 ## `for` loop and iterators
 
@@ -555,22 +525,20 @@ A `for` loop is syntactic sugar over a `while` loop. The syntax of a `for` loop 
 ```
 for x in iterator
    _
-for (x, y, z) in iterator
-   _
 ```
-where `x, y, z` are the _loop variables_, and `iterator` is the _iterator_ the loop should use.
+where `x` is the _loop variable_ (an irrefutable pattern), and `iterator` is the _iterator_ the loop should use.
 
 The iterator must implement the `Iterator` trait, which is defined like so:
 ```
 trait Iterator[T]
-   fun var next(): ?T
+   fun next(self: ^var Self): ?T
 ```
 
 The `for` loop is then expanded to a regular `while` loop:
 ```
 do
-   var <iterator> = iterator
-   while val <variables> = Iterator.next(<iterator>)
+   let var <iterator> = iterator
+   while let <variables> = Iterator.next(<iterator>)
       <loop body>
 ```
 Note that all the variables within angle brackets `<>` are not actually visible anywhere, they exist here solely for visualization purposes.
@@ -591,9 +559,9 @@ import @std.parsing
 
 while true
    write("Enter a number: ")
-   val number = stdin.read_line?
+   let number = stdin.read_line?
    write('\n')
-   if val number = Int.parse(number)
+   if let Ok(number) = Int.parse(number)
       print(number + 1)
    else
       break
@@ -643,8 +611,7 @@ The `return` expression allows for exiting from a function early. In functions r
 
 ```
 fun find[T](haystack: Seq[T], needle: T): Size
-where
-   T: Equal
+where T impl Equal
 
    for (element, i) in haystack.items.enumerate
       if element == needle
@@ -660,7 +627,7 @@ Whenever the tsuki runtime encounters an unrecoverable error, it _panics_. A pan
 
 A panic can be triggered using the built-in `panic()` function:
 ```
-val x = 1
+let x = 1
 if x != 1
    panic("oh my")
 ```
@@ -674,7 +641,7 @@ tsuki is a statically typed language; this means that every value has an assioci
 Most "magic" types that use special syntax in type position are available under different names in the standard library, so that they can be used in expression position. An example is accessing the associated functions of a slice:
 
 ```
-val s = Slice[Int].empty
+let s = Slice[Int].empty
 ```
 
 ## Unit type `()`
@@ -692,8 +659,8 @@ This type can be automatically converted into any other type. Thanks to this pro
 atom Error
    :nil_option
 
-fun some_or_error[T](opt: ?T): !T
-   val v = opt or return :nil_option
+fun some_or_error[T](opt: ?T) !T
+   let v = opt or return :nil_option
    v
 ```
 
@@ -720,14 +687,14 @@ Int8  Int16  Int32  Int64
 Integer types of smaller sizes are automatically converted into integer types of bigger sizes (widening conversion), so this works as expected:
 
 ```
-val x: Int16 = 1_i8
-val y: Uint32 = 1_u16
+let x: Int16 = 1_i8
+let y: Uint32 = 1_u16
 ```
 
 Narrowing conversions and conversions between unsigned and signed integers are not performed automatically, and must be done explicitly through the `to_*` family of functions:
 
 ```
-val x: Uint16 = 1_i8.to_u16 or 0
+let x: Uint16 = 1_i8.to_u16 or 0
 ```
 
 These functions return an optional wrapping the final type, which must be unwrapped using `unwrap` or `or`. The value returned is `nil` if overflow occurred. The `to_*_wrapping` and `to_*_saturating` variants can be used if different behavior is needed.
@@ -847,7 +814,7 @@ The `String` type is an immutable UTF-8 encoded string. It can be obtained throu
 
 Because all strings are UTF-8, `String` cannot be indexed directly. Instead, one of the available iterators has to be used:
 ```
-var iter = "cześć".chars
+let var iter = "cześć".chars
 print(iter.next)  # c
 print(iter.next)  # z
 print(iter.next)  # e
@@ -860,7 +827,7 @@ for char in "cześć".chars
 ```
 A `String` can also be used as a byte buffer, by using the `bytes` iterator:
 ```
-var iter = "\x00\xFF".bytes
+let var iter = "\x00\xFF".bytes
 print(iter.next)  # 0
 print(iter.next)  # 255
 ```
@@ -878,8 +845,8 @@ An optional is written like `?T`, where `T` is the value type. The standard libr
 
 As already mentioned, optionals can be initialized to `Nil`:
 ```
-val opt: ?Int = Nil
-val correct: ?Int = 3
+let opt: ?Int = Nil
+let correct: ?Int = 3
 ```
 
 The presence of a value can be queried using the `has_value` function, and the value can later be read using the `unwrap` function.
@@ -888,14 +855,14 @@ if opt.has_value
    print("That ain't happening, sir")
 
 if correct.has_value
-   val ok = correct.unwrap
+   let ok = correct.unwrap
    print("The unwrapped value is: " ~ ok.to_string)
 ```
 
-As mentioned previously in the "`if` expressions" section, there exists a shorthand for checking and unwrapping an optional, called `if val`:
+Optionals can be unwrapped using a shorthand `if let`:
 
 ```
-if val ok = correct
+if let Some(ok) = correct
    print("The unwrapped value is: " ~ ok.to_string)
 ```
 
@@ -910,7 +877,7 @@ pub type Nil[T] = Optional[T].Nil
 ```
 Thus, optionals can be used with `match` by using the variant names explicitly. The same can be said about constructing optionals.
 ```
-val a = Some(123)
+let a = Some(123)
 match a
    Some(x) -> print(x)
    Nil -> print("there's no value! :(")
@@ -945,7 +912,7 @@ There's also an error handling syntax sugar, which can be found in the [`?` oper
 
 ## Pointers
 
-Pointers allow for passing _locations_ by reference. They differ from `rc` in that unlike an `rc`, a pointer is not owned. To maintain memory safety, each pointer has an associated lifetime; this lifetime corresponds to the scope where a pointer's original value originates from. The pointer must not outlive the underlying value, and this is enforced at compile-time. TODO: How?
+Pointers allow for passing _locations_ by reference. They differ from `box` in that unlike an `box`, a pointer is not owned. To maintain memory safety, each pointer has an associated lifetime; this lifetime corresponds to the scope where a pointer's original value originates from. The pointer must not outlive the underlying value, and this is enforced at compile-time. TODO: How?
 
 A mutable pointer type is written as `^var T`. An immutable pointer type is written as `^T`. The standard library aliases for both types of pointers are `PtrVar[T]` and `Ptr[T]`, respectively.
 
@@ -956,7 +923,7 @@ fun inc(x: ^var Int)
    # left-hand side.
    x += 1
 
-var x = 0
+let var x = 0
 inc(^x)
 print(x)  # 1
 ```
@@ -969,7 +936,7 @@ There can only be a single mutable pointer to a given value, XOR any amount of i
 Pointers are also subject to automatic dereferencing when calling instance functions, using operators, and performing assignments. Consider this example:
 ```
 object Example
-   val x: Int
+   x: Int
 
 impl Example
    fun print_x(self)
@@ -981,7 +948,7 @@ fun print_x_from(example: ^Example)
    # ...but we can also let the compiler dereference it for us
    example.print_x()
 
-var example = Example { x = 1 }
+let var example = Example { x = 1 }
 print_x_from(^example)
 ```
 
@@ -990,8 +957,8 @@ print_x_from(^example)
 The inclusive and exclusive range operators (`..` and `..<` respectively) are one of the few non-overloadable operators in tsuki. These operators are binary operators, whose both sides must be of the same type, and produce a value of type `Range[T]` and `RangeExcl[T]`.
 
 ```
-val a = 1..2   # Range[Int]
-val b = 1..<3  # RangeExcl[Int]
+let a = 1..2   # Range[Int]
+let b = 1..<3  # RangeExcl[Int]
 # The lower and upper bounds can be retrieved using `.lower` and `.upper`.
 print(a.lower)  # 1
 print(a.upper)  # 2
@@ -1001,13 +968,13 @@ print(b.upper)  # 3
 
 There's also the value `..`, whose type is `RangeFull`.
 ```
-val c = ..  # RangeFull
+let c = ..  # RangeFull
 ```
 
 For a `RangeExcl[T]`, if `T` implements `Ordinal`, the exclusive range may be converted to an inclusive range, using the `to_inclusive` function.
 ```
-val excl = 1..<5
-val incl = excl.to_inclusive
+let excl = 1..<5
+let incl = excl.to_inclusive
 print(incl)  # 1..4
 ```
 The `to_inclusive` function returns a range with the upper bound replaced with `Ordinal.pred(.upper)`.
@@ -1021,14 +988,14 @@ A slice type is written like `[T]`. A slice type with mutable elements is writte
 Slices are usually initialized from owned `Array[N, T]` or `Seq[T]`.
 ```
 # initialize an Array[3, Int]
-val elems = [1, 2, 3]
+let elems = [1, 2, 3]
 
 fun do_stuff(slice: [Int])
    _
 
 do_stuff(elems.slice(..))  # slice all the elements
 ```
-Because the slice was created from a `val Seq[Int]`, the slice itself is `[Int]`. If the source sequence was `var`, the slice would be `[var Int]`.
+Because the slice was created from a non-`var` `Seq[Int]`, the slice itself is `[Int]`. If the source sequence was `var`, the slice would be `[var Int]`.
 
 We can read elements from this slice by using the `at()` and `get()` methods.
 ```
@@ -1046,38 +1013,53 @@ Out of bounds access with `at()` is checked at runtime and results in a panic. `
 
 Initializing a new array is done using the `[]` prefix:
 ```
-val pi_digits = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3]
+let pi_digits = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3]
 ```
 Arrays are slices, so the usual `slice()`, `at()`, and `get()` methods can be used on them.
 ```
 print(pi_digits.slice(0..3))  # ^[3, 1, 4, 1]
 print(pi_digits.at(0))        # 3
 print(pi_digits.get(0))       # Some(3)
-print(pi_digits.at(200))      # Nil
+print(pi_digits.at(200))      # panic: out of bounds
 ```
 
 For a resizable array type, the standard library `Seq[T]` can be used. For an associative array type with arbitrary key types, the standard library `Table[K, V]` can be used.
 
-## `rc T`, and `rc var T`
+## `box T`, and `box var T`
 
-`rc T` is a smart pointer that allows for multiple ownership of a single value. Usually a value can only have a single owner; with `rc T` however a value can be owned by _multiple_ locations, through the use of _reference-counting_.
-
-An `rc T` stores a reference count alongside the actual data. Copying an `rc T` increments that reference count by 1, and dropping an `rc T` decrements the reference count by 1. The inner value is dropped and the rc's heap memory is freed once the count reaches 0.
-
-tsuki's reference counting differs from most languages, in that increments and decrements of the reference count are optimized out by the compiler whenever possible. In fact, an `rc T` may even be downgraded into a plain stack or heap allocation, if the compiler can prove that copies of the `rc T` do not exit the scope in which the `rc T` was created.
+`box T` is a shared pointer that allows for multiple ownership of a single value. Usually a value can only have a single owner; with `box T` however a value can be owned by _multiple_ locations.
 
 ```
-# The `rc` operator can be used to create an rc value.
-val r = rc 1
-# An rc's inner value is immutable by default.
-# r = 2  # error: rc cannot be implicitly converted to ^var T
+# The `box` operator can be used to create an box value.
+let r = box 1
+# An box's inner value is immutable by default.
+# r = 2  # error: box cannot be implicitly converted to ^var T
 
-# The mutable alternative to rc is rc var:
-val r = rc var 1
-# Unlike rc, its inner value can be modified.
+# The mutable alternative to box is box var:
+let r = box var 1
+# Unlike box, its inner value can be modified.
 r = 3
 print(r^)  # 3
 ```
+
+Boxes do not share the same lifetime checking limitations as pointers, as their lifetime is automatically extended to be as long as is needed to keep all references to one `box` valid.
+
+```
+let var b: ?box Int = Nil
+do
+   # Perfectly legit, because the box's lifetime is extended.
+   let c = box 1
+   b = c
+
+# Same here.
+fun box_me_an_int(): box Int
+   let b = box 1
+   b
+let i = box_me_an_int()
+print(i^)  # 1
+```
+
+The exact mechanism used is currently unspecified. TODO: specify
 
 ## Tuples
 
@@ -1090,20 +1072,20 @@ A single-element tuple is specified using the syntax `(A,)`. The zero element tu
 
 A tuple is instantiated using syntax similar to its type definition, with values in place of types:
 ```
-val elems: (Int, Int, Int) = (1, 2, 3)
+let elems: (Int, Int, Int) = (1, 2, 3)
 ```
 Individual elements of the tuple can be retrieved through its fields, each of which starts with an underscore `_`, followed by the zero-based index of the field:
 ```
 print(elems._0)
 ```
 
-A tuple may also be unpacked to separate variables using similar syntax:
+A tuple may also be unpacked to separate variables using patterns:
 ```
-val (a, b, c) = (1, 2, 3)
+let (a, b, c) = (1, 2, 3)
 ```
 Certain elements of a tuple may be ignored while unpacking, using the `_` wildcard pattern:
 ```
-val (x, _, z, _) = (1, 2, 3, 4)
+let (x, _, z, _) = (1, 2, 3, 4)
 ```
 
 ## Objects
@@ -1112,13 +1094,13 @@ An object is a named type containing user-defined fields. An object is declared 
 ```
 object Example  # the name of the object
    # its fields
-   var x: Int
-   val y: Int       # a field can be marked as immutable
-   var z, w: Float
+   x: Int
+   y: Int
+   var z, w: Float  # fields can be marked as mutable
 ```
 The object can then be instantiated using the following construction syntax:
 ```
-val e = Example { x = 1, y = 2, z = 3, w = 4 }
+let e = Example { x = 1, y = 2, z = 3, w = 4 }
 ```
 Normally, all fields must be initialized. However, default expressions can be provided in the object declaration:
 ```
@@ -1126,22 +1108,22 @@ object Defaults
    var a: Int = 2
    var b: Int = 4
    var c: ?Int = nil
-val d = Defaults {}
+let d = Defaults {}
 ```
 A default value can be any expression. The expressions are evaluated every time the object is constructed. This means that expressions with visible side effects may influence the construction of different object instances:
 ```
-var counter = 0
+let var counter = 0
 fun inc_counter(): Int
-   val id = counter
+   let id = counter
    counter += 1
    id
 
 object Counted
-   val id: Int = inc_counter()
+   id: Int = inc_counter()
 
-val a = Counted {}
-val b = Counted {}
-val c = Counted {}
+let a = Counted {}
+let b = Counted {}
+let c = Counted {}
 print((a, b, c))  # Counted { id = 0 }, Counted { id = 1 }, Counted { id = 2 }
 ```
 
@@ -1150,10 +1132,10 @@ There's one more exception to the "all fields must be initialized" rule. That is
 object UninitExample
    # note that the field must be var in this case, otherwise we wouldn't be
    # able to set it
-   val x: Int
+   x: Int
    var y: Int
 
-var u = UninitExample { x = 1, y = uninit }
+let var u = UninitExample { x = 1, y = uninit }
 u.y = u.x + 2
 ```
 It is a compile-time error to try to read from a field that's `uninit`. It is also a compile-time error to try to move an object with `uninit` fields to a different location than where it already is, eg. via `return` or setting a variable.
@@ -1166,10 +1148,10 @@ When an object in a location (a variable or object field) is referenced by value
 
 ```
 object Example
-   val a: Int32 = 1
+   a: Int32 = 1
 
-val e = Example {}
-val f = e
+let e = Example {}
+let f = e
 # print(e)  # error: `e` is uninitialized and cannot be read from
 ```
 
@@ -1187,8 +1169,8 @@ object DupExample
 impl DupExample
    derive Dup
 
-val a = DupExample { x = 1, y = 2 }
-var b = a.dup()
+let a = DupExample { x = 1, y = 2 }
+let var b = a.dup()
 b.y = 3
 print(a)  # DupExample { x = 1, y = 2 }
 print(b)  # DupExample { x = 1, y = 3 }
@@ -1199,8 +1181,8 @@ object CopyExample
 impl CopyExample
    derive Dup, Copy
 
-val c = CopyExample { x = 1, y = 2 }
-var d = c
+let c = CopyExample { x = 1, y = 2 }
+let var d = c
 d.y = 3
 print(c)  # CopyExample { x = 1, y = 2 }
 print(d)  # CopyExample { x = 1, y = 3 }
@@ -1218,22 +1200,22 @@ trait Drop
 
 Here's an example implementation of the trait:
 ```
-var id_count = 0
+let var id_count = 0
 fun next_id(): Int
-   val id = id_count
+   let id = id_count
    id_count += 1
    id
 
 object Dropper
-   val id: Int = next_id()
+   id: Int = next_id()
 
 impl Drop for Dropper
    fun drop()
       print("Dropping " ~ .id.to_string)
 
-val d = Dropper {}
-val e = Dropper {}
-var f = Dropper {}
+let d = Dropper {}
+let e = Dropper {}
+let var f = Dropper {}
 f = Dropper {}  # Dropping 2
 # Dropping 3
 # Dropping 1
@@ -1255,7 +1237,7 @@ union Shape
 
 A union variant can be initialized using the union initialization syntax: the union type, followed by the subtype specifying the variant, followed by the variant values in parentheses.
 ```
-var my_shape = Shape.Rectangle(32, 32, 64, 64)
+let var my_shape = Shape.Rectangle(32, 32, 64, 64)
 ```
 
 Note that each union variant is a _real type_, and as such, can be specified as the return type from functions, passed around in variables, implemented, and so on.
@@ -1276,13 +1258,13 @@ The union type itself implements `AsVariant[T]` for all of its variants.
 fun obtain_shape(): Shape
    Shape.Circle(16, 16, 16)
 
-val shape = obtain_shape()
-val maybe_rectangle = shape.as_variant[Shape.Rectangle]
+let shape = obtain_shape()
+let maybe_rectangle = shape.as_variant[Shape.Rectangle]
 print(maybe_rectangle)  # None
 ```
 Once a concrete variant is obtained, its fields can be accessed like tuple fields. However, the variant type is _distinct_ from the tuple type with the same fields, and will not convert to it.
 ```
-val rectangle = Shape.Rectangle(16, 16, 32, 32)
+let rectangle = Shape.Rectangle(16, 16, 32, 32)
 print(("width: ", rectangle._2))
 ```
 
@@ -1361,18 +1343,18 @@ Functions with the `self` parameter are referred to as _instance functions_. Typ
 ```
 impl[N, T] Array[N, T]
 where
-   N: const Size,
-   T: Add[T] + Zero
+   N impl const Size and
+   T impl Add[T] + Zero
 
    fun sum(self): T
-      var accumulator = T.zero
+      let var accumulator = T.zero
       for i in .items()
          accumulator += i
       accumulator
 
-val ints = [1, 2, 3]
+let ints = [1, 2, 3]
 print(ints.sum)  # 6
-val strings = ["a", "bc", "d"]
+let strings = ["a", "bc", "d"]
 # print(ints.sum)  # error: impl's generic constraint is not satisfied
 ```
 
@@ -1412,10 +1394,10 @@ impl Example
 ```
 
 By default, what `self` can be is deduced from how the function uses it.
-- If the function only ever reads from `self`, it will accept any pointer (`^Self`, `^var Self`, `rc Self`, and `rc var Self`).
-- If the function mutates `self`, it will only accept mutable pointers (`^var Self` and `rc var Self`).
-- If the function duplicates `self` to an outer location, it will only accept owned pointers (`rc Self` and `rc var Self`).
-- If the function mutates `self` OR duplicates `self` to an outer location whose type is a mutable, owned pointer, it will only accept `rc var Self`.
+- If the function only ever reads from `self`, it will accept any pointer (`^Self`, `^var Self`, `box Self`, and `box var Self`).
+- If the function mutates `self`, it will only accept mutable pointers (`^var Self` and `box var Self`).
+- If the function duplicates `self` to an outer location, it will only accept owned pointers (`box Self` and `box var Self`).
+- If the function mutates `self` OR duplicates `self` to an outer location whose type is a mutable, owned pointer, it will only accept `box var Self`.
 
 Note that this inference only works for `self` which is a pointer. To move `self` into the function, an explicit type annotation must be used:
 ```
@@ -1427,10 +1409,10 @@ impl Example
 If reliance on this inference mechanism is unwanted, an explicit type annotation can also be used with all the pointer types to `Self`.
 ```
 impl Example
-   fun explicit_pointer(self: ^Self) -> ()          # accepts ^Self, ^var Self, rc Self, rc var Self
-   fun explicit_pointer_var(self: ^var Self) -> ()  # accepts ^var Self, rc var Self
-   fun explicit_rc(self: rc Self) -> ()             # accepts rc Self, rc var Self
-   fun explicit_rc_var(self: rc var Self) -> ()     # accepts rc var Self
+   fun explicit_pointer(self: ^Self) -> ()          # accepts ^Self, ^var Self, box Self, box var Self
+   fun explicit_pointer_var(self: ^var Self) -> ()  # accepts ^var Self, box var Self
+   fun explicit_box(self: box Self) -> ()           # accepts box Self, box var Self
+   fun explicit_box_var(self: box var Self) -> ()   # accepts box var Self
 ```
 Do note that these are the _only_ types `self` is allowed to be. Specifying a `self` whose type is not one of the above is an error.
 
@@ -1449,7 +1431,7 @@ The usual way of defining getters and setters is to create a method that returns
 ```
 object Example
    var x: Int
-   val y: Int
+   y: Int
 
 impl Example
    fun x(self): ^auto Int
@@ -1464,7 +1446,7 @@ impl Example
    fun y(self): ^Int
       ^.y
 
-var ex = Example { x = 1, y = 2 }
+let var ex = Example { x = 1, y = 2 }
 ex.x = 4
 print(ex.y)
 # same as the above, but uglier
@@ -1478,7 +1460,7 @@ The compiler allows for some trait implementations to be _derived_ automatically
 
 ```
 object Copycat
-   val x: Int
+   x: Int
 
 impl Copycat
    derive Dup, Copy
@@ -1498,7 +1480,7 @@ The above code defines a trait `Animal` that requires the implementing type to h
 Traits can be used as generic constraints:
 ```
 fun make_it_speak[T](animal: ^T)
-where T: Animal
+where T impl Animal
    animal.speak()
 ```
 
@@ -1533,7 +1515,7 @@ trait Animal
 When instantiating generic traits with associated types, the associated types are provided after generic types, using `K = V` syntax.
 ```
 fun add_two[T](x: T): Int
-where T: Add[Int, Ret = Int]
+where T impl Add[Int, Ret = Int]
    x + 2
 ```
 
@@ -1578,16 +1560,6 @@ trait Add[R]
    fun add(self: ^Self, rhs: R): Self.Ret
 ```
 
-#### The `Unwrap` trait
-
-The `Unwrap` trait is used to overload `if val` declarations. It's defined like so:
-```
-trait Unwrap
-   type Inner
-   fun has_value(self: ^Self): bool
-   fun unwrap(self: Self): Inner
-```
-
 ### Calling functions from specific traits
 
 Sometimes, two functions from different traits can share the same name. In these cases the method can be qualified explicitly, as a member of the trait.
@@ -1609,7 +1581,7 @@ impl ExampleB for Example
    fun my_method(self)
       print("Called on ExampleB")
 
-val e = Example {}
+let e = Example {}
 # e.my_method()  # error: ambiguous call; resolves to more than one function
 ExampleA.my_method(e)  # called on ExampleA
 ExampleB.my_method(e)  # called on ExampleB
@@ -1632,13 +1604,13 @@ It might be hard to grasp the concept just by looking at these abstract words, s
 ```
 object Array2D[W, H, T]
 where
-   W: const Size,
-   H: const Size
+   W impl const Size and
+   H impl const Size
 
    var inner: Self.Inner
 
 impl[W, H, T] Array2D[W, H, T]
-where T: Dup
+where T impl Dup
    type Inner = Array[W * H, T]
 
    fun new(default_value: T): Self
@@ -1652,11 +1624,11 @@ impl[W, H, T] Array2D[W, H, T]
       position._0 + position._1 * W
 
    fun at(self, x, y: Size): ^auto Ret
-      val position = (x, y)
+      let position = (x, y)
       Self.bounds_check((position))
       .inner.at(Self.flat_index(position))
 
-var image = Array2D[10, 10, Uint8].new(0)
+let var image = Array2D[10, 10, Uint8].new(0)
 print(image.at(0, 0))  # 0
 image.at(5, 5) = 255
 ```
@@ -1680,14 +1652,15 @@ Normally, generic parameters can accept any type. For the sake of early type che
 To allow for calling functions on these symbols, the generic type has to be constrained using traits. Generic constraints are specified after the declaration, before pragmas, using the `where` keyword:
 ```
 fun add_two[T](x: T): T.Ret
-where T: Add[Int]
+where T impl Add[Int]
    x + 2
 ```
+The constraint is a compile-time evaluated expression. It is the only place where the special `impl` operator can be used.
 
 Calling a generic function or using a generic object with explicit types uses the same syntax as generic parameters.
 ```
 print(add_two[Int64](2))  # 4
-val c = MyContainer[Int] {}
+let c = MyContainer[Int] {}
 ```
 
 `impl` blocks can have generic parameters. Note that the parameters are specified after the `impl` keyword, as implementations don't define any symbols on their own.
@@ -1698,9 +1671,7 @@ impl[T] Seq[T]
 These generic parameters are used to provide generic _arguments_ to types. Constraints for generic parameters in `impl` blocks are inferred automatically, so it's only required to specify a master set of constraints wherever the implemented type is declared:
 ```
 object Vec2[T]
-where
-   T: Default
-
+where T impl Default
    var x, y: T
 
 # Here, the T is inferred to have the Default constraint.
@@ -1714,8 +1685,7 @@ impl[T] Vec2[T]
 Additional constraints can be specified after the `impl` block's implemented type. This can be used to only enable certain sets of functions when a generic parameter implements some trait:
 ```
 impl[T] Add[Self] for Vec2[T]
-where
-   T: Add[T]
+where T impl Add[T]
 
    type Result = Self
 
@@ -1726,6 +1696,90 @@ where
       }
 ```
 In the example above, `Vec2[T]` will only overload the `+` operator if `T` implements the `Add[T]` trait.
+
+# Patterns
+
+In places where variables are bound, such as `let`, `match`, `for`, etc., patterns are used to match on the structural (and numeric) properties of values.
+
+There exist two kinds of patterns:
+- Irrefutable - patterns that always match
+- Refutable - patterns that match in only some cases
+
+Some patterns are always irrefutable, some patterns are always refutable, and some patterns are irrefutable only if they are built out of other irrefutable patterns. This property is discussed per each type of pattern.
+
+The refutability of patterns decides on where the pattern may be used. Refer to the documentation of individual constructs using patterns for more details.
+
+## Wildcard
+
+```
+_
+```
+This pattern is simply written down as an underscore `_`. It matches all values and immediately discards them. Because it matches all values, it is irrefutable.
+
+## Variable
+
+```
+name
+var name
+```
+The variable pattern matches against any value and binds it to an optionally mutable (specified with `var`) named variable. Because it matches all values, it is irrefutable.
+
+## Literal
+
+```
+1
+true
+:my_atom
+"a string literal"
+```
+Literal patterns match against any literal except floats. The match succeeds if the value being matched is equal to the literal in the pattern. Because matching can fail, literal patterns are refutable.
+
+## Range
+
+```
+1..10
+1..<50
+'a'..'z'
+:a..:z
+```
+Range patterns match against literal ranges of values. The `..` or `..<` operators can be used. The matched literals have to be of an ordinal type (numbers, characters, and ordinal atom _subsets_, but not the `Atom` type). The match succeeds if the range contains the value being matched. Because the value can fall outside this range, matching can fail, so range patterns are refutable.
+
+## Value
+
+```
+val x
+val (stdin.read_line?)
+```
+
+It is possible to match against dynamically computed values by using the `val` pattern. This pattern behaves similarly to the literal pattern, except an arbitrary value is checked for equality. Because this check can fail, value patterns are irrefutable.
+
+## Tuple
+
+```
+(a, b, c)
+(1, _, 1..10)
+```
+
+Tuple patterns match against the fields of tuples. A tuple pattern succeeds if each of the individual fields' patterns succeeds. If all field patterns are irrefutable, the tuple pattern itself is irrefutable. Otherwise the pattern is refutable as one of the fields can fail to match.
+
+## Union variant
+
+```
+Nil
+Some(x)
+Shape.Circle(x, y, 10)
+```
+
+Union variant patterns are similar to tuple patterns, but they also check that the variant of a union is the one specified in the pattern. Because the union may not actually hold this variant, union variant patterns are always refutable.
+
+## Object
+
+```
+MyObject { x = 1, y = y }
+MyObject { y, _ }
+MyObject { x = 1, _ }
+```
+Object patterns match on individual object fields. The right hand side of each field's `=` contains a pattern that the field should be matched against. Omitting the `=` is equivalent to `field = field`, ie. binding a new immutable variable whose name is the same as the field's. As with tuples, an object pattern is only irrefutable if all of the fields' patterns are irrefutable. Otherwise it is refutable.
 
 # Modules
 
@@ -1836,7 +1890,8 @@ fun adding_abstraction(a, b: Int): Int
 # objects can be marked public
 pub object Adder
    # object fields can also be marked public
-   pub val increment: Int
+   # the `pub` marker sits _before_ `var`
+   pub increment: Int
 
 impl Adder
    # functions inside of `impl` can also marked public
@@ -1851,7 +1906,7 @@ Package: my_program, File: src/my_program.tsu
 ```
 import @adder
 
-val two = Adder.init(2)
+let two = Adder.init(2)
 print(two.add(2))  # 4
 ```
 
@@ -1914,7 +1969,7 @@ fun adding_abstraction(a, b: Int): Int
 ## An adder adds a constant increment to a provided value.
 pub object Adder
    ## The increment of the adder. This is the value added to other values, when `add` is called.
-   pub val increment: Int
+   pub increment: Int
 
 impl Adder
    ## Adds the increment the adder was initialized with to `to`.
@@ -2020,8 +2075,8 @@ tsuki exposes a set of integer types that correspond to platform-specific C type
 The `RawPtr` type is used for creating and manipulating unmanaged pointers to data. Though it looks like a normal type, it's actually a magic type implemented in the compiler itself. `RawPtr[T]` acts similarly to `^T`, and `RawPtrVar[T]` acts similar to `^var T`, but their lifetime is not managed by the compiler. They can be created freely by using their `to` functions, and they can be dereferenced just like regular pointers:
 
 ```
-var x = 1
-var p = RawPtr.to(^x)
+let var x = 1
+let var p = RawPtr.to(^x)
 print(p^)  # 1
 ```
 
@@ -2029,17 +2084,17 @@ print(p^)  # 1
 
 Reading from an unmanaged pointer that points to invalid memory (aka dangling pointer) is undefined behavior.
 ```
-var p: RawPtr[Int]
+let var p: RawPtr[Int]
 do
-   var a = 1
+   let var a = 1
    p = RawPtr.to(^a)
 # print(p^)  # undefined behavior, because `a` doesn't exist anymore!!!
 ```
 
 `RawPtrSlice[T]` can be used to create pointers to slices. Its `to` function accepts a slice whose elements the pointer should point to. Note that `RawPtrSlice` is not dereferenced using the usual `^` operator, but rather the index operator.
 ```
-var s = [1, 2, 3]
-var a = RawPtrSlice.to(s.slice(..))
+let var s = [1, 2, 3]
+let var a = RawPtrSlice.to(s.slice(..))
 print(a[1])  # 2
 ```
 `RawPtrSlice`s do not store the length alongside the pointer like slices do, so using them allows for unbounded access, which is undefined behavior.
@@ -2101,7 +2156,7 @@ int main(void)
 tsuki allows for defining objects that are compatible with the C ABI. For that, the `c_struct` pragma can be used.
 ```
 object Things :: c_struct
-   val a, b, c: Int
+   a, b, c: Int
 
 impl Things
    # C structs can also have associated and instance functions.

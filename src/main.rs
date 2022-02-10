@@ -5,6 +5,7 @@ use structopt::StructOpt;
 use tsuki_backend_llvm::{ExecutableFile, LlvmBackend, LlvmBackendConfig, OptimizationLevel};
 use tsuki_frontend::backend::Backend;
 use tsuki_frontend::common::{Errors, SourceFile};
+use tsuki_frontend::AnalyzeOptions;
 
 #[derive(StructOpt)]
 #[structopt(name = "tsuki")]
@@ -14,15 +15,19 @@ struct Options {
    cache_dir: Option<PathBuf>,
 
    /// The name of the package. This is used for controlling the object file's name.
-   #[structopt(short = "p", long, name = "name")]
+   #[structopt(short = "p", long)]
    package_name: String,
 
    /// The `src` directory of the package.
-   #[structopt(short = "r", long, name = "path")]
+   #[structopt(short = "r", long)]
    package_root: PathBuf,
 
+   /// The root directory of the standard library.
+   #[structopt(short = "s", long)]
+   std_path: PathBuf,
+
    /// The root source file. Must be located in the package root.
-   #[structopt(short = "m", long, name = "main file")]
+   #[structopt(short = "m", long)]
    main_file: PathBuf,
 
    /// Only check the code for validity, without compiling it.
@@ -85,6 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
    };
    let backend = LlvmBackend::new(LlvmBackendConfig {
       cache_dir: &options.cache_dir.unwrap_or(std::env::current_dir()?.join("bin")),
+      std_path: &options.std_path,
       package_name: &options.package_name,
       // TODO: Cross-compilation.
       target_triple: None,
@@ -106,7 +112,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
    if options.check {
       let _ = unwrap_errors(tsuki_frontend::analyze(
-         &source_file,
+         AnalyzeOptions {
+            file: &source_file,
+            std_path: options.std_path,
+         },
          &frontend_debug_options,
       ));
    } else {

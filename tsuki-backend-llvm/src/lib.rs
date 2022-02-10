@@ -21,8 +21,8 @@ use inkwell::targets::{
 };
 use inkwell::values::BasicValue;
 use thiserror::Error;
-use tsuki_frontend::backend;
 use tsuki_frontend::common::{self, Error, ErrorKind, Errors, SourceFile, Span};
+use tsuki_frontend::{backend, AnalyzeOptions};
 
 use codegen::CodeGen;
 
@@ -42,6 +42,7 @@ impl Default for DebugOptions {
 /// Struct representing the LLVM compilation backend and options passed to it.
 pub struct LlvmBackend {
    cache_dir: PathBuf,
+   std_path: PathBuf,
    executable_name: String,
    target_triple: TargetTriple,
    optimization_level: OptimizationLevel,
@@ -52,6 +53,7 @@ pub struct LlvmBackend {
 /// Options for creating an LLVM backend instance.
 pub struct LlvmBackendConfig<'c, 'e, 't> {
    pub cache_dir: &'c Path,
+   pub std_path: &'c Path,
    pub package_name: &'e str,
    pub target_triple: Option<&'t str>,
    pub optimization_level: OptimizationLevel,
@@ -64,6 +66,7 @@ impl LlvmBackend {
    pub fn new(config: LlvmBackendConfig) -> Self {
       Self {
          cache_dir: config.cache_dir.to_owned(),
+         std_path: config.std_path.to_owned(),
          executable_name: config.package_name.to_owned(),
          target_triple: match config.target_triple {
             Some(triple) => TargetTriple::create(triple),
@@ -94,7 +97,13 @@ impl backend::Backend for LlvmBackend {
 
    /// Compiles the given source file to an executable.
    fn compile(&self, root: SourceFile) -> Result<Self::Target, Errors> {
-      let ir = tsuki_frontend::analyze(&root, &self.frontend_debug_options)?;
+      let ir = tsuki_frontend::analyze(
+         AnalyzeOptions {
+            file: &root,
+            std_path: self.std_path.clone(),
+         },
+         &self.frontend_debug_options,
+      )?;
       let context = Context::create();
       let module = context.create_module(&root.module_name);
 
@@ -143,7 +152,7 @@ impl backend::Backend for LlvmBackend {
       state.finish_function(Some(i32_type.const_zero().as_basic_value_enum()));
 
       if self.backend_debug_options.dump_ir {
-         eprintln!(":: LLVM IR");
+         eprintln!("## LLVM IR");
          eprintln!("{:?}", state);
          eprintln!();
       }

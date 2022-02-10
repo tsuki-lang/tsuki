@@ -13,7 +13,7 @@ impl<'s> SemTypes<'s> {
    fn widen_integer(&mut self, ast: &mut Ast, node: NodeId, new_size: IntegerSize) -> TypeLogEntry {
       if ast.kind(node).is_integer() {
          // Shortcut path for literals.
-         let as_uint = ast.extra(node).unwrap_uint();
+         let as_uint = ast.extra(node).as_uint().unwrap();
          ast.convert(
             node,
             match new_size {
@@ -69,7 +69,7 @@ impl<'s> SemTypes<'s> {
    /// Behavior with literals is similar to `widen_integer`.
    fn widen_float(&mut self, ast: &mut Ast, node: NodeId, new_size: FloatSize) -> TypeLogEntry {
       if ast.kind(node).is_float() {
-         let as_float = ast.extra(node).unwrap_float();
+         let as_float = ast.extra(node).as_float().unwrap();
          ast.convert(
             node,
             match new_size {

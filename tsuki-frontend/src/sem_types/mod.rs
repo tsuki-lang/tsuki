@@ -6,6 +6,8 @@ mod functions;
 mod locations;
 mod lookups;
 mod operators;
+mod pragmas;
+mod types;
 
 use std::path::Path;
 
@@ -14,9 +16,9 @@ use smallvec::SmallVec;
 use crate::ast::{Ast, NodeId, NodeKind};
 use crate::common::{ErrorKind, Errors};
 use crate::functions::{register_intrinsics, FunctionId, Functions};
-use crate::scope::{ScopeId, ScopeStack, Scopes, Symbols};
+use crate::scope::{ScopeId, ScopeStack, Scopes, SymbolId, Symbols};
 use crate::sem::{SemCommon, SemPass};
-use crate::types::{BuiltinTypes, TypeId, TypeLog, TypeLogEntry, Types};
+use crate::types::{BuiltinTypes, TypeId, TypeInfo, TypeKind, TypeLog, TypeLogEntry, Types};
 
 pub(crate) struct SemTypes<'s> {
    common: &'s SemCommon<'s>,
@@ -33,7 +35,7 @@ pub(crate) struct SemTypes<'s> {
    module_scope: ScopeId,
    /// A stack of vectors of nodes to be sem'checked after the module's done being checked.
    ///
-   /// The scope ID is used to determine where the given node is placed. The scope of the node's
+   /// The node ID is used to determine where the given node is placed. The scope of the node's
    /// body is determined from the node's metadata.
    deferred: SmallVec<[Vec<(NodeId, NodeContext)>; 4]>,
 
@@ -164,6 +166,14 @@ impl<'s> SemTypes<'s> {
             self.scope_stack.pop();
          }
       }
+   }
+
+   /// Creates a new type that represents a declaration.
+   fn create_declaration_type(&mut self, symbol: SymbolId) -> TypeId {
+      self.types.create_type(TypeInfo {
+         name: &format!("declaration({})", symbol.id()),
+         kind: TypeKind::Declaration(symbol),
+      })
    }
 
    /// Annotates a literal with a concrete type.
@@ -302,6 +312,8 @@ impl<'s> SemTypes<'s> {
          // Declarations
          NodeKind::Val | NodeKind::Var => self.annotate_variable_declaration(ast, node).into(),
          NodeKind::Fun => self.annotate_function_declaration(ast, node).into(),
+         NodeKind::Type => self.annotate_type_alias(ast, node).into(),
+         NodeKind::Pub => self.annotate_pub(ast, node),
 
          // Other nodes are invalid (or not implemented yet).
          other => self.error(ast, node, ErrorKind::SemTypesInvalidAstNode(other)),

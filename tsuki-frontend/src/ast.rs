@@ -251,6 +251,20 @@ impl Ast {
       self.set_span(node, span);
    }
 
+   /// Unwraps a node from its container.
+   ///
+   /// The child node is expected to be stored in the `first` of the provided node.
+   pub fn unwrap(&mut self, node: NodeId) {
+      let child = self.first_handle(node);
+      self.convert_preserve(node, self.kind(child));
+      self.set_span(node, self.span(child).clone());
+      self.set_first(node, self.first(child));
+      self.set_second(node, self.second(child));
+      self.set_extra(node, self.extra(child).clone());
+      self.set_type_id(node, self.type_id(child));
+      self.set_scope(node, self.scope(child));
+   }
+
    /// Returns an iterator over all node handles in the AST.
    pub fn node_handles(&self) -> NodeHandles {
       NodeHandles {
@@ -267,9 +281,9 @@ impl Ast {
 macro_rules! walk_node_list_impl {
    ($ast:expr, $node:expr, $then:expr) => {
       if matches!($ast.extra($node), NodeData::NodeList(..)) {
-         let n = $ast.extra($node).unwrap_node_list().len();
+         let n = $ast.extra($node).as_node_list().unwrap().len();
          for i in 0..n {
-            $then($ast, i, $ast.extra($node).unwrap_node_list()[i]);
+            $then($ast, i, $ast.extra($node).as_node_list().unwrap()[i]);
          }
       }
    };
@@ -345,7 +359,6 @@ pub enum NodeKind {
    Error,
 
    // Literals
-   Nil,
    True,
    False,
    Integer,
@@ -434,6 +447,27 @@ pub enum NodeKind {
    // - first: the type of the parameters
    // - extra: Identifier nodes, the names of the parameters
    NamedParameters,
+   // Type alias declaration `type A = B`.
+   // - first: TypeName
+   // - second: the type to alias, optional
+   Type,
+   // The name of a declared type.
+   // - first: Identifier - the name, as brought into scope
+   // - extra: optional generic parameters
+   TypeName,
+   // A constrained type, as part of a `where` declaration or a `type` in a trait.
+   // - first: Identifier - the name
+   // - second: the optional constraint.
+   ConstrainedType,
+   Pub, // `pub` visibility declaration
+
+   // Modifiers
+   // ---------
+   // List of pragmas `:: a(x), b(y)`.
+   // - first: name or function signature or whatever the pragmas apply to
+   // - extra: Pragma - the pragmas
+   Pragmas,
+   Pragma, // a single pragma application `name(a, b, c)`
 
    // Control flow
    Pass, // `_` statement
@@ -542,35 +576,35 @@ pub enum NodeData {
 
 impl NodeData {
    /// Unwraps a node list, or panics if the data aren't a node list.
-   pub fn unwrap_node_list(&self) -> &[NodeId] {
+   pub fn as_node_list(&self) -> Option<&[NodeId]> {
       if let Self::NodeList(list) = self {
-         &list
+         Some(&list)
       } else {
-         panic!("unwrap_node_list called on node data that aren't a node list");
+         None
       }
    }
 
    /// Unwraps `Uint` or `Int` data to the largest possible unsigned integer.
-   pub fn unwrap_uint(&self) -> u64 {
+   pub fn as_uint(&self) -> Option<u64> {
       match self {
-         &Self::Uint8(x) => x as u64,
-         &Self::Uint16(x) => x as u64,
-         &Self::Uint32(x) => x as u64,
-         &Self::Uint64(x) => x,
-         &Self::Int8(x) => x as u64,
-         &Self::Int16(x) => x as u64,
-         &Self::Int32(x) => x as u64,
-         &Self::Int64(x) => x as u64,
-         _ => panic!("unwrap_uint called on node data that isn't a u?int"),
+         &Self::Uint8(x) => Some(x as u64),
+         &Self::Uint16(x) => Some(x as u64),
+         &Self::Uint32(x) => Some(x as u64),
+         &Self::Uint64(x) => Some(x),
+         &Self::Int8(x) => Some(x as u64),
+         &Self::Int16(x) => Some(x as u64),
+         &Self::Int32(x) => Some(x as u64),
+         &Self::Int64(x) => Some(x as u64),
+         _ => None,
       }
    }
 
    /// Unwraps `Float` data to the largest possible float.
-   pub fn unwrap_float(&self) -> f64 {
+   pub fn as_float(&self) -> Option<f64> {
       match self {
-         &Self::Float32(x) => x as f64,
-         &Self::Float64(x) => x,
-         _ => panic!("unwrap_float called on node data that isn't a float"),
+         &Self::Float32(x) => Some(x as f64),
+         &Self::Float64(x) => Some(x),
+         _ => None,
       }
    }
 }

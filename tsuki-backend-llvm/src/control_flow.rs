@@ -24,7 +24,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
       node: NodeId,
    ) -> BasicValueEnum<'c> {
       let mut tail = None;
-      for (index, &child) in ir.ast.extra(node).unwrap_node_list().iter().enumerate() {
+      for (index, &child) in ir.ast.extra(node).as_node_list().unwrap().iter().enumerate() {
          if ir.ast.is_last_child(node, index) {
             tail = Some(self.generate_expression(ir, child))
          } else {
@@ -83,7 +83,7 @@ impl<'src, 'c, 'pm> CodeGen<'src, 'c, 'pm> {
 
       // Generate code for each of the branches. The `br` instructions are added after the inner
       // code is generated, because all blocks have to be known beforehand.
-      let branch_nodes = ir.ast.extra(node).unwrap_node_list();
+      let branch_nodes = ir.ast.extra(node).as_node_list().unwrap();
       for (index, &branch) in branch_nodes.iter().enumerate() {
          let body_block = self.context.append_basic_block(
             self.function.value,

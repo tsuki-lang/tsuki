@@ -241,6 +241,18 @@ impl<'s> Parser<'s> {
       })
    }
 
+   /// Parses a type name (in a declaration).
+   ///
+   /// A type name can have generic arguments attached to it.
+   fn parse_type_name(&mut self) -> Result<NodeId, Error> {
+      let identifier = self.lexer.next()?;
+      let name = self.create_identifier(identifier);
+      let type_name = self.create_node_with_handle(NodeKind::TypeName, name);
+      self.ast.set_span(type_name, self.ast.span(name).clone());
+      // TODO: generic parameters
+      Ok(type_name)
+   }
+
    /*
     * Expressions
     */
@@ -248,7 +260,6 @@ impl<'s> Parser<'s> {
    /// Parses a literal token and returns the node corresponding to it.
    fn parse_literal(&mut self, token: Token) -> NodeId {
       let literal = match token.kind {
-         TokenKind::Nil => self.ast.create_node(NodeKind::Nil),
          TokenKind::True => self.ast.create_node(NodeKind::True),
          TokenKind::False => self.ast.create_node(NodeKind::False),
          TokenKind::Integer(r) => self.create_node_with_range(NodeKind::Integer, r),
@@ -294,7 +305,6 @@ impl<'s> Parser<'s> {
       let span = token.span.clone();
       Ok(match token.kind {
          // Literals
-         | TokenKind::Nil
          | TokenKind::True
          | TokenKind::False
          | TokenKind::Integer(..)
@@ -572,6 +582,10 @@ impl<'s> Parser<'s> {
       Ok(left)
    }
 
+   /*
+    * Statements
+    */
+
    /// Parses a pass (`_`) statement.
    fn parse_pass(&mut self) -> Result<NodeId, Error> {
       let token = self.lexer.next()?;
@@ -643,6 +657,49 @@ impl<'s> Parser<'s> {
       })
    }
 
+   /// Parses a pragma application.
+   fn parse_pragma(&mut self) -> Result<NodeId, Error> {
+      let identifier = self.lexer.next()?;
+      let name = self.create_identifier(identifier);
+      if let Some(left_paren) = self.expect_token(TokenKind::LeftParen, |token| {
+         ErrorKind::PragmaArgsExpected(token.kind)
+      })? {
+         let mut arguments = Vec::new();
+         self.parse_comma_separated(&mut arguments, &left_paren, TokenKind::RightParen, |p| {
+            p.parse_expression(0)
+         })?;
+         let pragma = self.create_node_with_handle(NodeKind::Call, name);
+         self.ast.set_span(
+            pragma,
+            Span::join(self.ast.span(name), &self.span_all_nodes(&arguments)),
+         );
+         self.ast.set_extra(pragma, NodeData::NodeList(arguments));
+         Ok(pragma)
+      } else {
+         Ok(self.ast.create_node(NodeKind::Error))
+      }
+   }
+
+   /// Attempts to parse pragmas, and if the `::` is present, wraps the given node in a `Pragmas`
+   /// node and stores all the pragmas in the new node's extra.
+   fn parse_pragmas(&mut self, node: NodeId) -> Result<NodeId, Error> {
+      if let Some(colons) = self.match_token(TokenKind::Colons)? {
+         self.ast.wrap(node, NodeKind::Pragmas);
+         let mut pragmas = Vec::new();
+         let first_pragma = self.parse_pragma()?;
+         pragmas.push(first_pragma);
+         while let Some(..) = self.match_token(TokenKind::Comma)? {
+            pragmas.push(self.parse_pragma()?);
+         }
+         self.ast.set_span(
+            node,
+            Span::join(&colons.span, &self.span_all_nodes(&pragmas)),
+         );
+         self.ast.set_extra(node, NodeData::NodeList(pragmas));
+      }
+      Ok(node)
+   }
+
    /// Parses a `val` or `var` declaration.
    fn parse_variable_declaration(&mut self) -> Result<NodeId, Error> {
       let var_token = self.lexer.next()?;
@@ -652,7 +709,7 @@ impl<'s> Parser<'s> {
          _ => unreachable!(),
       };
 
-      // TODO: Tuple destructuring, multiple assignment.
+      // TODO: Destructuring.
       // Similarly to a discarding assignment `val _ = x`, these should use a separate node kind for
       // the name node.
       let name_token = self.lexer.next()?;
@@ -742,6 +799,61 @@ impl<'s> Parser<'s> {
       Ok(fun)
    }
 
+   /// Parses a declaration for a type alias.
+   fn parse_type_alias_declaraction(&mut self) -> Result<NodeId, Error> {
+      let type_keyword = self.lexer.next()?;
+      let name = self.parse_type_name()?;
+
+      // TODO: constraints `: T`
+      // For now we'll just keep them empty.
+      let constraint = NodeId::null();
+      let constrained = self.create_node_with_handles(NodeKind::ConstrainedType, name, constraint);
+      self.ast.set_span(constrained, self.ast.span(name).clone());
+
+      // Optional pragmas. Note that `parse_pragmas` mutates the node passed to it, rather than
+      // creating a new one.
+      self.parse_pragmas(constrained)?;
+
+      // The `= B` RHS is optional and can be omitted if this is an associated type definition
+      // in a trait, or a declaration for a built-in type.
+      let aliased_type = if let TokenKind::Equal = self.lexer.peek()?.kind {
+         let _equal = self.lexer.next()?;
+         self.parse_type()?
+      } else {
+         NodeId::null()
+      };
+
+      let typ = self.create_node_with_handles(NodeKind::Type, constrained, aliased_type);
+      self.ast.set_span(
+         typ,
+         Span::join(
+            &type_keyword.span,
+            self.ast.span(if aliased_type != NodeId::null() {
+               aliased_type
+            } else {
+               constrained
+            }),
+         ),
+      );
+      Ok(typ)
+   }
+
+   /// Parses a `pub` symbol declaration.
+   fn parse_pub_declaration(&mut self) -> Result<NodeId, Error> {
+      let pub_token = self.lexer.next()?;
+      let next_token = self.lexer.peek()?;
+      let inner = match next_token.kind {
+         TokenKind::Fun | TokenKind::Type => self.parse_statement()?,
+         _ => {
+            let span = Span::join(&pub_token.span, &next_token.span);
+            self.error(ErrorKind::PubMustBeFollowedByDeclaration, span)
+         }
+      };
+      let node = self.create_node_with_handle(NodeKind::Pub, inner);
+      self.ast.set_span(node, Span::join(&pub_token.span, self.ast.span(inner)));
+      Ok(node)
+   }
+
    /// Parses a statement.
    fn parse_statement(&mut self) -> Result<NodeId, Error> {
       let token_kind = self.lexer.peek()?.kind.clone();
@@ -749,6 +861,8 @@ impl<'s> Parser<'s> {
          // Declarations
          TokenKind::Val | TokenKind::Var => self.parse_variable_declaration()?,
          TokenKind::Fun => self.parse_function_declaration()?,
+         TokenKind::Type => self.parse_type_alias_declaraction()?,
+         TokenKind::Pub => self.parse_pub_declaration()?,
 
          // Control flow
          TokenKind::Underscore => self.parse_pass()?,
